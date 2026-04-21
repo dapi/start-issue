@@ -4,9 +4,15 @@
 
 [Русская версия](README.ru.md)
 
-Start work on a GitHub issue from the terminal.
+Turn a GitHub issue into a dedicated branch, git worktree, and coding-agent session.
 
-`start-issue` fetches issue metadata with `gh`, creates a git worktree with a branch name based on the issue, optionally runs `init.sh`, renames the current zellij tab, and starts a configurable coding agent session.
+`start-issue` turns issue context into a repeatable workflow:
+
+1. issue -> branch
+2. branch -> worktree
+3. worktree -> agent session
+
+It fetches issue metadata with `gh`, creates a git worktree with a branch name based on the issue, optionally runs `init.sh`, renames the current zellij tab, and starts a configurable coding agent session.
 
 ## Install
 
@@ -201,6 +207,30 @@ The environment variable for the default worktree parent directory is `START_ISS
 
 CLI `--worktree-dir` has the highest priority. If neither is set, `start-issue` uses `~/worktrees`.
 
+## Workflow
+
+```mermaid
+flowchart TD
+    A["start-issue ISSUE [options]"] --> B["Resolve context<br/>repo, issue, base branch"]
+    B --> C["Load configuration<br/>agent, prompt, worktree dir"]
+    C --> D["Fetch GitHub issue metadata"]
+    D --> E["Plan branch and worktree path"]
+    E --> F{"--dry-run?"}
+
+    F -- yes --> G["Print planned actions<br/>and exit"]
+    F -- no --> H["Create or reuse git worktree"]
+
+    H --> I["Run init.sh if enabled"]
+    I --> J["Render agent prompt"]
+    J --> K{"Agent selected?"}
+
+    K -- yes --> L["Launch selected coding agent<br/>inside worktree"]
+    K -- no --> M["Print manual next steps"]
+
+    L --> N["Work on issue"]
+    M --> N
+```
+
 ## Requirements
 
 - `bash`
@@ -210,8 +240,6 @@ CLI `--worktree-dir` has the highest priority. If neither is set, `start-issue` 
 - selected agent CLI unless `--agent none` is used
 
 ## Specification
-
-The workflow diagram is in [docs/start-issue-workflow.md](docs/start-issue-workflow.md).
 
 The script specification is in [docs/specs/start-issue-spec.md](docs/specs/start-issue-spec.md).
 

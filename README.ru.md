@@ -4,9 +4,15 @@
 
 [English version](README.md)
 
-Начинайте работу над GitHub issue из терминала.
+Превращайте GitHub issue в отдельную ветку, git worktree и сессию coding agent.
 
-`start-issue` получает данные issue через `gh`, создает git worktree с именем ветки на основе issue, при необходимости запускает `init.sh`, переименовывает текущую вкладку zellij и запускает настраиваемую сессию coding agent.
+`start-issue` превращает контекст issue в повторяемый workflow:
+
+1. issue -> branch
+2. branch -> worktree
+3. worktree -> agent session
+
+Он получает данные issue через `gh`, создает git worktree с именем ветки на основе issue, при необходимости запускает `init.sh`, переименовывает текущую вкладку zellij и запускает настраиваемую сессию coding agent.
 
 ## Установка
 
@@ -201,6 +207,30 @@ Environment variable для default parent directory worktree: `START_ISSUE_WORK
 
 CLI `--worktree-dir` имеет самый высокий приоритет. Если ни CLI, ни environment variable не заданы, `start-issue` использует `~/worktrees`.
 
+## Процесс
+
+```mermaid
+flowchart TD
+    A["start-issue ISSUE [options]"] --> B["Определить контекст<br/>repo, issue, base branch"]
+    B --> C["Загрузить конфигурацию<br/>agent, prompt, worktree dir"]
+    C --> D["Получить metadata GitHub issue"]
+    D --> E["Спланировать branch<br/>и путь worktree"]
+    E --> F{"--dry-run?"}
+
+    F -- yes --> G["Напечатать план<br/>и выйти"]
+    F -- no --> H["Создать или переиспользовать<br/>git worktree"]
+
+    H --> I["Запустить init.sh<br/>если включено"]
+    I --> J["Сформировать prompt<br/>для agent"]
+    J --> K{"Agent выбран?"}
+
+    K -- yes --> L["Запустить выбранный coding agent<br/>внутри worktree"]
+    K -- no --> M["Напечатать ручные<br/>следующие шаги"]
+
+    L --> N["Работа над issue"]
+    M --> N
+```
+
 ## Требования
 
 - `bash`
@@ -210,8 +240,6 @@ CLI `--worktree-dir` имеет самый высокий приоритет. Е
 - CLI выбранного агента, если не используется `--agent none`
 
 ## Спецификация
-
-Workflow diagram находится в [docs/start-issue-workflow.md](docs/start-issue-workflow.md).
 
 Спецификация скрипта находится в [docs/specs/start-issue-spec.md](docs/specs/start-issue-spec.md).
 
