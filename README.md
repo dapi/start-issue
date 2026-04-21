@@ -12,7 +12,7 @@ Turn a GitHub issue into a dedicated branch, git worktree, and coding-agent sess
 2. branch -> worktree
 3. worktree -> agent session
 
-It fetches issue metadata with `gh`, creates a git worktree with a branch name based on the issue, optionally runs `init.sh`, renames the current zellij tab, and starts a configurable coding agent session.
+It fetches issue metadata with `gh`, creates a git worktree with a branch name based on the issue, optionally runs `init.sh`, optionally renames the current zellij tab, and starts a configurable coding agent session.
 
 ## Install
 
@@ -43,7 +43,8 @@ flowchart TD
     A["start-issue ISSUE [options]"] --> B["Resolve context<br/>repo, issue, base branch"]
     B --> C["Load configuration<br/>agent, prompt, worktree dir"]
     C --> D["Fetch GitHub issue metadata"]
-    D --> E["Plan branch and worktree path"]
+    D --> Z["Optional zellij tab rename<br/>with zellij-tab-status"]
+    Z --> E["Plan branch and worktree path"]
     E --> F{"--dry-run?"}
 
     F -- yes --> G["Print planned actions<br/>and exit"]
@@ -139,17 +140,27 @@ Prompt templates support:
 
 Unknown placeholders are left unchanged.
 
+## Zellij Support
+
+If [`zellij-tab-status`](https://github.com/dapi/zellij-tab-status) is available in `PATH`, `start-issue` renames the current Zellij tab to `#ISSUE_NUMBER` with `zellij-tab-status --set-name` after the issue is fetched.
+
+This step is optional. Missing `zellij-tab-status` is ignored, and a rename failure is reported as a warning without stopping the workflow.
+
+Optional dependency for Zellij support:
+
+- [`zellij-tab-status`](https://github.com/dapi/zellij-tab-status)
+
 ## Requirements
 
 - `bash`
 - `git`
 - `gh` CLI with authenticated GitHub session
 - `jq`
-- selected agent CLI unless `--agent none` is used
+- selected agent CLI unless `--agent none` or `--dry-run` is used
 
 ## Specification
 
-The script specification is in [docs/specs/start-issue-spec.md](docs/specs/start-issue-spec.md).
+The script specification is in [doc/spec.md](doc/spec.md).
 
 ## License
 

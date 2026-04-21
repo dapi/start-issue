@@ -30,7 +30,7 @@ jobs:
       - name: Legacy environment drift check
         run: |
           legacy_name="CLAUDE""_WORKTREE_DIR"
-          if grep -R --line-number "$legacy_name" scripts README.md docs test .github; then
+          if grep -R --line-number "$legacy_name" scripts README.md README.ru.md docs doc test .github; then
             echo "Legacy Claude worktree environment variable name must not be used."
             exit 1
           fi

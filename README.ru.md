@@ -12,7 +12,7 @@
 2. branch -> worktree
 3. worktree -> agent session
 
-Он получает данные issue через `gh`, создает git worktree с именем ветки на основе issue, при необходимости запускает `init.sh`, переименовывает текущую вкладку zellij и запускает настраиваемую сессию coding agent.
+Он получает данные issue через `gh`, создает git worktree с именем ветки на основе issue, при необходимости запускает `init.sh`, опционально переименовывает текущую вкладку zellij и запускает настраиваемую сессию coding agent.
 
 ## Установка
 
@@ -43,7 +43,8 @@ flowchart TD
     A["start-issue ISSUE [options]"] --> B["Определить контекст<br/>repo, issue, base branch"]
     B --> C["Загрузить конфигурацию<br/>agent, prompt, worktree dir"]
     C --> D["Получить metadata GitHub issue"]
-    D --> E["Спланировать branch<br/>и путь worktree"]
+    D --> Z["Опционально переименовать zellij tab<br/>через zellij-tab-status"]
+    Z --> E["Спланировать branch<br/>и путь worktree"]
     E --> F{"--dry-run?"}
 
     F -- yes --> G["Напечатать план<br/>и выйти"]
@@ -81,7 +82,7 @@ flowchart TD
 | `--version`, `-v` | Показать версию. |
 | `--help`, `-h` | Показать справку. |
 
-Подробные примеры по агентам находятся в [docs/agent-examples.md](docs/agent-examples.md).
+Подробные примеры по агентам находятся в [docs/agent-examples.ru.md](docs/agent-examples.ru.md).
 
 Связанные Claude Code workflows из marketplace:
 
@@ -139,17 +140,27 @@ Prompt templates поддерживают:
 
 Неизвестные placeholders остаются без изменений.
 
+## Поддержка Zellij
+
+Если [`zellij-tab-status`](https://github.com/dapi/zellij-tab-status) доступен в `PATH`, `start-issue` после получения issue переименовывает текущую вкладку Zellij в `#ISSUE_NUMBER` через `zellij-tab-status --set-name`.
+
+Этот шаг опциональный. Отсутствие `zellij-tab-status` игнорируется, а ошибка переименования выводится как предупреждение и не останавливает workflow.
+
+Опциональная зависимость для поддержки Zellij:
+
+- [`zellij-tab-status`](https://github.com/dapi/zellij-tab-status)
+
 ## Требования
 
 - `bash`
 - `git`
 - `gh` CLI с авторизованной GitHub session
 - `jq`
-- CLI выбранного агента, если не используется `--agent none`
+- CLI выбранного агента, если не используется `--agent none` или `--dry-run`
 
 ## Спецификация
 
-Спецификация скрипта находится в [docs/specs/start-issue-spec.md](docs/specs/start-issue-spec.md).
+Спецификация скрипта находится в [doc/spec.md](doc/spec.md).
 
 ## Лицензия
 

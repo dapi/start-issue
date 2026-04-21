@@ -4,7 +4,7 @@
 
 **Название**: `start-issue`
 **Тип**: Bash-скрипт
-**Назначение**: автоматизировать начало работы над GitHub issue: получить issue через `gh`, создать git worktree, при необходимости запустить `init.sh`, переименовать zellij tab и запустить выбранный coding agent.
+**Назначение**: автоматизировать начало работы над GitHub issue: получить issue через `gh`, опционально переименовать zellij tab через `zellij-tab-status`, создать git worktree, при необходимости запустить `init.sh` и запустить выбранный coding agent.
 
 ## Поддерживаемые агенты
 
@@ -146,7 +146,21 @@ gh api "repos/{REPO}/issues/{ISSUE_NUMBER}"
 - labels
 - issue URL
 
-### Фаза 3: Имя ветки
+### Фаза 3: Zellij
+
+После успешного получения issue скрипт проверяет наличие `zellij-tab-status` в `PATH`.
+
+Если `zellij-tab-status` установлен и режим не `--dry-run`, выполняется:
+
+```bash
+zellij-tab-status --set-name "#{ISSUE_NUMBER}"
+```
+
+Если `zellij-tab-status` отсутствует, это не ошибка. Если команда переименования завершилась с ошибкой, скрипт печатает warning и продолжает workflow.
+
+В режиме `--dry-run` скрипт печатает, был бы выполнен rename или шаг был бы пропущен из-за отсутствия `zellij-tab-status`.
+
+### Фаза 4: Имя ветки
 
 По умолчанию используется быстрая bash-эвристика.
 
@@ -170,7 +184,7 @@ gh api "repos/{REPO}/issues/{ISSUE_NUMBER}"
 
 `--ai` пытается сгенерировать имя ветки через выбранный agent в non-interactive mode и fallback-ится на bash-эвристику при ошибке или невалидном формате.
 
-### Фаза 4: Создание worktree
+### Фаза 5: Создание worktree
 
 1. Определить путь:
 
@@ -195,7 +209,7 @@ git worktree add -b {BRANCH_NAME} {WORKTREE_PATH} origin/{BASE_BRANCH}
 
 Если `origin/{BASE_BRANCH}` недоступен, используется `{BASE_BRANCH}`.
 
-### Фаза 5: Инициализация окружения
+### Фаза 6: Инициализация окружения
 
 Если `{WORKTREE_PATH}/init.sh` существует и не передан `--no-init`, выполнить:
 
@@ -205,16 +219,6 @@ bash ./init.sh
 ```
 
 Ненулевой exit code `init.sh` считается предупреждением, а не критической ошибкой.
-
-### Фаза 6: Zellij
-
-После успешного получения issue скрипт пытается выполнить соседний helper:
-
-```bash
-zellij-rename-tab-to-issue-number "{ISSUE_NUMBER}"
-```
-
-Если helper отсутствует, это не ошибка.
 
 ### Фаза 7: Запуск агента
 
@@ -251,6 +255,7 @@ none:
 - worktree directory и источник
 - выбранный prompt source
 - длину rendered prompt
+- planned/skip информацию для optional zellij tab rename
 - команду запуска agent, которая была бы выполнена
 
 ## Обработка ошибок
@@ -265,7 +270,7 @@ none:
 | `jq` отсутствует | `jq not found. Please install jq.` |
 | Issue не найден | `Issue #{number} not found in {owner}/{repo}` |
 | Agent неизвестен | `Unknown agent: {agent}` |
-| Agent CLI отсутствует | `{agent} CLI not found. Install it or use --agent none.` |
+| Agent CLI отсутствует вне `--dry-run` | `{agent} CLI not found. Install it or use --agent none.` |
 | Prompt file отсутствует | `Prompt file not found: {path}` |
 | Одновременно заданы inline и file prompt | `Use either ... not both.` |
 | Worktree создать не удалось | `Failed to create worktree` |
@@ -277,7 +282,8 @@ none:
 | `init.sh` отсутствует | Пропустить initialization |
 | `init.sh` вернул ненулевой код | Напечатать warning и продолжить |
 | AI branch naming не сработал | Использовать fast fallback |
-| zellij helper отсутствует | Пропустить rename |
+| `zellij-tab-status` отсутствует | Пропустить rename |
+| `zellij-tab-status --set-name` вернул ненулевой код | Напечатать warning и продолжить |
 
 ## Примеры использования
 
@@ -306,9 +312,9 @@ START_ISSUE_WORKTREE_DIR=~/projects/worktrees start-issue 123
 
 Опциональные:
 
-- `claude`, `codex`, `kimi`, `pi` - нужен только выбранный agent
+- `claude`, `codex`, `kimi`, `pi` - нужен только выбранный agent, если не используется `--dry-run`
 - `init.sh` в корне worktree
-- `zellij-rename-tab-to-issue-number` рядом со скриптом
+- `zellij-tab-status` в `PATH` для поддержки переименования вкладки Zellij
 
 ## Критерии приемки
 
@@ -322,3 +328,4 @@ START_ISSUE_WORKTREE_DIR=~/projects/worktrees start-issue 123
 - [x] Claude-specific aliases сохранены, help text описывает agent-neutral поведение.
 - [x] `--dry-run` печатает selected agent, prompt source и launch command.
 - [x] `START_ISSUE_WORKTREE_DIR` является env для worktree directory.
+- [x] Если `zellij-tab-status` установлен, `start-issue` опционально переименовывает вкладку Zellij.

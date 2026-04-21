@@ -45,6 +45,19 @@ assert_output_contains() {
   [[ "$output" == *"$1"* ]]
 }
 
+install_fake_zellij_tab_status() {
+  ZELLIJ_FAKE_BIN="$TEST_TMPDIR/zellij-bin"
+  mkdir -p "$ZELLIJ_FAKE_BIN"
+  {
+    printf "%s\n" "#!/usr/bin/env bash"
+    printf "%s\n" "set -euo pipefail"
+    printf "%s\n" "printf '%s\\n' \"\$*\" > \"\${START_ISSUE_ZELLIJ_LOG:?}\""
+  } > "$ZELLIJ_FAKE_BIN/zellij-tab-status"
+  chmod +x "$ZELLIJ_FAKE_BIN/zellij-tab-status"
+  export PATH="$ZELLIJ_FAKE_BIN:$PATH"
+  export START_ISSUE_ZELLIJ_LOG="$TEST_TMPDIR/zellij-tab-status.log"
+}
+
 @test "default agent is claude and SSH origin remote is parsed" {
   run_start_issue 1 --dry-run --no-init
 
@@ -116,6 +129,15 @@ assert_output_contains() {
   assert_output_contains "Selected agent: none (CLI)"
   assert_output_contains "To start working:"
   assert_output_contains "codex --cd $HOME/worktrees/feature/issue-1-add-login-button"
+}
+
+@test "zellij-tab-status dry-run rename is shown when installed" {
+  install_fake_zellij_tab_status
+
+  run_start_issue 1 --agent none --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Would run: zellij-tab-status --set-name \\#1"
 }
 
 @test "worktree directory priority uses environment and CLI override" {

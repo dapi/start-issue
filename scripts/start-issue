@@ -716,17 +716,26 @@ run_init_script() {
 # ============================================================================
 
 rename_zellij_tab() {
-    local script_dir
-    script_dir="$(cd "$(dirname "$0")" && pwd)"
+    local tab_name="#$ISSUE_NUMBER"
 
-    log_info "📑 Renaming zellij tab..."
     if [[ "$DRY_RUN" == "true" ]]; then
-        echo "   [DRY-RUN] Would run: zellij-rename-tab-to-issue-number \"$ISSUE_NUMBER\""
+        if command -v zellij-tab-status &> /dev/null; then
+            echo "   [DRY-RUN] Would run: zellij-tab-status --set-name $(shell_join "$tab_name")"
+        else
+            echo "   [DRY-RUN] Would skip zellij tab rename: zellij-tab-status not found"
+        fi
         return
     fi
-    if [[ -x "$script_dir/zellij-rename-tab-to-issue-number" ]] && \
-        "$script_dir/zellij-rename-tab-to-issue-number" "$ISSUE_NUMBER"; then
+
+    if ! command -v zellij-tab-status &> /dev/null; then
+        return
+    fi
+
+    log_info "📑 Renaming zellij tab..."
+    if zellij-tab-status --set-name "$tab_name" &> /dev/null; then
         log_success "   ✅ Tab renamed to #$ISSUE_NUMBER"
+    else
+        log_warn "Could not rename zellij tab with zellij-tab-status"
     fi
 }
 
