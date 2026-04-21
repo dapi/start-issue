@@ -92,7 +92,7 @@ Use `--dry-run --no-init` as the default test mode. Add a small number of non-dr
 - Script passes `bash -n`.
 - Script passes `shellcheck`.
 - Repository has no trailing whitespace via `git diff --check`.
-- removed legacy Claude-specific worktree environment names do not appear in `scripts/`, `README.md`, `docs/`, or `github-workflow/`.
+- removed legacy Claude-specific worktree environment names do not appear in `scripts/`, `README.md`, or `docs/`.
 
 ### Issue and Repository Parsing
 
