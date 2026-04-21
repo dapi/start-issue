@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# start-issue - Start working on a GitHub issue with git worktree and Claude Code
+# start-issue - Start working on a GitHub issue with git worktree and an agent
 #
 # Usage: start-issue <issue-url-or-number> [options]
 #
@@ -8,6 +8,8 @@
 #   --repo, -r <owner/repo>    Repository (default: from git remote)
 #   --base, -b <branch>        Base branch (default: main or master)
 #   --worktree-dir, -w <dir>   Worktree directory (default: ~/worktrees)
+#   --agent <name>             Agent to launch: claude, codex, kimi, pi, none
+#   --no-agent                 Only prepare the worktree, do not launch an agent
 #   --no-init                  Skip init.sh execution
 #   --dry-run                  Show what would be done without executing
 #   --help, -h                 Show this help
@@ -15,7 +17,7 @@
 
 set -euo pipefail
 
-VERSION="1.8.0"
+VERSION="1.9.0"
 
 # Colors
 RED='\033[0;31m'
@@ -25,16 +27,45 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Defaults
-WORKTREE_DIR="${CLAUDE_WORKTREE_DIR:-$HOME/worktrees}"
+DEFAULT_WORKTREE_DIR="$HOME/worktrees"
+WORKTREE_DIR_SOURCE="built-in default"
+if [[ -n "${START_ISSUE_WORKTREE_DIR:-}" ]]; then
+    WORKTREE_DIR="$START_ISSUE_WORKTREE_DIR"
+    WORKTREE_DIR_SOURCE="START_ISSUE_WORKTREE_DIR"
+else
+    WORKTREE_DIR="$DEFAULT_WORKTREE_DIR"
+fi
+
 BASE_BRANCH=""
 REPO=""
 NO_INIT=false
-NO_CLAUDE=false
 DRY_RUN=false
 FAST_MODE=true
 FLAT_WORKTREE=false
 INITIAL_COMMAND=""
 ISSUE_INPUT=""
+PROJECT_ROOT=""
+
+AGENT=""
+AGENT_CLI=""
+AGENT_SOURCE=""
+PROMPT_TEMPLATE=""
+PROMPT_SOURCE=""
+PROMPT_FILE_CLI=""
+PROMPT_INLINE_CLI=""
+AGENT_PROMPT=""
+
+ISSUE_NUMBER=""
+ISSUE_JSON=""
+ISSUE_TITLE=""
+ISSUE_BODY=""
+ISSUE_LABELS=""
+ISSUE_URL=""
+BRANCH_NAME=""
+WORKTREE_PATH=""
+
+LAUNCH_CWD=""
+LAUNCH_CMD=()
 
 # ============================================================================
 # Helper functions
@@ -65,11 +96,48 @@ show_version() {
     echo "start-issue v$VERSION"
 }
 
+shell_join() {
+    local out=""
+    local quoted
+    local arg
+
+    for arg in "$@"; do
+        printf -v quoted "%q" "$arg"
+        if [[ -n "$out" ]]; then
+            out+=" "
+        fi
+        out+="$quoted"
+    done
+
+    printf "%s" "$out"
+}
+
+trim() {
+    local value="$1"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf "%s" "$value"
+}
+
+read_first_config_value() {
+    local file="$1"
+    awk '
+        {
+            sub(/#.*/, "")
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+        }
+        NF {
+            print
+            exit
+        }
+    ' "$file"
+}
+
 show_help() {
     show_version
     cat << 'EOF'
 
-Start working on a GitHub issue with git worktree and Claude Code
+Start working on a GitHub issue with git worktree and a configurable agent
 
 Usage: start-issue <issue-url-or-number> [options]
 
@@ -80,32 +148,58 @@ Arguments:
 Options:
   --repo, -r <owner/repo>    Repository (default: detected from git remote)
   --base, -b <branch>        Base branch (default: main or master)
-  --worktree-dir, -w <dir>   Directory for worktrees (default: CLAUDE_WORKTREE_DIR or ~/.worktrees)
+  --worktree-dir, -w <dir>   Directory for worktrees
+                             Default: START_ISSUE_WORKTREE_DIR or ~/worktrees
   --flat                     Use flat worktree structure (replace / with - in path)
+  --agent <name>             Agent to launch: claude, codex, kimi, pi, none
+  --no-agent                 Only create worktree, do not start an agent session
+  --no-claude                Compatibility alias for --no-agent
+  --prompt <text>            Prompt template for the launched agent
+  --prompt-file <path>       Prompt template file for the launched agent
   --no-init                  Skip init.sh execution
-  --no-claude                Only create worktree, don't start Claude session
-  --command, -c <cmd>        Custom initial command for Claude (default: /task-router:route-task)
-  --ai                       Use Claude AI for branch name (default: fast bash heuristics)
+  --command, -c <cmd>        Compatibility: initial command for Claude default launch
+  --ai                       Use the selected agent for branch name generation
+                             Default: fast bash heuristics
   --dry-run                  Show what would be done without executing
   --version, -v              Show version
   --help, -h                 Show this help
+
+Agent selection precedence:
+  CLI --agent / --no-agent
+  .start-issue/agent in the git root
+  ~/.config/start-issue/agent
+  START_ISSUE_AGENT
+  built-in default: claude
+
+Prompt template precedence:
+  CLI --prompt-file / --prompt
+  .start-issue/prompt.md in the git root
+  ~/.config/start-issue/prompt.md
+  START_ISSUE_PROMPT_FILE / START_ISSUE_PROMPT
+  built-in default
+
+Prompt variables:
+  {ISSUE_URL}, {ISSUE_NUMBER}, {ISSUE_TITLE}, {ISSUE_BODY}, {ISSUE_LABELS},
+  {REPO}, {BRANCH_NAME}, {WORKTREE_PATH}, {BASE_BRANCH}
 
 Examples:
   start-issue 123
   start-issue https://github.com/owner/repo/issues/123
   start-issue 123 --repo owner/repo --base develop
-  start-issue 123 --no-claude              # Only create worktree
-  start-issue 123 --command "/debug"       # Custom Claude command
-  start-issue 123 --flat                   # Flat worktree path
+  start-issue 123 --agent codex
+  start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
+  start-issue 123 --no-agent              # Only create worktree
+  start-issue 123 --command "/debug"      # Legacy Claude command
+  start-issue 123 --flat                  # Flat worktree path
   start-issue 123 --dry-run
 EOF
 }
 
 # ============================================================================
-# Validation functions
+# Validation and project functions
 # ============================================================================
 
-check_dependencies() {
+check_core_dependencies() {
     if ! command -v git &> /dev/null; then
         die "git not found. Please install git."
     fi
@@ -118,17 +212,8 @@ check_dependencies() {
         die "gh not authenticated. Run: gh auth login"
     fi
 
-    if ! command -v claude &> /dev/null; then
-        die "claude CLI not found. Please install Claude Code."
-    fi
-
     if ! command -v jq &> /dev/null; then
         die "jq not found. Please install jq."
-    fi
-
-    # Show worktree configuration
-    if [[ -n "${CLAUDE_WORKTREE_DIR:-}" ]]; then
-        log_info "Worktree directory: $WORKTREE_DIR (from CLAUDE_WORKTREE_DIR)"
     fi
 }
 
@@ -136,6 +221,158 @@ check_git_repo() {
     if ! git rev-parse --git-dir &> /dev/null; then
         die "Not in a git repository"
     fi
+}
+
+detect_project_root() {
+    PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+}
+
+check_selected_agent_dependency() {
+    if [[ "$AGENT" == "none" || "$DRY_RUN" == "true" ]]; then
+        return
+    fi
+
+    if ! command -v "$AGENT" &> /dev/null; then
+        die "$AGENT CLI not found. Install it or use --agent none."
+    fi
+}
+
+validate_agent() {
+    case "$AGENT" in
+        claude|codex|kimi|pi|none)
+            ;;
+        *)
+            die "Unknown agent: $AGENT. Valid agents: claude, codex, kimi, pi, none."
+            ;;
+    esac
+}
+
+# ============================================================================
+# Config resolution
+# ============================================================================
+
+resolve_agent() {
+    local project_agent_file="$PROJECT_ROOT/.start-issue/agent"
+    local user_agent_file="$HOME/.config/start-issue/agent"
+
+    if [[ -n "$AGENT_CLI" ]]; then
+        AGENT="$AGENT_CLI"
+        AGENT_SOURCE="CLI"
+    elif [[ -f "$project_agent_file" ]]; then
+        AGENT=$(read_first_config_value "$project_agent_file")
+        AGENT_SOURCE="$project_agent_file"
+    elif [[ -f "$user_agent_file" ]]; then
+        AGENT=$(read_first_config_value "$user_agent_file")
+        AGENT_SOURCE="$user_agent_file"
+    elif [[ -n "${START_ISSUE_AGENT:-}" ]]; then
+        AGENT=$(trim "$START_ISSUE_AGENT")
+        AGENT_SOURCE="START_ISSUE_AGENT"
+    else
+        AGENT="claude"
+        AGENT_SOURCE="built-in default"
+    fi
+
+    if [[ -z "$AGENT" ]]; then
+        die "Agent config is empty. Valid agents: claude, codex, kimi, pi, none."
+    fi
+
+    validate_agent
+}
+
+default_portable_prompt_template() {
+    cat << 'EOF'
+Implement GitHub issue {ISSUE_URL} in this worktree.
+
+Context:
+- Repo: {REPO}
+- Issue: #{ISSUE_NUMBER}
+- Title: {ISSUE_TITLE}
+- Branch: {BRANCH_NAME}
+- Worktree: {WORKTREE_PATH}
+
+Start by reading the issue with gh if needed. Follow repository instructions. Keep changes scoped. Run relevant tests or checks. Summarize changed files and verification before finishing.
+EOF
+}
+
+default_claude_prompt_template() {
+    if [[ -n "$INITIAL_COMMAND" ]]; then
+        printf "%s {ISSUE_URL}" "$INITIAL_COMMAND"
+    else
+        printf "/task-router:route-task {ISSUE_URL}"
+    fi
+}
+
+read_prompt_file() {
+    local path="$1"
+
+    if [[ ! -f "$path" ]]; then
+        die "Prompt file not found: $path"
+    fi
+
+    if [[ ! -r "$path" ]]; then
+        die "Prompt file is not readable: $path"
+    fi
+
+    PROMPT_TEMPLATE=$(< "$path")
+}
+
+resolve_prompt_template() {
+    local project_prompt_file="$PROJECT_ROOT/.start-issue/prompt.md"
+    local user_prompt_file="$HOME/.config/start-issue/prompt.md"
+
+    if [[ -n "$PROMPT_FILE_CLI" && -n "$PROMPT_INLINE_CLI" ]]; then
+        die "Use either --prompt-file or --prompt, not both."
+    fi
+
+    if [[ -n "$PROMPT_FILE_CLI" ]]; then
+        read_prompt_file "$PROMPT_FILE_CLI"
+        PROMPT_SOURCE="CLI --prompt-file: $PROMPT_FILE_CLI"
+    elif [[ -n "$PROMPT_INLINE_CLI" ]]; then
+        PROMPT_TEMPLATE="$PROMPT_INLINE_CLI"
+        PROMPT_SOURCE="CLI --prompt"
+    elif [[ -f "$project_prompt_file" ]]; then
+        read_prompt_file "$project_prompt_file"
+        PROMPT_SOURCE="$project_prompt_file"
+    elif [[ -f "$user_prompt_file" ]]; then
+        read_prompt_file "$user_prompt_file"
+        PROMPT_SOURCE="$user_prompt_file"
+    elif [[ -n "${START_ISSUE_PROMPT_FILE:-}" || -n "${START_ISSUE_PROMPT:-}" ]]; then
+        if [[ -n "${START_ISSUE_PROMPT_FILE:-}" && -n "${START_ISSUE_PROMPT:-}" ]]; then
+            die "Use either START_ISSUE_PROMPT_FILE or START_ISSUE_PROMPT, not both."
+        fi
+
+        if [[ -n "${START_ISSUE_PROMPT_FILE:-}" ]]; then
+            read_prompt_file "$START_ISSUE_PROMPT_FILE"
+            PROMPT_SOURCE="START_ISSUE_PROMPT_FILE: $START_ISSUE_PROMPT_FILE"
+        else
+            PROMPT_TEMPLATE="$START_ISSUE_PROMPT"
+            PROMPT_SOURCE="START_ISSUE_PROMPT"
+        fi
+    else
+        if [[ "$AGENT" == "claude" ]]; then
+            PROMPT_TEMPLATE=$(default_claude_prompt_template)
+            PROMPT_SOURCE="built-in Claude command"
+        else
+            PROMPT_TEMPLATE=$(default_portable_prompt_template)
+            PROMPT_SOURCE="built-in portable prompt"
+        fi
+    fi
+}
+
+render_prompt_template() {
+    local rendered="$PROMPT_TEMPLATE"
+
+    rendered="${rendered//\{ISSUE_URL\}/$ISSUE_URL}"
+    rendered="${rendered//\{ISSUE_NUMBER\}/$ISSUE_NUMBER}"
+    rendered="${rendered//\{ISSUE_TITLE\}/$ISSUE_TITLE}"
+    rendered="${rendered//\{ISSUE_BODY\}/$ISSUE_BODY}"
+    rendered="${rendered//\{ISSUE_LABELS\}/$ISSUE_LABELS}"
+    rendered="${rendered//\{REPO\}/$REPO}"
+    rendered="${rendered//\{BRANCH_NAME\}/$BRANCH_NAME}"
+    rendered="${rendered//\{WORKTREE_PATH\}/$WORKTREE_PATH}"
+    rendered="${rendered//\{BASE_BRANCH\}/$BASE_BRANCH}"
+
+    AGENT_PROMPT="$rendered"
 }
 
 # ============================================================================
@@ -170,11 +407,13 @@ detect_repo_from_remote() {
     fi
 
     # Parse SSH format: git@github.com:owner/repo.git
-    if [[ "$remote_url" =~ git@github\.com:([^/]+)/(.+?)(\.git)?$ ]]; then
-        REPO="${BASH_REMATCH[1]}/${BASH_REMATCH[2]%.git}"
+    if [[ "$remote_url" =~ git@github\.com:([^/]+)/(.+)$ ]]; then
+        REPO="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+        REPO="${REPO%.git}"
     # Parse HTTPS format: https://github.com/owner/repo.git
-    elif [[ "$remote_url" =~ https://github\.com/([^/]+)/(.+?)(\.git)?$ ]]; then
-        REPO="${BASH_REMATCH[1]}/${BASH_REMATCH[2]%.git}"
+    elif [[ "$remote_url" =~ https://github\.com/([^/]+)/(.+)$ ]]; then
+        REPO="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+        REPO="${REPO%.git}"
     else
         die "Cannot parse repository from remote URL: $remote_url. Use --repo flag."
     fi
@@ -219,66 +458,108 @@ fetch_issue() {
     fi
 }
 
+generate_fast_branch_name() {
+    # Fast mode: bash heuristics
+    local branch_type="feature"
+
+    # Determine type from labels (order matters - more specific first)
+    if [[ "$ISSUE_LABELS" =~ (hotfix|critical|urgent) ]]; then
+        branch_type="hotfix"
+    elif [[ "$ISSUE_LABELS" =~ (bug|fix|bugfix|error) ]]; then
+        branch_type="fix"
+    elif [[ "$ISSUE_LABELS" =~ (docs|documentation) ]]; then
+        branch_type="docs"
+    elif [[ "$ISSUE_LABELS" =~ (refactor|tech-debt|cleanup|technical) ]]; then
+        branch_type="refactor"
+    elif [[ "$ISSUE_LABELS" =~ (test|testing|tests) ]]; then
+        branch_type="test"
+    elif [[ "$ISSUE_LABELS" =~ (chore|ci|build|infra) ]]; then
+        branch_type="chore"
+    fi
+    # enhancement, feature, improvement -> default "feature"
+
+    # Generate short name from title
+    local short_name
+    short_name=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | \
+        sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-40)
+
+    BRANCH_NAME="$branch_type/issue-$ISSUE_NUMBER-$short_name"
+}
+
+generate_ai_branch_name() {
+    local prompt="Git branch name for issue #$ISSUE_NUMBER: \"$ISSUE_TITLE\" (labels: $ISSUE_LABELS).
+Format: {type}/issue-$ISSUE_NUMBER-{kebab-case-name}
+Types: bug/fix -> fix, enhancement -> feature, hotfix -> hotfix, docs -> docs, refactor -> refactor, test -> test, chore -> chore, default -> feature.
+Reply with ONLY the branch name."
+
+    if [[ "$AGENT" == "none" ]]; then
+        return 1
+    fi
+
+    if ! command -v "$AGENT" &> /dev/null; then
+        return 1
+    fi
+
+    local output=""
+    case "$AGENT" in
+        claude)
+            output=$(claude --print --model haiku --no-session-persistence \
+                --disable-slash-commands "$prompt" 2>/dev/null) || return 1
+            ;;
+        codex)
+            output=$(codex exec --cd "$PROJECT_ROOT" --sandbox read-only \
+                --skip-git-repo-check "$prompt" 2>/dev/null | tail -n 1) || return 1
+            ;;
+        kimi)
+            output=$(kimi --work-dir "$PROJECT_ROOT" --quiet -p "$prompt" 2>/dev/null) || return 1
+            ;;
+        pi)
+            output=$(pi --print --no-tools --no-session "$prompt" 2>/dev/null | tail -n 1) || return 1
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+
+    # Clean up the response (remove whitespace, quotes, backticks, and prose fences).
+    BRANCH_NAME=$(printf "%s" "$output" | tr -d '`"' | awk 'NF { last=$0 } END { print last }' | xargs)
+
+    [[ -n "$BRANCH_NAME" ]]
+}
+
+validate_branch_name_or_fallback() {
+    local elapsed="$1"
+
+    if [[ "$BRANCH_NAME" =~ ^(feature|fix|hotfix|refactor|docs|test|chore)/issue-[0-9]+-[a-z0-9-]+$ ]]; then
+        log_success "   Branch: $BRANCH_NAME (${elapsed}s, ai:$AGENT)"
+        return
+    fi
+
+    log_warn "Generated branch name doesn't match expected format: $BRANCH_NAME"
+    generate_fast_branch_name
+    log_info "   Using fallback: $BRANCH_NAME (${elapsed}s)"
+}
+
 generate_branch_name() {
     log_info "🧠 Generating branch name..."
 
     local start_time=$SECONDS
 
     if [[ "$FAST_MODE" == "true" ]]; then
-        # Fast mode: bash heuristics
-        local branch_type="feature"
-
-        # Determine type from labels (order matters - more specific first)
-        if [[ "$ISSUE_LABELS" =~ (hotfix|critical|urgent) ]]; then
-            branch_type="hotfix"
-        elif [[ "$ISSUE_LABELS" =~ (bug|fix|bugfix|error) ]]; then
-            branch_type="fix"
-        elif [[ "$ISSUE_LABELS" =~ (docs|documentation) ]]; then
-            branch_type="docs"
-        elif [[ "$ISSUE_LABELS" =~ (refactor|tech-debt|cleanup|technical) ]]; then
-            branch_type="refactor"
-        elif [[ "$ISSUE_LABELS" =~ (test|testing|tests) ]]; then
-            branch_type="test"
-        elif [[ "$ISSUE_LABELS" =~ (chore|ci|build|infra) ]]; then
-            branch_type="chore"
-        fi
-        # enhancement, feature, improvement → default "feature"
-
-        # Generate short name from title
-        local short_name
-        short_name=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | \
-            sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-40)
-
-        BRANCH_NAME="$branch_type/issue-$ISSUE_NUMBER-$short_name"
+        generate_fast_branch_name
         local elapsed=$((SECONDS - start_time))
         log_success "   Branch: $BRANCH_NAME (${elapsed}s, fast)"
-    else
-        # Claude mode: AI-generated name
-        local prompt="Git branch name for issue #$ISSUE_NUMBER: \"$ISSUE_TITLE\" (labels: $ISSUE_LABELS).
-Format: {type}/issue-$ISSUE_NUMBER-{kebab-case-name}
-Types: bug/fix→fix, enhancement→feature, hotfix→hotfix, docs→docs, default→feature.
-Reply with ONLY the branch name."
+        return
+    fi
 
-        # Disable skills for faster startup
-        BRANCH_NAME=$(claude --print --model haiku --no-session-persistence \
-            --disable-slash-commands "$prompt" 2>/dev/null) || \
-            die "Failed to generate branch name with Claude"
+    if generate_ai_branch_name; then
         local elapsed=$((SECONDS - start_time))
-
-        # Clean up the response (remove any whitespace, quotes, backticks)
-        BRANCH_NAME=$(echo "$BRANCH_NAME" | tr -d '`"' | xargs)
-
-        # Validate branch name format
-        if [[ ! "$BRANCH_NAME" =~ ^(feature|fix|hotfix|refactor|docs)/issue-[0-9]+-[a-z0-9-]+$ ]]; then
-            log_warn "Generated branch name doesn't match expected format: $BRANCH_NAME"
-            # Fallback to simple format
-            local short_name
-            short_name=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-40)
-            BRANCH_NAME="feature/issue-$ISSUE_NUMBER-$short_name"
-            log_info "   Using fallback: $BRANCH_NAME (${elapsed}s)"
-        else
-            log_success "   Branch: $BRANCH_NAME (${elapsed}s)"
-        fi
+        validate_branch_name_or_fallback "$elapsed"
+    else
+        local elapsed=$((SECONDS - start_time))
+        log_warn "Could not generate branch name with $AGENT; falling back to fast heuristic"
+        generate_fast_branch_name
+        log_info "   Branch: $BRANCH_NAME (${elapsed}s, fast fallback)"
     fi
 }
 
@@ -315,7 +596,7 @@ create_worktree() {
         echo "  3) Delete branch/worktree and recreate"
         echo "  0) Exit"
         echo ""
-        read -n 1 -p "Choice: " choice
+        read -r -n 1 -p "Choice: " choice
         echo ""
         case "$choice" in
             1)
@@ -366,7 +647,7 @@ create_worktree() {
         echo "  2) Delete and recreate"
         echo "  0) Exit"
         echo ""
-        read -n 1 -p "Choice: " choice
+        read -r -n 1 -p "Choice: " choice
         echo ""
         case "$choice" in
             1)
@@ -436,20 +717,21 @@ run_init_script() {
 
 rename_zellij_tab() {
     local script_dir
-    script_dir="$(dirname "$(readlink -f "$0")")"
+    script_dir="$(cd "$(dirname "$0")" && pwd)"
 
     log_info "📑 Renaming zellij tab..."
     if [[ "$DRY_RUN" == "true" ]]; then
         echo "   [DRY-RUN] Would run: zellij-rename-tab-to-issue-number \"$ISSUE_NUMBER\""
         return
     fi
-    if "$script_dir/zellij-rename-tab-to-issue-number" "$ISSUE_NUMBER"; then
+    if [[ -x "$script_dir/zellij-rename-tab-to-issue-number" ]] && \
+        "$script_dir/zellij-rename-tab-to-issue-number" "$ISSUE_NUMBER"; then
         log_success "   ✅ Tab renamed to #$ISSUE_NUMBER"
     fi
 }
 
 # ============================================================================
-# Claude session
+# Agent launch
 # ============================================================================
 
 print_session_header() {
@@ -464,19 +746,20 @@ print_session_header() {
     local display_path="${WORKTREE_PATH/#$HOME/\~}"
 
     # Content lines
-    local line1="Claude Code"
+    local line1="Agent: $AGENT"
     local line2="Branch: $BRANCH_NAME"
     local line3="Issue: #$ISSUE_NUMBER - $ISSUE_TITLE"
     local line4="Path: $display_path"
 
     # Truncate long lines if needed
-    local max_content_width=$((term_width - 4))  # 4 = "│ " + " │"
+    local max_content_width=$((term_width - 4))  # 4 = "| " + " |"
     [[ ${#line2} -gt $max_content_width ]] && line2="${line2:0:$((max_content_width - 3))}..."
     [[ ${#line3} -gt $max_content_width ]] && line3="${line3:0:$((max_content_width - 3))}..."
     [[ ${#line4} -gt $max_content_width ]] && line4="${line4:0:$((max_content_width - 3))}..."
 
     # Generate horizontal lines
     local h_line=""
+    local i
     for ((i = 0; i < term_width - 2; i++)); do
         h_line+="─"
     done
@@ -499,63 +782,163 @@ print_session_header() {
     echo ""
 }
 
-start_claude_session() {
-    if [[ "$NO_CLAUDE" == "true" ]]; then
-        log_success "✅ Worktree ready at: $WORKTREE_PATH"
-        echo ""
-        echo "To start working:"
-        echo "  cd $WORKTREE_PATH"
-        echo "  claude"
+build_launch_command() {
+    LAUNCH_CWD=""
+    LAUNCH_CMD=()
+
+    case "$AGENT" in
+        claude)
+            LAUNCH_CWD="$WORKTREE_PATH"
+            LAUNCH_CMD=(claude --dangerously-skip-permissions "$AGENT_PROMPT")
+            ;;
+        codex)
+            LAUNCH_CMD=(codex --cd "$WORKTREE_PATH" --dangerously-bypass-approvals-and-sandbox "$AGENT_PROMPT")
+            ;;
+        kimi)
+            LAUNCH_CMD=(kimi --work-dir "$WORKTREE_PATH" --yolo -p "$AGENT_PROMPT")
+            ;;
+        pi)
+            LAUNCH_CWD="$WORKTREE_PATH"
+            LAUNCH_CMD=(pi "$AGENT_PROMPT")
+            ;;
+        none)
+            ;;
+        *)
+            die "Unknown agent: $AGENT"
+            ;;
+    esac
+}
+
+print_manual_next_steps() {
+    log_success "✅ Worktree ready at: $WORKTREE_PATH"
+    echo ""
+    echo "Selected agent: none ($AGENT_SOURCE)"
+    echo "Prompt source: $PROMPT_SOURCE"
+    echo "To start working:"
+    echo "  cd $(shell_join "$WORKTREE_PATH")"
+    echo ""
+    echo "Suggested agent commands:"
+    echo "  claude"
+    echo "  codex --cd $(shell_join "$WORKTREE_PATH")"
+    echo "  kimi --work-dir $(shell_join "$WORKTREE_PATH")"
+    echo "  pi"
+}
+
+print_dry_run_launch_command() {
+    build_launch_command
+
+    echo "   Agent: $AGENT ($AGENT_SOURCE)"
+    echo "   Prompt source: $PROMPT_SOURCE"
+    echo "   Prompt length: ${#AGENT_PROMPT} chars"
+
+    local cmd
+    if [[ ${#AGENT_PROMPT} -gt 4000 && "${START_ISSUE_DUMP_PROMPT:-}" != "1" ]]; then
+        echo "   Prompt omitted from command display because it is large."
+        echo "   Set START_ISSUE_DUMP_PROMPT=1 to print the full rendered prompt."
+        case "$AGENT" in
+            claude)
+                cmd=$(shell_join claude --dangerously-skip-permissions "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                ;;
+            codex)
+                cmd=$(shell_join codex --cd "$WORKTREE_PATH" --dangerously-bypass-approvals-and-sandbox "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                ;;
+            kimi)
+                cmd=$(shell_join kimi --work-dir "$WORKTREE_PATH" --yolo -p "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                ;;
+            pi)
+                cmd=$(shell_join pi "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                ;;
+            *)
+                cmd=""
+                ;;
+        esac
+    else
+        cmd=$(shell_join "${LAUNCH_CMD[@]}")
+    fi
+
+    if [[ -n "$LAUNCH_CWD" ]]; then
+        echo "   [DRY-RUN] Would run: cd $(shell_join "$LAUNCH_CWD") && $cmd"
+    else
+        echo "   [DRY-RUN] Would run: $cmd"
+    fi
+}
+
+start_agent_session() {
+    if [[ "$AGENT" == "none" ]]; then
+        print_manual_next_steps
         return
     fi
 
-    log_info "🚀 Starting Claude Code session..."
-
-    # Use custom command if provided, otherwise default to task-router
-    local cmd
-    if [[ -n "$INITIAL_COMMAND" ]]; then
-        cmd="$INITIAL_COMMAND $ISSUE_URL"
-    else
-        cmd="/task-router:route-task $ISSUE_URL"
-    fi
+    log_info "🚀 Starting $AGENT agent session..."
 
     if [[ "$DRY_RUN" == "true" ]]; then
-        echo "   [DRY-RUN] Would run: cd $WORKTREE_PATH && claude --dangerously-skip-permissions \"$cmd\""
+        print_dry_run_launch_command
         return
     fi
 
     print_session_header
+    build_launch_command
 
-    # Change to worktree directory and start Claude
-    cd "$WORKTREE_PATH"
-    exec claude --dangerously-skip-permissions "$cmd"
+    if [[ -n "$LAUNCH_CWD" ]]; then
+        cd "$LAUNCH_CWD"
+    fi
+
+    exec "${LAUNCH_CMD[@]}"
 }
 
 # ============================================================================
 # Argument parsing
 # ============================================================================
 
+require_value() {
+    local option="$1"
+    local value="${2:-}"
+
+    if [[ -z "$value" || "$value" == -* ]]; then
+        die "$option requires a value."
+    fi
+}
+
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case $1 in
             --repo|-r)
+                require_value "$1" "${2:-}"
                 REPO="$2"
                 shift 2
                 ;;
             --base|-b)
+                require_value "$1" "${2:-}"
                 BASE_BRANCH="$2"
                 shift 2
                 ;;
             --worktree-dir|-w)
+                require_value "$1" "${2:-}"
                 WORKTREE_DIR="$2"
+                WORKTREE_DIR_SOURCE="CLI"
+                shift 2
+                ;;
+            --agent)
+                require_value "$1" "${2:-}"
+                AGENT_CLI="$2"
+                shift 2
+                ;;
+            --no-agent|--no-claude)
+                AGENT_CLI="none"
+                shift
+                ;;
+            --prompt-file)
+                require_value "$1" "${2:-}"
+                PROMPT_FILE_CLI="$2"
+                shift 2
+                ;;
+            --prompt)
+                require_value "$1" "${2:-}"
+                PROMPT_INLINE_CLI="$2"
                 shift 2
                 ;;
             --no-init)
                 NO_INIT=true
-                shift
-                ;;
-            --no-claude)
-                NO_CLAUDE=true
                 shift
                 ;;
             --flat)
@@ -563,6 +946,7 @@ parse_args() {
                 shift
                 ;;
             --command|-c)
+                require_value "$1" "${2:-}"
                 INITIAL_COMMAND="$2"
                 shift 2
                 ;;
@@ -612,18 +996,27 @@ main() {
     echo -e "${BLUE}start-issue${NC} v$VERSION"
     echo ""
 
-    check_dependencies
+    check_core_dependencies
     check_git_repo
+    detect_project_root
     parse_issue_input "$ISSUE_INPUT"
     detect_repo_from_remote
     detect_base_branch
+    resolve_agent
+    check_selected_agent_dependency
+    resolve_prompt_template
+
+    echo "Agent: $AGENT ($AGENT_SOURCE)"
+    echo "Worktree directory: $WORKTREE_DIR ($WORKTREE_DIR_SOURCE)"
+    echo ""
 
     fetch_issue
     rename_zellij_tab  # After fetch_issue succeeds, rename tab
     generate_branch_name
     create_worktree
     run_init_script
-    start_claude_session
+    render_prompt_template
+    start_agent_session
 }
 
 main "$@"

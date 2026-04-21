@@ -2,7 +2,7 @@
 
 Start work on a GitHub issue from the terminal.
 
-`start-issue` fetches issue metadata with `gh`, creates a git worktree with a branch name based on the issue, optionally runs `init.sh`, renames the current zellij tab, and starts an agent session.
+`start-issue` fetches issue metadata with `gh`, creates a git worktree with a branch name based on the issue, optionally runs `init.sh`, renames the current zellij tab, and starts a configurable coding agent session.
 
 ## Install
 
@@ -20,9 +20,63 @@ Make sure `~/.local/bin` is in your `PATH`.
 start-issue 123
 start-issue https://github.com/owner/repo/issues/123
 start-issue 123 --repo owner/repo --base develop
-start-issue 123 --no-claude
+start-issue 123 --agent codex
+start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
+start-issue 123 --no-agent
 start-issue 123 --dry-run
 ```
+
+## Agents
+
+Supported agent values are `claude`, `codex`, `kimi`, `pi`, and `none`.
+
+Agent selection precedence:
+
+1. CLI: `--agent codex`, `--no-agent`, or legacy `--no-claude`
+2. Project config: `.start-issue/agent` in the git root
+3. User config: `~/.config/start-issue/agent`
+4. Environment: `START_ISSUE_AGENT`
+5. Built-in default: `claude`
+
+Claude remains the default for compatibility. `--no-claude` still works as an alias for `--no-agent`.
+
+## Prompt Configuration
+
+Claude uses the legacy plugin-native command by default:
+
+```text
+/task-router:route-task {ISSUE_URL}
+```
+
+Other agents use a portable prompt by default. You can override the launch prompt with:
+
+1. CLI: `--prompt-file path/to/prompt.md` or `--prompt "..."`
+2. Project config: `.start-issue/prompt.md`
+3. User config: `~/.config/start-issue/prompt.md`
+4. Environment: `START_ISSUE_PROMPT_FILE` or `START_ISSUE_PROMPT`
+5. Built-in default
+
+Prompt templates support:
+
+```text
+{ISSUE_URL}
+{ISSUE_NUMBER}
+{ISSUE_TITLE}
+{ISSUE_BODY}
+{ISSUE_LABELS}
+{REPO}
+{BRANCH_NAME}
+{WORKTREE_PATH}
+{BASE_BRANCH}
+```
+
+Unknown placeholders are left unchanged.
+
+## Worktree Directory
+
+The environment variable for the default worktree parent directory is `START_ISSUE_WORKTREE_DIR`.
+
+CLI `--worktree-dir` has the highest priority. If neither is set, `start-issue` uses `~/worktrees`.
 
 ## Requirements
 
@@ -30,17 +84,13 @@ start-issue 123 --dry-run
 - `git`
 - `gh` CLI with authenticated GitHub session
 - `jq`
-- `claude` CLI for the current implementation
-
-## Roadmap
-
-The next step is making the launcher agent-agnostic so it can start `claude`, `codex`, `kimi`, or `pi` and use a configurable portable prompt.
-
-Track that work in [issue #1](https://github.com/dapi/start-issue/issues/1).
+- selected agent CLI unless `--agent none` is used
 
 ## Specification
 
-The original script specification is in [docs/specs/start-issue-spec.md](docs/specs/start-issue-spec.md).
+The script specification is in [docs/specs/start-issue-spec.md](docs/specs/start-issue-spec.md).
+
+The CI test plan is in [docs/ci-test-plan.md](docs/ci-test-plan.md).
 
 ## License
 
