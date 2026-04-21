@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${START_ISSUE_FAKE_AGENT_FAIL:-}" == "1" ]]; then
+  exit 1
+fi
+
+for arg in "$@"; do
+  if [[ "$arg" == "--print" ]]; then
+    printf "%s\n" "${START_ISSUE_FAKE_BRANCH_NAME:-feature/issue-1-ai-branch}"
+    exit 0
+  fi
+done
+
+printf "fake pi invoked\n"

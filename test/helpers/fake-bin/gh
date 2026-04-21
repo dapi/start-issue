@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "${1:-}" in
+  auth)
+    if [[ "${2:-}" == "status" ]]; then
+      exit 0
+    fi
+    ;;
+  api)
+    endpoint="${2:-}"
+    if [[ "$endpoint" =~ ^repos/[^/]+/[^/]+/issues/[0-9]+$ ]]; then
+      cat "${START_ISSUE_FAKE_ISSUE_JSON:?START_ISSUE_FAKE_ISSUE_JSON is required}"
+      exit 0
+    fi
+    ;;
+esac
+
+echo "fake gh: unsupported arguments: $*" >&2
+exit 1

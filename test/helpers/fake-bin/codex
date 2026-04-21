@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${START_ISSUE_FAKE_AGENT_FAIL:-}" == "1" ]]; then
+  exit 1
+fi
+
+if [[ "${1:-}" == "exec" ]]; then
+  printf "%s\n" "${START_ISSUE_FAKE_BRANCH_NAME:-feature/issue-1-ai-branch}"
+  exit 0
+fi
+
+printf "fake codex invoked\n"

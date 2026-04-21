@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${START_ISSUE_FAKE_AGENT_FAIL:-}" == "1" ]]; then
+  exit 1
+fi
+
+printf "%s\n" "${START_ISSUE_FAKE_BRANCH_NAME:-feature/issue-1-ai-branch}"

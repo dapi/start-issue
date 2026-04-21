@@ -1,0 +1,14 @@
+{
+  "number": 1,
+  "title": "Add login button",
+  "body": "Add a login button to the header and keep the implementation scoped.",
+  "html_url": "https://github.com/owner/repo/issues/1",
+  "labels": [
+    {
+      "name": "enhancement"
+    },
+    {
+      "name": "ui"
+    }
+  ]
+}

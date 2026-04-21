@@ -1,5 +1,9 @@
 # start-issue
 
+[![CI](https://github.com/dapi/start-issue/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/dapi/start-issue/actions/workflows/ci.yml)
+
+[Русская версия](README.ru.md)
+
 Start work on a GitHub issue from the terminal.
 
 `start-issue` fetches issue metadata with `gh`, creates a git worktree with a branch name based on the issue, optionally runs `init.sh`, renames the current zellij tab, and starts a configurable coding agent session.
@@ -210,8 +214,6 @@ CLI `--worktree-dir` has the highest priority. If neither is set, `start-issue` 
 The workflow diagram is in [docs/start-issue-workflow.md](docs/start-issue-workflow.md).
 
 The script specification is in [docs/specs/start-issue-spec.md](docs/specs/start-issue-spec.md).
-
-The CI test plan is in [docs/ci-test-plan.md](docs/ci-test-plan.md).
 
 ## License
 
