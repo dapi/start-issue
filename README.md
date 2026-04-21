@@ -36,7 +36,11 @@ start-issue 123 --dry-run
 
 The next step is making the launcher agent-agnostic so it can start `claude`, `codex`, `kimi`, or `pi` and use a configurable portable prompt.
 
-Track that work in the repository issues.
+Track that work in [issue #1](https://github.com/dapi/start-issue/issues/1).
+
+## Specification
+
+The original script specification is in [docs/specs/start-issue-spec.md](docs/specs/start-issue-spec.md).
 
 ## License
 
