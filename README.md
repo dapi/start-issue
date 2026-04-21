@@ -36,177 +36,6 @@ start-issue 123 --no-agent
 start-issue 123 --dry-run
 ```
 
-## Agents
-
-Supported agent values are `claude`, `codex`, `kimi`, `pi`, and `none`.
-
-Agent selection precedence:
-
-1. CLI: `--agent codex`, `--no-agent`, or compatibility alias `--no-claude`
-2. Project config: `.start-issue/agent` in the git root
-3. User config: `~/.config/start-issue/agent`
-4. Environment: `START_ISSUE_AGENT`
-5. Built-in default: `claude`
-
-Claude remains the default for compatibility. `--no-claude` still works as an alias for `--no-agent`.
-
-Related Claude Code marketplace workflows:
-
-- [task-router](https://github.com/dapi/claude-code-marketplace/tree/master/task-router)
-- [zellij-workflow](https://github.com/dapi/claude-code-marketplace/tree/master/zellij-workflow)
-
-## Agent Examples
-
-### Claude
-
-Claude is the default agent, so these commands are equivalent:
-
-```bash
-start-issue 123
-start-issue 123 --agent claude
-```
-
-By default, Claude receives the repository-native task-router command:
-
-```text
-/task-router:route-task {ISSUE_URL}
-```
-
-Use `--command` to keep the Claude slash-command style but change the command prefix:
-
-```bash
-start-issue 123 --agent claude --command "/debug"
-```
-
-Use project config when Claude should be the default for this repository:
-
-```bash
-mkdir -p .start-issue
-echo claude > .start-issue/agent
-start-issue 123
-```
-
-### Codex
-
-Launch Codex for a single issue:
-
-```bash
-start-issue 123 --agent codex
-```
-
-The script creates the worktree, renders the portable prompt, and launches:
-
-```bash
-codex --cd "$WORKTREE_PATH" --dangerously-bypass-approvals-and-sandbox "$PROMPT"
-```
-
-Use Codex as your project default:
-
-```bash
-mkdir -p .start-issue
-echo codex > .start-issue/agent
-start-issue 123
-```
-
-Use a custom prompt file with Codex:
-
-```bash
-start-issue 123 --agent codex --prompt-file .start-issue/prompt.md
-```
-
-### Kimi
-
-Launch Kimi for a single issue:
-
-```bash
-start-issue 123 --agent kimi
-```
-
-The script creates the worktree, renders the portable prompt, and launches:
-
-```bash
-kimi --work-dir "$WORKTREE_PATH" --yolo -p "$PROMPT"
-```
-
-Use Kimi from the environment without changing project files:
-
-```bash
-START_ISSUE_AGENT=kimi start-issue 123
-```
-
-Use an inline prompt for one run:
-
-```bash
-start-issue 123 --agent kimi --prompt "Implement {ISSUE_URL} in {WORKTREE_PATH}. Keep changes scoped and run tests."
-```
-
-### Pi
-
-Launch Pi for a single issue:
-
-```bash
-start-issue 123 --agent pi
-```
-
-The script changes into the worktree and launches:
-
-```bash
-cd "$WORKTREE_PATH"
-pi "$PROMPT"
-```
-
-Use Pi as your user default for all repositories:
-
-```bash
-mkdir -p ~/.config/start-issue
-echo pi > ~/.config/start-issue/agent
-start-issue 123
-```
-
-Preview exactly what would happen before launching Pi:
-
-```bash
-start-issue 123 --agent pi --dry-run
-```
-
-## Prompt Configuration
-
-Claude uses the plugin-native command by default:
-
-```text
-/task-router:route-task {ISSUE_URL}
-```
-
-Other agents use a portable prompt by default. You can override the launch prompt with:
-
-1. CLI: `--prompt-file path/to/prompt.md` or `--prompt "..."`
-2. Project config: `.start-issue/prompt.md`
-3. User config: `~/.config/start-issue/prompt.md`
-4. Environment: `START_ISSUE_PROMPT_FILE` or `START_ISSUE_PROMPT`
-5. Built-in default
-
-Prompt templates support:
-
-```text
-{ISSUE_URL}
-{ISSUE_NUMBER}
-{ISSUE_TITLE}
-{ISSUE_BODY}
-{ISSUE_LABELS}
-{REPO}
-{BRANCH_NAME}
-{WORKTREE_PATH}
-{BASE_BRANCH}
-```
-
-Unknown placeholders are left unchanged.
-
-## Worktree Directory
-
-The environment variable for the default worktree parent directory is `START_ISSUE_WORKTREE_DIR`.
-
-CLI `--worktree-dir` has the highest priority. If neither is set, `start-issue` uses `~/worktrees`.
-
 ## Workflow
 
 ```mermaid
@@ -230,6 +59,85 @@ flowchart TD
     L --> N["Work on issue"]
     M --> N
 ```
+
+## CLI Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `ISSUE` | GitHub issue number or full GitHub issue URL. Required. |
+| `--repo OWNER/REPO`, `-r OWNER/REPO` | Repository to read the issue from when `ISSUE` is a number. If omitted, `start-issue` detects the repository from `origin`. |
+| `--base BRANCH`, `-b BRANCH` | Base branch for the new worktree branch. If omitted, `start-issue` uses the repository default when available, otherwise the current branch. |
+| `--worktree-dir DIR`, `-w DIR` | Parent directory for created worktrees. Overrides `START_ISSUE_WORKTREE_DIR`. |
+| `--flat` | Use a flat worktree path by replacing `/` in the branch name with `-`. |
+| `--agent AGENT` | Agent to launch after preparing the worktree. Supported: `claude`, `codex`, `kimi`, `pi`, `none`. |
+| `--no-agent` | Prepare the worktree and print manual next steps without launching an agent. Alias for `--agent none`. |
+| `--no-claude` | Compatibility alias for `--no-agent`. |
+| `--prompt TEXT` | Inline prompt template for the selected agent. Mutually exclusive with `--prompt-file`. |
+| `--prompt-file PATH` | Prompt template file for the selected agent. Mutually exclusive with `--prompt`. |
+| `--no-init` | Do not run `init.sh` even if it exists in the created worktree. |
+| `--command COMMAND`, `-c COMMAND` | Claude command prefix used by the default Claude prompt. Default: `/task-router:route-task`. |
+| `--ai` | Ask the selected agent to generate the branch name. Falls back to the local branch-name heuristic if generation fails. |
+| `--dry-run` | Print the selected configuration and launch command without creating a worktree, running `init.sh`, or launching an agent. |
+| `--version`, `-v` | Show version. |
+| `--help`, `-h` | Show help. |
+
+Detailed per-agent examples are in [docs/agent-examples.md](docs/agent-examples.md).
+
+Related Claude Code marketplace workflows:
+
+- [task-router](https://github.com/dapi/claude-code-marketplace/tree/master/task-router)
+- [zellij-workflow](https://github.com/dapi/claude-code-marketplace/tree/master/zellij-workflow)
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `START_ISSUE_AGENT` | Default agent when `--agent` is not provided and no config file sets an agent. Supported: `claude`, `codex`, `kimi`, `pi`, `none`. Built-in default: `claude`. |
+| `START_ISSUE_PROMPT` | Inline prompt template used when no CLI or config prompt is provided. Mutually exclusive with `START_ISSUE_PROMPT_FILE` when the environment prompt is active. |
+| `START_ISSUE_PROMPT_FILE` | Prompt template file used when no CLI or config prompt is provided. Mutually exclusive with `START_ISSUE_PROMPT` when the environment prompt is active. |
+| `START_ISSUE_WORKTREE_DIR` | Default parent directory for created worktrees when `--worktree-dir` is not provided. Built-in default: `~/worktrees`. |
+| `START_ISSUE_DUMP_PROMPT` | When set to `1`, dry-run output includes the full rendered prompt instead of only summary information. |
+
+## Configuration Files
+
+| File | Description |
+|------|-------------|
+| `.start-issue/agent` | Project default agent. Read from the git root. |
+| `.start-issue/prompt.md` | Project default prompt template. Read from the git root. |
+| `~/.config/start-issue/agent` | User default agent. |
+| `~/.config/start-issue/prompt.md` | User default prompt template. |
+
+Configuration precedence:
+
+1. CLI arguments
+2. Project config
+3. User config
+4. Environment variables
+5. Built-in defaults
+
+Claude uses the plugin-native command by default:
+
+```text
+/task-router:route-task {ISSUE_URL}
+```
+
+Other agents use a portable prompt by default.
+
+Prompt templates support:
+
+```text
+{ISSUE_URL}
+{ISSUE_NUMBER}
+{ISSUE_TITLE}
+{ISSUE_BODY}
+{ISSUE_LABELS}
+{REPO}
+{BRANCH_NAME}
+{WORKTREE_PATH}
+{BASE_BRANCH}
+```
+
+Unknown placeholders are left unchanged.
 
 ## Requirements
 
