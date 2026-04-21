@@ -88,6 +88,8 @@ CLI `--worktree-dir` has the highest priority. If neither is set, `start-issue` 
 
 ## Specification
 
+The workflow diagram is in [docs/start-issue-workflow.md](docs/start-issue-workflow.md).
+
 The script specification is in [docs/specs/start-issue-spec.md](docs/specs/start-issue-spec.md).
 
 The CI test plan is in [docs/ci-test-plan.md](docs/ci-test-plan.md).
