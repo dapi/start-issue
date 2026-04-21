@@ -42,7 +42,7 @@ Supported agent values are `claude`, `codex`, `kimi`, `pi`, and `none`.
 
 Agent selection precedence:
 
-1. CLI: `--agent codex`, `--no-agent`, or legacy `--no-claude`
+1. CLI: `--agent codex`, `--no-agent`, or compatibility alias `--no-claude`
 2. Project config: `.start-issue/agent` in the git root
 3. User config: `~/.config/start-issue/agent`
 4. Environment: `START_ISSUE_AGENT`
@@ -171,7 +171,7 @@ start-issue 123 --agent pi --dry-run
 
 ## Prompt Configuration
 
-Claude uses the legacy plugin-native command by default:
+Claude uses the plugin-native command by default:
 
 ```text
 /task-router:route-task {ISSUE_URL}

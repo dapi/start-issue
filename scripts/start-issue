@@ -189,7 +189,7 @@ Examples:
   start-issue 123 --agent codex
   start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
   start-issue 123 --no-agent              # Only create worktree
-  start-issue 123 --command "/debug"      # Legacy Claude command
+  start-issue 123 --command "/debug"      # Claude command prefix
   start-issue 123 --flat                  # Flat worktree path
   start-issue 123 --dry-run
 EOF

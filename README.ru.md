@@ -42,7 +42,7 @@ start-issue 123 --dry-run
 
 Приоритет выбора agent:
 
-1. CLI: `--agent codex`, `--no-agent` или legacy `--no-claude`
+1. CLI: `--agent codex`, `--no-agent` или совместимый alias `--no-claude`
 2. Project config: `.start-issue/agent` в git root
 3. User config: `~/.config/start-issue/agent`
 4. Environment: `START_ISSUE_AGENT`
@@ -171,7 +171,7 @@ start-issue 123 --agent pi --dry-run
 
 ## Настройка Prompt
 
-Claude по умолчанию использует legacy plugin-native команду:
+Claude по умолчанию использует plugin-native команду:
 
 ```text
 /task-router:route-task {ISSUE_URL}
