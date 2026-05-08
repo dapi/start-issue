@@ -36,6 +36,10 @@ start-issue 123 --no-agent
 start-issue 123 --dry-run
 ```
 
+Running `start-issue` without an issue prints the normal help plus the currently
+selected agent, prompt source, prompt location, and a short prompt preview, then
+exits without contacting GitHub.
+
 ## Workflow
 
 ```mermaid
