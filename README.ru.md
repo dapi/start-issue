@@ -34,6 +34,7 @@ start-issue 123 --agent codex
 start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
 start-issue 123 --no-agent
 start-issue 123 --dry-run
+start-issue init
 ```
 
 Запуск `start-issue` без issue печатает обычную справку, а также текущий
@@ -70,19 +71,23 @@ flowchart TD
 | Аргумент | Описание |
 |----------|----------|
 | `ISSUE` | Номер GitHub issue или полный URL GitHub issue. Обязательный аргумент. |
+| `init` | Создать файлы конфигурации по умолчанию для текущего проекта или текущего пользователя. |
 | `--repo OWNER/REPO`, `-r OWNER/REPO` | Репозиторий, из которого нужно прочитать issue, если `ISSUE` передан номером. Если не задан, `start-issue` определяет репозиторий из `origin`. |
 | `--base BRANCH`, `-b BRANCH` | Базовая ветка для новой worktree branch. Если не задана, `start-issue` использует default branch репозитория, когда она доступна, иначе текущую ветку. |
 | `--worktree-dir DIR`, `-w DIR` | Родительская директория для создаваемых worktree. Переопределяет `START_ISSUE_WORKTREE_DIR`. |
 | `--flat` | Использовать плоский путь worktree, заменяя `/` в имени ветки на `-`. |
-| `--agent AGENT` | Агент, который будет запущен после подготовки worktree. Поддерживаются: `claude`, `codex`, `kimi`, `pi`, `none`. |
+| `--agent AGENT` | Агент, который будет запущен после подготовки worktree. С `init` - agent по умолчанию, который нужно записать. Поддерживаются: `claude`, `codex`, `kimi`, `pi`, `none`. |
 | `--no-agent` | Подготовить worktree и напечатать ручные следующие шаги без запуска агента. Alias для `--agent none`. |
 | `--no-claude` | Совместимый alias для `--no-agent`. |
-| `--prompt TEXT` | Inline prompt template для выбранного агента. Нельзя использовать вместе с `--prompt-file`. |
-| `--prompt-file PATH` | Файл prompt template для выбранного агента. Нельзя использовать вместе с `--prompt`. |
+| `--prompt TEXT` | Inline prompt template для выбранного агента. С `init` - prompt template, который нужно записать. Нельзя использовать вместе с `--prompt-file`. |
+| `--prompt-file PATH` | Файл prompt template для выбранного агента. С `init` - содержимое файла, которое нужно записать. Нельзя использовать вместе с `--prompt`. |
 | `--no-init` | Не запускать `init.sh`, даже если он есть в созданном worktree. |
 | `--command COMMAND`, `-c COMMAND` | Префикс Claude command для стандартного Claude prompt. Значение по умолчанию: `/task-router:route-task`. |
 | `--ai` | Попросить выбранного агента сгенерировать имя ветки. Если генерация не удалась, используется локальная эвристика. |
-| `--dry-run` | Напечатать выбранную конфигурацию и launch command без создания worktree, запуска `init.sh` или запуска агента. |
+| `--project` | С `init` - записать проектную конфигурацию в `.start-issue` в git root. |
+| `--user` | С `init` - записать пользовательскую конфигурацию в `~/.config/start-issue`. |
+| `--force` | С `init` - перезаписать существующие файлы `agent` и `prompt.md`. По умолчанию существующие файлы сохраняются. |
+| `--dry-run` | Напечатать выбранную конфигурацию и launch command без создания worktree, запуска `init.sh` или запуска агента. С `init` - напечатать план записи конфигурации без создания файлов. |
 | `--version`, `-v` | Показать версию. |
 | `--help`, `-h` | Показать справку. |
 
@@ -111,6 +116,8 @@ flowchart TD
 | `.start-issue/prompt.md` | Prompt template по умолчанию для проекта. Читается из git root. |
 | `~/.config/start-issue/agent` | Пользовательский agent по умолчанию. |
 | `~/.config/start-issue/prompt.md` | Пользовательский prompt template по умолчанию. |
+
+Запустите `start-issue init`, чтобы создать эти файлы. Если не переданы `--project` или `--user`, команда спросит, какой scope инициализировать. Она записывает встроенные agent и prompt по умолчанию, если не переданы `--agent`, `--prompt` или `--prompt-file`.
 
 Приоритет конфигурации:
 

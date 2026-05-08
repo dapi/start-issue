@@ -25,6 +25,7 @@
 | Параметр | Формат | Примеры |
 |----------|--------|---------|
 | Issue | URL или номер | `https://github.com/owner/repo/issues/123` или `123` |
+| Config init | Литерал `init` | `start-issue init` |
 
 Если Issue не передан, команда печатает справку и текущую конфигурацию:
 выбранный agent с источником, prompt source, prompt location и короткий prompt
@@ -46,6 +47,9 @@ preview. Этот путь не обращается к GitHub и заверша
 | `--no-init` | Пропустить запуск `init.sh` | false |
 | `--command` / `-c` | Совместимый Claude command для дефолтного Claude prompt | `/task-router:route-task` |
 | `--ai` | Генерировать имя ветки выбранным агентом | false, используется быстрая bash-эвристика |
+| `--project` | Для `init`: записать конфигурацию проекта в `.start-issue` | интерактивный выбор |
+| `--user` | Для `init`: записать пользовательскую конфигурацию в `~/.config/start-issue` | интерактивный выбор |
+| `--force` | Для `init`: перезаписать существующие `agent` и `prompt.md` | false |
 | `--dry-run` | Показать действия, не выполняя worktree/init/agent launch | false |
 
 ## Приоритет конфигурации
@@ -75,6 +79,19 @@ git rev-parse --show-toplevel
 5. Built-in default
 
 Если одновременно заданы `--prompt-file` и `--prompt`, скрипт завершает работу с ошибкой. То же правило действует для `START_ISSUE_PROMPT_FILE` и `START_ISSUE_PROMPT`, когда env является активным источником prompt.
+
+## Инициализация конфигурации
+
+`start-issue init` создает файлы конфигурации:
+
+- project scope: `{git-root}/.start-issue/agent` и `{git-root}/.start-issue/prompt.md`
+- user scope: `~/.config/start-issue/agent` и `~/.config/start-issue/prompt.md`
+
+Если не передан `--project` или `--user`, команда интерактивно спрашивает scope. Project scope требует запуск внутри git repository; user scope может выполняться вне git repository. Режим `init` не требует issue, `gh` или `jq`.
+
+По умолчанию записывается agent `claude` и стандартный Claude prompt. `--agent` меняет записываемый agent; `--prompt` или `--prompt-file` меняют записываемый prompt. Если выбран не `claude` и prompt явно не задан, записывается portable prompt.
+
+Существующие файлы не перезаписываются. `--force` перезаписывает `agent` и `prompt.md`.
 
 ## Prompt templates
 
@@ -122,6 +139,19 @@ Templating правила:
 - `--dry-run` печатает prompt source и launch command. Если rendered prompt очень большой, команда показывает placeholder, а полный prompt можно вывести через `START_ISSUE_DUMP_PROMPT=1`.
 
 ## Алгоритм работы
+
+### Фаза 0: Config init
+
+Если первый positional argument равен `init`:
+
+1. Прочитать `--project`, `--user`, `--force`, `--agent`, `--prompt`, `--prompt-file`, `--command`.
+2. Если scope не задан, спросить пользователя: project config или user config.
+3. Для project config проверить git repository и определить git root.
+4. Выбрать agent: `--agent`, иначе `claude`.
+5. Выбрать prompt: `--prompt-file`, `--prompt`, иначе built-in prompt для выбранного agent.
+6. Создать target directory.
+7. Записать `agent` и `prompt.md`; существующие файлы оставить без изменений, если не передан `--force`. В `--dry-run` только напечатать planned writes.
+8. Завершить работу без получения issue, создания worktree и запуска agent.
 
 ### Фаза 1: Валидация и парсинг
 
@@ -302,6 +332,9 @@ start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
 start-issue 123 --agent pi --prompt "Implement {ISSUE_URL} in {WORKTREE_PATH}"
 start-issue 123 --no-agent
 start-issue 123 --no-claude
+start-issue init
+start-issue init --project --agent codex
+start-issue init --user --force
 START_ISSUE_AGENT=codex start-issue 123
 START_ISSUE_WORKTREE_DIR=~/projects/worktrees start-issue 123
 ```
@@ -314,6 +347,8 @@ START_ISSUE_WORKTREE_DIR=~/projects/worktrees start-issue 123
 - `git`
 - `gh` CLI с авторизованной GitHub session
 - `jq`
+
+Для `start-issue init --user` обязателен только `bash`. Для `start-issue init --project` нужны `bash` и `git`.
 
 Опциональные:
 
@@ -331,6 +366,8 @@ START_ISSUE_WORKTREE_DIR=~/projects/worktrees start-issue 123
 - [x] Agent выбирается через CLI, `.start-issue/agent`, `~/.config/start-issue/agent`, `START_ISSUE_AGENT`.
 - [x] Prompt выбирается через CLI, `.start-issue/prompt.md`, `~/.config/start-issue/prompt.md`, env.
 - [x] Запуск без Issue печатает выбранный agent и prompt details с расположением prompt.
+- [x] `start-issue init` создает project или user config с agent и prompt по умолчанию.
+- [x] `start-issue init --force` перезаписывает существующие config-файлы.
 - [x] Claude-specific aliases сохранены, help text описывает agent-neutral поведение.
 - [x] `--dry-run` печатает selected agent, prompt source и launch command.
 - [x] `START_ISSUE_WORKTREE_DIR` является env для worktree directory.
