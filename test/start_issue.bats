@@ -279,6 +279,74 @@ install_fake_zellij_tab_status() {
   assert_output_contains "UNKNOWN"
 }
 
+@test "prompt improvement writes proposal next to project prompt and exits before worktree" {
+  mkdir -p .start-issue
+  printf "Prompt {ISSUE_NUMBER}\n" > .start-issue/prompt.md
+  export START_ISSUE_FAKE_IMPROVED_PROMPT="Improved prompt {ISSUE_URL} {ISSUE_NUMBER}"
+
+  run_start_issue 1 --agent codex --improve-prompt --no-init
+
+  assert_success
+  assert_output_contains "Improving prompt template"
+  assert_output_contains "Prompt source:"
+  assert_output_contains ".start-issue/prompt.md"
+  assert_output_contains "Proposal path:"
+  assert_output_contains ".start-issue/prompt.improved.md"
+  assert_output_contains "Prompt improvement written"
+  [[ "$(cat .start-issue/prompt.improved.md)" == "Improved prompt {ISSUE_URL} {ISSUE_NUMBER}" ]]
+  [[ "$output" != *"Creating worktree"* ]]
+}
+
+@test "built-in prompt improvement writes project proposal by default" {
+  export START_ISSUE_FAKE_IMPROVED_PROMPT="Improved built-in prompt {ISSUE_URL}"
+
+  run_start_issue 1 --agent codex --improve-prompt --no-init
+
+  assert_success
+  assert_output_contains "Prompt source: built-in portable prompt"
+  assert_output_contains "Proposal path:"
+  assert_output_contains ".start-issue/prompt.improved.md"
+  [[ "$(cat .start-issue/prompt.improved.md)" == "Improved built-in prompt {ISSUE_URL}" ]]
+}
+
+@test "prompt improvement dry-run does not write proposal or call agent" {
+  mkdir -p .start-issue
+  printf "Prompt {ISSUE_NUMBER}\n" > .start-issue/prompt.md
+  export START_ISSUE_FAKE_AGENT_FAIL=1
+
+  run_start_issue 1 --agent codex --improve-prompt --dry-run --no-init
+
+  assert_success
+  assert_output_contains "[DRY-RUN] Would ask codex to generate an improved prompt proposal."
+  [[ ! -e .start-issue/prompt.improved.md ]]
+}
+
+@test "prompt improvement uses custom output path and refuses overwrite" {
+  mkdir -p .start-issue
+  printf "Prompt {ISSUE_NUMBER}\n" > .start-issue/prompt.md
+  export START_ISSUE_FAKE_IMPROVED_PROMPT="Improved custom prompt"
+
+  run_start_issue 1 --agent codex --improve-prompt --prompt-output-file .start-issue/prompt.next.md --no-init
+
+  assert_success
+  assert_output_contains "Proposal path: .start-issue/prompt.next.md"
+  [[ "$(cat .start-issue/prompt.next.md)" == "Improved custom prompt" ]]
+
+  run_start_issue 1 --agent codex --improve-prompt --prompt-output-file .start-issue/prompt.next.md --no-init
+
+  assert_failure
+  assert_output_contains "Prompt improvement output already exists: .start-issue/prompt.next.md"
+  [[ "$(cat .start-issue/prompt.next.md)" == "Improved custom prompt" ]]
+}
+
+@test "prompt improvement rejects agent none before fetching issue" {
+  run_start_issue 1 --agent none --improve-prompt --dry-run --no-init
+
+  assert_failure
+  assert_output_contains "--improve-prompt requires an agent"
+  [[ "$output" != *"Fetching issue"* ]]
+}
+
 @test "prompt conflict fails fast" {
   run_start_issue 1 --agent none --dry-run --prompt inline --prompt-file prompt.md
 

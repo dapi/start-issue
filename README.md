@@ -81,6 +81,8 @@ flowchart TD
 | `--no-claude` | Compatibility alias for `--no-agent`. |
 | `--prompt TEXT` | Inline prompt template for the selected agent. With `init`, the prompt template to write. Mutually exclusive with `--prompt-file`. |
 | `--prompt-file PATH` | Prompt template file for the selected agent. With `init`, the file content to write. Mutually exclusive with `--prompt`. |
+| `--improve-prompt` | Ask the selected agent to generate a reviewable improved prompt template proposal, then exit before creating a worktree. |
+| `--prompt-output-file PATH` | Proposal output path for `--improve-prompt`. |
 | `--no-init` | Do not run `init.sh` even if it exists in the created worktree. |
 | `--command COMMAND`, `-c COMMAND` | Claude command prefix used by the default Claude prompt. Default: `/task-router:route-task`. |
 | `--ai` | Ask the selected agent to generate the branch name. Falls back to the local branch-name heuristic if generation fails. |
@@ -134,6 +136,14 @@ Claude uses the plugin-native command by default:
 ```
 
 Other agents use a portable prompt by default.
+
+To improve the prompt template used for future development starts, run:
+
+```bash
+start-issue 123 --agent codex --improve-prompt
+```
+
+The command resolves the active prompt template with the normal precedence, fetches the issue as context, asks the selected agent for a complete improved prompt template, and writes a proposal file. It does not overwrite the active prompt. File-backed prompts write next to the source as `*.improved.md` by default; built-in and inline prompts write to `.start-issue/prompt.improved.md`. Use `--prompt-output-file` to choose another proposal path.
 
 Prompt templates support:
 
