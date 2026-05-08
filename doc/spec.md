@@ -89,7 +89,7 @@ git rev-parse --show-toplevel
 
 Если не передан `--project` или `--user`, команда интерактивно спрашивает scope. Project scope требует запуск внутри git repository; user scope может выполняться вне git repository. Режим `init` не требует issue, `gh` или `jq`.
 
-По умолчанию записывается agent `claude` и стандартный Claude prompt. `--agent` меняет записываемый agent; `--prompt` или `--prompt-file` меняют записываемый prompt. Если выбран не `claude` и prompt явно не задан, записывается portable prompt.
+По умолчанию записывается agent `claude` и стандартный Claude prompt. `--agent` меняет записываемый agent; `--prompt` или `--prompt-file` меняют записываемый prompt. Если выбран не `claude` и prompt явно не задан, записывается portable prompt. Если существующий `agent` сохраняется без `--force`, default prompt выбирается по сохраненному agent, а не по built-in default или CLI override.
 
 Существующие файлы не перезаписываются. `--force` перезаписывает `agent` и `prompt.md`.
 
@@ -147,7 +147,7 @@ Templating правила:
 1. Прочитать `--project`, `--user`, `--force`, `--agent`, `--prompt`, `--prompt-file`, `--command`.
 2. Если scope не задан, спросить пользователя: project config или user config.
 3. Для project config проверить git repository и определить git root.
-4. Выбрать agent: `--agent`, иначе `claude`.
+4. Выбрать фактический agent: существующий `agent`, если он сохраняется без `--force`; иначе `--agent`; иначе `claude`.
 5. Выбрать prompt: `--prompt-file`, `--prompt`, иначе built-in prompt для выбранного agent.
 6. Создать target directory.
 7. Записать `agent` и `prompt.md`; существующие файлы оставить без изменений, если не передан `--force`. В `--dry-run` только напечатать planned writes.

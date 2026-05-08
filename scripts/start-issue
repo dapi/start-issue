@@ -447,7 +447,12 @@ render_prompt_template() {
 # ============================================================================
 
 resolve_init_agent() {
-    if [[ -n "$AGENT_CLI" ]]; then
+    local agent_file="$1"
+
+    if [[ -f "$agent_file" && "$INIT_FORCE" != "true" ]]; then
+        AGENT=$(read_first_config_value "$agent_file")
+        AGENT_SOURCE="$agent_file (existing)"
+    elif [[ -n "$AGENT_CLI" ]]; then
         AGENT=$(trim "$AGENT_CLI")
         AGENT_SOURCE="CLI"
     else
@@ -563,9 +568,6 @@ run_config_init() {
             ;;
     esac
 
-    resolve_init_agent
-    resolve_init_prompt_template
-
     local target_dir=""
     local scope_label=""
 
@@ -576,6 +578,9 @@ run_config_init() {
         target_dir="$HOME/.config/start-issue"
         scope_label="user config"
     fi
+
+    resolve_init_agent "$target_dir/agent"
+    resolve_init_prompt_template
 
     echo "Scope: $scope_label"
     echo "Directory: $target_dir"

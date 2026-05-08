@@ -188,6 +188,20 @@ install_fake_zellij_tab_status() {
   [[ "$(cat .start-issue/prompt.md)" == "inline" ]]
 }
 
+@test "init derives missing prompt from kept existing agent" {
+  mkdir -p .start-issue
+  printf "codex\n" > .start-issue/agent
+
+  run_start_issue init --project
+
+  assert_success
+  assert_output_contains "Agent: codex ("
+  assert_output_contains ".start-issue/agent (existing)"
+  [[ "$(cat .start-issue/agent)" == "codex" ]]
+  [[ "$(cat .start-issue/prompt.md)" == *"Implement GitHub issue {ISSUE_URL} in this worktree."* ]]
+  [[ "$(cat .start-issue/prompt.md)" != *"/task-router:route-task"* ]]
+}
+
 @test "init dry-run does not write config files" {
   run_start_issue init --project --agent codex --dry-run
 

@@ -117,7 +117,7 @@ Related Claude Code marketplace workflows:
 | `~/.config/start-issue/agent` | User default agent. |
 | `~/.config/start-issue/prompt.md` | User default prompt template. |
 
-Run `start-issue init` to create these files. If neither `--project` nor `--user` is provided, the command asks which scope to initialize. It writes the built-in default agent and prompt unless `--agent`, `--prompt`, or `--prompt-file` is provided.
+Run `start-issue init` to create these files. If neither `--project` nor `--user` is provided, the command asks which scope to initialize. It writes the built-in default agent and prompt unless `--agent`, `--prompt`, or `--prompt-file` is provided. If an existing `agent` file is kept without `--force`, the generated default prompt is chosen for that kept agent.
 
 Configuration precedence:
 

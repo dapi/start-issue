@@ -117,7 +117,7 @@ flowchart TD
 | `~/.config/start-issue/agent` | Пользовательский agent по умолчанию. |
 | `~/.config/start-issue/prompt.md` | Пользовательский prompt template по умолчанию. |
 
-Запустите `start-issue init`, чтобы создать эти файлы. Если не переданы `--project` или `--user`, команда спросит, какой scope инициализировать. Она записывает встроенные agent и prompt по умолчанию, если не переданы `--agent`, `--prompt` или `--prompt-file`.
+Запустите `start-issue init`, чтобы создать эти файлы. Если не переданы `--project` или `--user`, команда спросит, какой scope инициализировать. Она записывает встроенные agent и prompt по умолчанию, если не переданы `--agent`, `--prompt` или `--prompt-file`. Если существующий файл `agent` сохраняется без `--force`, default prompt выбирается для этого сохраненного agent.
 
 Приоритет конфигурации:
 
