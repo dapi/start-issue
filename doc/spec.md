@@ -26,6 +26,10 @@
 |----------|--------|---------|
 | Issue | URL или номер | `https://github.com/owner/repo/issues/123` или `123` |
 
+Если Issue не передан, команда печатает справку и текущую конфигурацию:
+выбранный agent с источником, prompt source, prompt location и короткий prompt
+preview. Этот путь не обращается к GitHub и завершается с ненулевым кодом.
+
 ### Опциональные параметры
 
 | Флаг | Описание | По умолчанию |
@@ -274,6 +278,7 @@ none:
 | Prompt file отсутствует | `Prompt file not found: {path}` |
 | Одновременно заданы inline и file prompt | `Use either ... not both.` |
 | Worktree создать не удалось | `Failed to create worktree` |
+| Issue не передан | Печатает help и current configuration, затем выходит с ненулевым кодом |
 
 Предупреждения не прерывают выполнение:
 
@@ -325,6 +330,7 @@ START_ISSUE_WORKTREE_DIR=~/projects/worktrees start-issue 123
 - [x] `start-issue 123 --no-agent` только готовит worktree и печатает следующие шаги.
 - [x] Agent выбирается через CLI, `.start-issue/agent`, `~/.config/start-issue/agent`, `START_ISSUE_AGENT`.
 - [x] Prompt выбирается через CLI, `.start-issue/prompt.md`, `~/.config/start-issue/prompt.md`, env.
+- [x] Запуск без Issue печатает выбранный agent и prompt details с расположением prompt.
 - [x] Claude-specific aliases сохранены, help text описывает agent-neutral поведение.
 - [x] `--dry-run` печатает selected agent, prompt source и launch command.
 - [x] `START_ISSUE_WORKTREE_DIR` является env для worktree directory.

@@ -69,6 +69,36 @@ install_fake_zellij_tab_status() {
   assert_output_contains "/task-router:route-task"
 }
 
+@test "missing issue prints selected default agent and prompt details" {
+  run_start_issue
+
+  assert_failure
+  assert_output_contains "Usage: start-issue <issue-url-or-number> [options]"
+  assert_output_contains "Current configuration:"
+  assert_output_contains "Agent: claude (built-in default)"
+  assert_output_contains "Prompt source: built-in Claude command"
+  assert_output_contains "Prompt location: $REPO_ROOT/scripts/start-issue"
+  assert_output_contains "Prompt preview: /task-router:route-task {ISSUE_URL}"
+  [[ "$output" != *"Fetching issue"* ]]
+}
+
+@test "missing issue prints project agent and prompt file location" {
+  mkdir -p .start-issue
+  printf "codex\n" > .start-issue/agent
+  printf "Project prompt for {ISSUE_URL}\n" > .start-issue/prompt.md
+
+  run_start_issue
+
+  assert_failure
+  assert_output_contains "Agent: codex ("
+  assert_output_contains ".start-issue/agent)"
+  assert_output_contains "Prompt source:"
+  assert_output_contains ".start-issue/prompt.md"
+  assert_output_contains "Prompt location:"
+  assert_output_contains "Prompt preview: Project prompt for {ISSUE_URL}"
+  [[ "$output" != *"Fetching issue"* ]]
+}
+
 @test "full issue URL overrides detected repository" {
   run_start_issue https://github.com/other/project/issues/1 --dry-run --no-init --no-agent
 

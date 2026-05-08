@@ -36,6 +36,10 @@ start-issue 123 --no-agent
 start-issue 123 --dry-run
 ```
 
+Запуск `start-issue` без issue печатает обычную справку, а также текущий
+выбранный agent, источник prompt, расположение prompt и короткий preview prompt,
+после чего выходит без обращения к GitHub.
+
 ## Процесс
 
 ```mermaid

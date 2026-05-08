@@ -44,6 +44,7 @@ FAST_MODE=true
 FLAT_WORKTREE=false
 INITIAL_COMMAND=""
 ISSUE_INPUT=""
+MISSING_ISSUE=false
 PROJECT_ROOT=""
 
 AGENT=""
@@ -51,6 +52,7 @@ AGENT_CLI=""
 AGENT_SOURCE=""
 PROMPT_TEMPLATE=""
 PROMPT_SOURCE=""
+PROMPT_LOCATION=""
 PROMPT_FILE_CLI=""
 PROMPT_INLINE_CLI=""
 AGENT_PROMPT=""
@@ -66,6 +68,8 @@ WORKTREE_PATH=""
 
 LAUNCH_CWD=""
 LAUNCH_CMD=()
+
+SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
 # ============================================================================
 # Helper functions
@@ -119,6 +123,16 @@ trim() {
     printf "%s" "$value"
 }
 
+absolute_path() {
+    local path="$1"
+
+    if [[ "$path" == /* ]]; then
+        printf "%s" "$path"
+    else
+        printf "%s/%s" "$(pwd)" "$path"
+    fi
+}
+
 read_first_config_value() {
     local file="$1"
     awk '
@@ -131,6 +145,20 @@ read_first_config_value() {
             exit
         }
     ' "$file"
+}
+
+prompt_preview() {
+    local preview="$PROMPT_TEMPLATE"
+
+    preview="${preview//$'\n'/ }"
+    preview=$(printf "%s" "$preview" | sed 's/[[:space:]][[:space:]]*/ /g')
+    preview=$(trim "$preview")
+
+    if [[ ${#preview} -gt 140 ]]; then
+        preview="${preview:0:137}..."
+    fi
+
+    printf "%s" "$preview"
 }
 
 show_help() {
@@ -195,6 +223,14 @@ Examples:
 EOF
 }
 
+show_current_configuration() {
+    echo "Current configuration:"
+    echo "  Agent: $AGENT ($AGENT_SOURCE)"
+    echo "  Prompt source: $PROMPT_SOURCE"
+    echo "  Prompt location: $PROMPT_LOCATION"
+    echo "  Prompt preview: $(prompt_preview)"
+}
+
 # ============================================================================
 # Validation and project functions
 # ============================================================================
@@ -225,6 +261,14 @@ check_git_repo() {
 
 detect_project_root() {
     PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+}
+
+detect_project_root_if_available() {
+    PROJECT_ROOT="$(pwd)"
+
+    if command -v git &> /dev/null && git rev-parse --git-dir &> /dev/null; then
+        detect_project_root
+    fi
 }
 
 check_selected_agent_dependency() {
@@ -327,15 +371,19 @@ resolve_prompt_template() {
     if [[ -n "$PROMPT_FILE_CLI" ]]; then
         read_prompt_file "$PROMPT_FILE_CLI"
         PROMPT_SOURCE="CLI --prompt-file: $PROMPT_FILE_CLI"
+        PROMPT_LOCATION=$(absolute_path "$PROMPT_FILE_CLI")
     elif [[ -n "$PROMPT_INLINE_CLI" ]]; then
         PROMPT_TEMPLATE="$PROMPT_INLINE_CLI"
         PROMPT_SOURCE="CLI --prompt"
+        PROMPT_LOCATION="inline CLI argument"
     elif [[ -f "$project_prompt_file" ]]; then
         read_prompt_file "$project_prompt_file"
         PROMPT_SOURCE="$project_prompt_file"
+        PROMPT_LOCATION="$project_prompt_file"
     elif [[ -f "$user_prompt_file" ]]; then
         read_prompt_file "$user_prompt_file"
         PROMPT_SOURCE="$user_prompt_file"
+        PROMPT_LOCATION="$user_prompt_file"
     elif [[ -n "${START_ISSUE_PROMPT_FILE:-}" || -n "${START_ISSUE_PROMPT:-}" ]]; then
         if [[ -n "${START_ISSUE_PROMPT_FILE:-}" && -n "${START_ISSUE_PROMPT:-}" ]]; then
             die "Use either START_ISSUE_PROMPT_FILE or START_ISSUE_PROMPT, not both."
@@ -344,9 +392,11 @@ resolve_prompt_template() {
         if [[ -n "${START_ISSUE_PROMPT_FILE:-}" ]]; then
             read_prompt_file "$START_ISSUE_PROMPT_FILE"
             PROMPT_SOURCE="START_ISSUE_PROMPT_FILE: $START_ISSUE_PROMPT_FILE"
+            PROMPT_LOCATION=$(absolute_path "$START_ISSUE_PROMPT_FILE")
         else
             PROMPT_TEMPLATE="$START_ISSUE_PROMPT"
             PROMPT_SOURCE="START_ISSUE_PROMPT"
+            PROMPT_LOCATION="START_ISSUE_PROMPT environment variable"
         fi
     else
         if [[ "$AGENT" == "claude" ]]; then
@@ -356,6 +406,7 @@ resolve_prompt_template() {
             PROMPT_TEMPLATE=$(default_portable_prompt_template)
             PROMPT_SOURCE="built-in portable prompt"
         fi
+        PROMPT_LOCATION="$SCRIPT_PATH"
     fi
 }
 
@@ -990,8 +1041,7 @@ parse_args() {
     done
 
     if [[ -z "$ISSUE_INPUT" ]]; then
-        show_help
-        exit 1
+        MISSING_ISSUE=true
     fi
 }
 
@@ -1001,6 +1051,16 @@ parse_args() {
 
 main() {
     parse_args "$@"
+
+    if [[ "$MISSING_ISSUE" == "true" ]]; then
+        detect_project_root_if_available
+        resolve_agent
+        resolve_prompt_template
+        show_help
+        echo ""
+        show_current_configuration
+        exit 1
+    fi
 
     echo -e "${BLUE}start-issue${NC} v$VERSION"
     echo ""
