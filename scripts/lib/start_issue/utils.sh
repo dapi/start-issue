@@ -57,6 +57,16 @@ absolute_path() {
     fi
 }
 
+canonicalize_existing_path() {
+    local path="$1"
+
+    if [[ -d "$path" ]]; then
+        (cd "$path" && pwd -P)
+    else
+        printf "%s" "$path"
+    fi
+}
+
 read_first_config_value() {
     local file="$1"
     awk '
