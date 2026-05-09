@@ -20,7 +20,7 @@
 make install
 ```
 
-Команда устанавливает `scripts/start-issue` в `~/.local/bin/start-issue`.
+Команда собирает self-contained `start-issue` из модульных исходников и устанавливает его в `~/.local/bin/start-issue`.
 
 Убедитесь, что `~/.local/bin` есть в вашем `PATH`.
 
@@ -69,6 +69,7 @@ flowchart TD
 ## Внутренняя архитектура
 
 CLI entrypoint остается `scripts/start-issue`, но реализация теперь разбита на специализированные shell-модули в `scripts/lib/start_issue/`.
+`make build` и `make install` собирают эти модули обратно в single-file script для дистрибуции и локальной установки.
 
 - `cli.sh` парсит аргументы и нормализует флаги в состояние workflow.
 - `config.sh` разрешает конфигурацию agent и prompt.

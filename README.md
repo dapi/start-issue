@@ -20,7 +20,7 @@ It fetches issue metadata with `gh`, creates a git worktree with a branch name b
 make install
 ```
 
-This installs `scripts/start-issue` to `~/.local/bin/start-issue`.
+This builds a self-contained `start-issue` script from the modular sources and installs it to `~/.local/bin/start-issue`.
 
 Make sure `~/.local/bin` is in your `PATH`.
 
@@ -69,6 +69,7 @@ flowchart TD
 ## Internal Architecture
 
 The CLI entrypoint remains `scripts/start-issue`, but the implementation is now split into focused shell modules under `scripts/lib/start_issue/`.
+`make build` and `make install` bundle those modules back into a single-file script for distribution and local installation.
 
 - `cli.sh` parses arguments and normalizes flags into workflow state.
 - `config.sh` resolves agent and prompt configuration.

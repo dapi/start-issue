@@ -6,6 +6,8 @@
 **Тип**: Bash CLI с модульной shell-архитектурой
 **Назначение**: автоматизировать начало работы над GitHub issue: получить issue через `gh`, опционально переименовать zellij tab через `zellij-tab-status`, создать git worktree, при необходимости запустить `init.sh` и запустить выбранный coding agent.
 
+Для разработки код остается модульным в `scripts/lib/start_issue/`, но install/distribution path должен собирать self-contained single-file script.
+
 ## Поддерживаемые агенты
 
 Начальные значения `--agent`:

@@ -79,6 +79,8 @@ LAUNCH_CWD=""
 LAUNCH_CMD=()
 
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+
+# BEGIN_MODULE_SOURCES
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$SCRIPT_DIR/lib/start_issue"
 
@@ -104,6 +106,7 @@ source "$LIB_DIR/output.sh"
 source "$LIB_DIR/cli.sh"
 # shellcheck source=scripts/lib/start_issue/pipeline.sh
 source "$LIB_DIR/pipeline.sh"
+# END_MODULE_SOURCES
 
 main() {
     parse_args "$@"

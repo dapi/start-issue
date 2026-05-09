@@ -1,20 +1,23 @@
-.PHONY: install uninstall
+.PHONY: build install uninstall
 
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
-LIBDIR ?= $(PREFIX)/lib/start-issue
+BUILD_DIR ?= .build
+BUILD_OUTPUT ?= $(BUILD_DIR)/start-issue
+
+build:
+	@mkdir -p "$(BUILD_DIR)"
+	@bash scripts/build-start-issue "$(BUILD_OUTPUT)" >/dev/null
+	@chmod +x "$(BUILD_OUTPUT)"
+	@echo "Built: $(BUILD_OUTPUT)"
 
 install:
 	@mkdir -p "$(BINDIR)"
-	@mkdir -p "$(LIBDIR)"
-	@cp scripts/start-issue "$(BINDIR)/start-issue"
-	@cp scripts/lib/start_issue/*.sh "$(LIBDIR)/"
+	@bash scripts/build-start-issue "$(BUILD_OUTPUT)" >/dev/null
+	@cp "$(BUILD_OUTPUT)" "$(BINDIR)/start-issue"
 	@chmod +x "$(BINDIR)/start-issue"
 	@echo "Installed: $(BINDIR)/start-issue"
-	@echo "Installed libs: $(LIBDIR)"
 
 uninstall:
 	@rm -f "$(BINDIR)/start-issue"
-	@rm -rf "$(LIBDIR)"
 	@echo "Removed: $(BINDIR)/start-issue"
-	@echo "Removed: $(LIBDIR)"
