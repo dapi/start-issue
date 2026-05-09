@@ -78,14 +78,33 @@ WORKTREE_PATH=""
 LAUNCH_CWD=""
 LAUNCH_CMD=()
 
-SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+resolve_script_path() {
+    local source_path="${BASH_SOURCE[0]}"
+    local source_dir
+    local target_path
+
+    while [[ -L "$source_path" ]]; do
+        source_dir="$(cd -P "$(dirname "$source_path")" && pwd)"
+        target_path="$(readlink "$source_path")"
+        if [[ "$target_path" == /* ]]; then
+            source_path="$target_path"
+        else
+            source_path="$source_dir/$target_path"
+        fi
+    done
+
+    source_dir="$(cd -P "$(dirname "$source_path")" && pwd)"
+    printf "%s/%s" "$source_dir" "$(basename "$source_path")"
+}
+
+SCRIPT_PATH="$(resolve_script_path)"
 
 # BEGIN_MODULE_SOURCES
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 LIB_DIR="$SCRIPT_DIR/lib/start_issue"
 
 if [[ ! -d "$LIB_DIR" ]]; then
-    LIB_DIR="$SCRIPT_DIR/../lib/start-issue"
+    LIB_DIR="$SCRIPT_DIR/../lib/start_issue"
 fi
 
 # shellcheck source=scripts/lib/start_issue/utils.sh
