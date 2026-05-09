@@ -13,7 +13,8 @@ build:
 
 install:
 	@mkdir -p "$(BINDIR)"
-	@tmpfile="$$(mktemp)"; \
+	@set -e; \
+	tmpfile="$$(mktemp)"; \
 	trap 'rm -f "$$tmpfile"' EXIT; \
 	bash scripts/build-start-issue "$$tmpfile" >/dev/null; \
 	cp "$$tmpfile" "$(BINDIR)/start-issue"
