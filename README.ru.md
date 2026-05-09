@@ -66,6 +66,30 @@ flowchart TD
     M --> N
 ```
 
+## Внутренняя архитектура
+
+CLI entrypoint остается `scripts/start-issue`, но реализация теперь разбита на специализированные shell-модули в `scripts/lib/start_issue/`.
+
+- `cli.sh` парсит аргументы и нормализует флаги в состояние workflow.
+- `config.sh` разрешает конфигурацию agent и prompt.
+- `github.sh` определяет контекст репозитория и получает metadata issue.
+- `worktree.sh` планирует поведение branch/worktree и выполняет worktree-side effects.
+- `agent.sh` владеет операциями agent adapter: validation, сборка launch command, AI branch naming и prompt improvement.
+- `output.sh` рендерит help, status, dry-run output и session framing.
+- `init.sh` владеет `start-issue init`.
+- `pipeline.sh` делает orchestration pipeline явным.
+
+Внутренний pipeline теперь такой:
+
+1. Parse input.
+2. Resolve config.
+3. Fetch issue.
+4. Plan branch and worktree.
+5. Execute the plan.
+6. Launch the selected agent.
+
+Bash стоит сохранять, пока lifecycle commands, shape конфигурации и требования к output остаются достаточно простыми для читаемых shell-модулей. Если будущие задачи потребуют nested configuration, более богатых subcommands вроде `resume` или `cleanup`, или структурированного machine-readable output, это следует считать порогом для оценки Python core.
+
 ## Аргументы CLI
 
 | Аргумент | Описание |

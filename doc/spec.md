@@ -3,7 +3,7 @@
 ## Обзор
 
 **Название**: `start-issue`
-**Тип**: Bash-скрипт
+**Тип**: Bash CLI с модульной shell-архитектурой
 **Назначение**: автоматизировать начало работы над GitHub issue: получить issue через `gh`, опционально переименовать zellij tab через `zellij-tab-status`, создать git worktree, при необходимости запустить `init.sh` и запустить выбранный coding agent.
 
 ## Поддерживаемые агенты
@@ -17,6 +17,30 @@
 | `kimi` | Запускает Kimi CLI в созданном worktree. |
 | `pi` | Запускает Pi CLI из созданного worktree. |
 | `none` | Готовит worktree и печатает ручные следующие шаги без запуска агента. |
+
+## Внутренняя архитектура
+
+Публичный CLI contract остается за `scripts/start-issue`, но внутренняя реализация разбита на shell-модули в `scripts/lib/start_issue/`.
+
+| Модуль | Ответственность |
+|--------|-----------------|
+| `cli.sh` | CLI parsing и нормализация входных флагов |
+| `config.sh` | Разрешение agent/prompt config и prompt rendering |
+| `github.sh` | Parse issue input, detect repo/base branch, fetch issue metadata |
+| `worktree.sh` | Branch naming, worktree planning, worktree/init/zellij side effects |
+| `agent.sh` | Agent adapter contract: validate, branch-name generation, prompt improvement, launch command |
+| `output.sh` | Help, status rendering, dry-run output, session header |
+| `init.sh` | Workflow конфигурационного `init` |
+| `pipeline.sh` | Явная orchestration pipeline |
+
+Agent-specific behavior должен быть централизован за единым adapter boundary:
+
+- validate agent support
+- build launch command
+- generate branch name in `--ai`
+- improve prompt template in `--improve-prompt`
+
+Если будущие изменения потребуют nested configuration, richer lifecycle subcommands (`resume`, `list`, `cleanup`) или полноценный structured output, это считается порогом для оценки Python core вместо дальнейшего роста Bash.
 
 ## Входные данные
 
@@ -157,6 +181,15 @@ Templating правила:
 - `--dry-run` печатает prompt source и launch command. Если rendered prompt очень большой, команда показывает placeholder, а полный prompt можно вывести через `START_ISSUE_DUMP_PROMPT=1`.
 
 ## Алгоритм работы
+
+Оркестрация выражена явным pipeline:
+
+1. Parse input.
+2. Resolve config.
+3. Fetch issue.
+4. Plan branch and worktree.
+5. Execute the plan.
+6. Launch the selected agent.
 
 ### Фаза 0: Config init
 
