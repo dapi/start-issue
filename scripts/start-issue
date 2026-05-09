@@ -1403,6 +1403,9 @@ main() {
     parse_args "$@"
 
     if [[ "$MISSING_ISSUE" == "true" ]]; then
+        if [[ "$IMPROVE_PROMPT" == "true" ]]; then
+            die "--improve-prompt requires <issue-url-or-number>. Example: start-issue 123 --improve-prompt"
+        fi
         detect_project_root_if_available
         resolve_agent
         resolve_prompt_template

@@ -99,6 +99,16 @@ install_fake_zellij_tab_status() {
   [[ "$output" != *"Fetching issue"* ]]
 }
 
+@test "prompt improvement without issue prints explicit error" {
+  run_start_issue --improve-prompt
+
+  assert_failure
+  assert_output_contains "--improve-prompt requires <issue-url-or-number>"
+  assert_output_contains "Example: start-issue 123 --improve-prompt"
+  [[ "$output" != *"Current configuration:"* ]]
+  [[ "$output" != *"Fetching issue"* ]]
+}
+
 @test "full issue URL overrides detected repository" {
   run_start_issue https://github.com/other/project/issues/1 --dry-run --no-init --no-agent
 
