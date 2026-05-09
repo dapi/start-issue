@@ -20,7 +20,7 @@ It fetches issue metadata with `gh`, creates a git worktree with a branch name b
 make install
 ```
 
-This installs `scripts/start-issue` to `~/.local/bin/start-issue`.
+This builds a self-contained `start-issue` script from the modular sources and installs it to `~/.local/bin/start-issue`.
 
 Make sure `~/.local/bin` is in your `PATH`.
 
@@ -65,6 +65,31 @@ flowchart TD
     L --> N["Work on issue"]
     M --> N
 ```
+
+## Internal Architecture
+
+The CLI entrypoint remains `scripts/start-issue`, but the implementation is now split into focused shell modules under `scripts/lib/start_issue/`.
+`make build` and `make install` bundle those modules back into a single-file script for distribution and local installation.
+
+- `cli.sh` parses arguments and normalizes flags into workflow state.
+- `config.sh` resolves agent and prompt configuration.
+- `github.sh` resolves repository context and fetches issue metadata.
+- `worktree.sh` plans branch/worktree behavior and runs worktree-side effects.
+- `agent.sh` owns agent adapter operations: validation, launch command construction, AI branch naming, and prompt improvement.
+- `output.sh` renders help, status, dry-run output, and session framing.
+- `init.sh` owns `start-issue init`.
+- `pipeline.sh` makes the orchestration pipeline explicit.
+
+The internal pipeline is now:
+
+1. Parse input.
+2. Resolve config.
+3. Fetch issue.
+4. Plan branch and worktree.
+5. Execute the plan.
+6. Launch the selected agent.
+
+The project should keep Bash as long as lifecycle commands, configuration shape, and output needs stay simple enough for shell modules to remain readable. If future work requires nested configuration, richer subcommands such as `resume` or `cleanup`, or more structured machine-readable output, that should be treated as the threshold for evaluating a Python core.
 
 ## CLI Arguments
 

@@ -24,7 +24,7 @@ jobs:
       - name: Static checks
         run: |
           bash -n scripts/start-issue
-          shellcheck scripts/start-issue
+          shellcheck scripts/start-issue scripts/lib/start_issue/*.sh
           git diff --check
 
       - name: Legacy environment drift check
