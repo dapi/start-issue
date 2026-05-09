@@ -34,6 +34,7 @@ start-issue 123 --agent codex
 start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
 start-issue 123 --no-agent
 start-issue 123 --dry-run
+start-issue init
 ```
 
 Running `start-issue` without an issue prints the normal help plus the currently
@@ -70,19 +71,23 @@ flowchart TD
 | Argument | Description |
 |----------|-------------|
 | `ISSUE` | GitHub issue number or full GitHub issue URL. Required. |
+| `init` | Create default configuration files for either the current project or the current user. |
 | `--repo OWNER/REPO`, `-r OWNER/REPO` | Repository to read the issue from when `ISSUE` is a number. If omitted, `start-issue` detects the repository from `origin`. |
 | `--base BRANCH`, `-b BRANCH` | Base branch for the new worktree branch. If omitted, `start-issue` uses the repository default when available, otherwise the current branch. |
 | `--worktree-dir DIR`, `-w DIR` | Parent directory for created worktrees. Overrides `START_ISSUE_WORKTREE_DIR`. |
 | `--flat` | Use a flat worktree path by replacing `/` in the branch name with `-`. |
-| `--agent AGENT` | Agent to launch after preparing the worktree. Supported: `claude`, `codex`, `kimi`, `pi`, `none`. |
+| `--agent AGENT` | Agent to launch after preparing the worktree. With `init`, the default agent to write. Supported: `claude`, `codex`, `kimi`, `pi`, `none`. |
 | `--no-agent` | Prepare the worktree and print manual next steps without launching an agent. Alias for `--agent none`. |
 | `--no-claude` | Compatibility alias for `--no-agent`. |
-| `--prompt TEXT` | Inline prompt template for the selected agent. Mutually exclusive with `--prompt-file`. |
-| `--prompt-file PATH` | Prompt template file for the selected agent. Mutually exclusive with `--prompt`. |
+| `--prompt TEXT` | Inline prompt template for the selected agent. With `init`, the prompt template to write. Mutually exclusive with `--prompt-file`. |
+| `--prompt-file PATH` | Prompt template file for the selected agent. With `init`, the file content to write. Mutually exclusive with `--prompt`. |
 | `--no-init` | Do not run `init.sh` even if it exists in the created worktree. |
 | `--command COMMAND`, `-c COMMAND` | Claude command prefix used by the default Claude prompt. Default: `/task-router:route-task`. |
 | `--ai` | Ask the selected agent to generate the branch name. Falls back to the local branch-name heuristic if generation fails. |
-| `--dry-run` | Print the selected configuration and launch command without creating a worktree, running `init.sh`, or launching an agent. |
+| `--project` | With `init`, write project config under `.start-issue` in the git root. |
+| `--user` | With `init`, write user config under `~/.config/start-issue`. |
+| `--force` | With `init`, overwrite existing `agent` and `prompt.md` files. Existing files are kept by default. |
+| `--dry-run` | Print the selected configuration and launch command without creating a worktree, running `init.sh`, or launching an agent. With `init`, print planned config writes without creating files. |
 | `--version`, `-v` | Show version. |
 | `--help`, `-h` | Show help. |
 
@@ -111,6 +116,8 @@ Related Claude Code marketplace workflows:
 | `.start-issue/prompt.md` | Project default prompt template. Read from the git root. |
 | `~/.config/start-issue/agent` | User default agent. |
 | `~/.config/start-issue/prompt.md` | User default prompt template. |
+
+Run `start-issue init` to create these files. If neither `--project` nor `--user` is provided, the command asks which scope to initialize. It writes the built-in default agent and prompt unless `--agent`, `--prompt`, or `--prompt-file` is provided. If an existing `agent` file is kept without `--force`, the generated default prompt is chosen for that kept agent.
 
 Configuration precedence:
 

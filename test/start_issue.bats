@@ -152,6 +152,65 @@ install_fake_zellij_tab_status() {
   assert_output_contains "cd $HOME/worktrees/feature/issue-1-add-login-button && pi"
 }
 
+@test "init writes project config with selected agent and portable prompt" {
+  run_start_issue init --project --agent codex
+
+  assert_success
+  assert_output_contains "Scope: project config"
+  assert_output_contains "Agent: codex (CLI)"
+  [[ "$(cat .start-issue/agent)" == "codex" ]]
+  [[ "$(cat .start-issue/prompt.md)" == *"Implement GitHub issue {ISSUE_URL} in this worktree."* ]]
+  [[ "$output" != *"Fetching issue"* ]]
+}
+
+@test "init prompts for user config when scope is omitted" {
+  run bash -c 'printf "2\n" | "$REPO_ROOT/scripts/start-issue" init'
+
+  assert_success
+  assert_output_contains "User config"
+  [[ "$(cat "$HOME/.config/start-issue/agent")" == "claude" ]]
+  [[ "$(cat "$HOME/.config/start-issue/prompt.md")" == "/task-router:route-task {ISSUE_URL}" ]]
+}
+
+@test "init keeps existing config unless forced" {
+  mkdir -p .start-issue
+  printf "kimi\n" > .start-issue/agent
+  printf "custom\n" > .start-issue/prompt.md
+
+  run_start_issue init --project --agent codex --prompt inline
+  assert_success
+  [[ "$(cat .start-issue/agent)" == "kimi" ]]
+  [[ "$(cat .start-issue/prompt.md)" == "custom" ]]
+
+  run_start_issue init --project --agent codex --prompt inline --force
+  assert_success
+  [[ "$(cat .start-issue/agent)" == "codex" ]]
+  [[ "$(cat .start-issue/prompt.md)" == "inline" ]]
+}
+
+@test "init derives missing prompt from kept existing agent" {
+  mkdir -p .start-issue
+  printf "codex\n" > .start-issue/agent
+
+  run_start_issue init --project
+
+  assert_success
+  assert_output_contains "Agent: codex ("
+  assert_output_contains ".start-issue/agent (existing)"
+  [[ "$(cat .start-issue/agent)" == "codex" ]]
+  [[ "$(cat .start-issue/prompt.md)" == *"Implement GitHub issue {ISSUE_URL} in this worktree."* ]]
+  [[ "$(cat .start-issue/prompt.md)" != *"/task-router:route-task"* ]]
+}
+
+@test "init dry-run does not write config files" {
+  run_start_issue init --project --agent codex --dry-run
+
+  assert_success
+  assert_output_contains "[DRY-RUN] Would write agent config"
+  [[ ! -e .start-issue/agent ]]
+  [[ ! -e .start-issue/prompt.md ]]
+}
+
 @test "--no-agent prints manual next steps" {
   run_start_issue 1 --no-agent --dry-run --no-init
 

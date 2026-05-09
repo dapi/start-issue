@@ -3,12 +3,16 @@
 # start-issue - Start working on a GitHub issue with git worktree and an agent
 #
 # Usage: start-issue <issue-url-or-number> [options]
+#        start-issue init [options]
 #
 # Options:
 #   --repo, -r <owner/repo>    Repository (default: from git remote)
 #   --base, -b <branch>        Base branch (default: main or master)
 #   --worktree-dir, -w <dir>   Worktree directory (default: ~/worktrees)
 #   --agent <name>             Agent to launch: claude, codex, kimi, pi, none
+#   --project                  With init, write .start-issue config in the repo
+#   --user                     With init, write config in ~/.config/start-issue
+#   --force                    With init, overwrite existing config files
 #   --no-agent                 Only prepare the worktree, do not launch an agent
 #   --no-init                  Skip init.sh execution
 #   --dry-run                  Show what would be done without executing
@@ -17,7 +21,7 @@
 
 set -euo pipefail
 
-VERSION="1.9.0"
+VERSION="1.10.0"
 
 # Colors
 RED='\033[0;31m'
@@ -46,6 +50,9 @@ INITIAL_COMMAND=""
 ISSUE_INPUT=""
 MISSING_ISSUE=false
 PROJECT_ROOT=""
+INIT_CONFIG=false
+INIT_SCOPE=""
+INIT_FORCE=false
 
 AGENT=""
 AGENT_CLI=""
@@ -168,10 +175,12 @@ show_help() {
 Start working on a GitHub issue with git worktree and a configurable agent
 
 Usage: start-issue <issue-url-or-number> [options]
+       start-issue init [options]
 
 Arguments:
   <issue-url-or-number>    GitHub issue URL or issue number
                            Examples: 123, https://github.com/owner/repo/issues/123
+  init                     Create default start-issue configuration
 
 Options:
   --repo, -r <owner/repo>    Repository (default: detected from git remote)
@@ -180,6 +189,7 @@ Options:
                              Default: START_ISSUE_WORKTREE_DIR or ~/worktrees
   --flat                     Use flat worktree structure (replace / with - in path)
   --agent <name>             Agent to launch: claude, codex, kimi, pi, none
+                             With init: default agent to write
   --no-agent                 Only create worktree, do not start an agent session
   --no-claude                Compatibility alias for --no-agent
   --prompt <text>            Prompt template for the launched agent
@@ -188,6 +198,9 @@ Options:
   --command, -c <cmd>        Compatibility: initial command for Claude default launch
   --ai                       Use the selected agent for branch name generation
                              Default: fast bash heuristics
+  --project                  With init: write .start-issue config in this repo
+  --user                     With init: write config in ~/.config/start-issue
+  --force                    With init: overwrite existing config files
   --dry-run                  Show what would be done without executing
   --version, -v              Show version
   --help, -h                 Show this help
@@ -220,6 +233,9 @@ Examples:
   start-issue 123 --command "/debug"      # Claude command prefix
   start-issue 123 --flat                  # Flat worktree path
   start-issue 123 --dry-run
+  start-issue init
+  start-issue init --project --agent codex
+  start-issue init --user --force
 EOF
 }
 
@@ -424,6 +440,156 @@ render_prompt_template() {
     rendered="${rendered//\{BASE_BRANCH\}/$BASE_BRANCH}"
 
     AGENT_PROMPT="$rendered"
+}
+
+# ============================================================================
+# Configuration init
+# ============================================================================
+
+resolve_init_agent() {
+    local agent_file="$1"
+
+    if [[ -f "$agent_file" && "$INIT_FORCE" != "true" ]]; then
+        AGENT=$(read_first_config_value "$agent_file")
+        AGENT_SOURCE="$agent_file (existing)"
+    elif [[ -n "$AGENT_CLI" ]]; then
+        AGENT=$(trim "$AGENT_CLI")
+        AGENT_SOURCE="CLI"
+    else
+        AGENT="claude"
+        AGENT_SOURCE="built-in default"
+    fi
+
+    if [[ -z "$AGENT" ]]; then
+        die "Agent config is empty. Valid agents: claude, codex, kimi, pi, none."
+    fi
+
+    validate_agent
+}
+
+resolve_init_prompt_template() {
+    if [[ -n "$PROMPT_FILE_CLI" && -n "$PROMPT_INLINE_CLI" ]]; then
+        die "Use either --prompt-file or --prompt, not both."
+    fi
+
+    if [[ -n "$PROMPT_FILE_CLI" ]]; then
+        read_prompt_file "$PROMPT_FILE_CLI"
+        PROMPT_SOURCE="CLI --prompt-file: $PROMPT_FILE_CLI"
+    elif [[ -n "$PROMPT_INLINE_CLI" ]]; then
+        PROMPT_TEMPLATE="$PROMPT_INLINE_CLI"
+        PROMPT_SOURCE="CLI --prompt"
+    elif [[ "$AGENT" == "claude" ]]; then
+        PROMPT_TEMPLATE=$(default_claude_prompt_template)
+        PROMPT_SOURCE="built-in Claude command"
+    else
+        PROMPT_TEMPLATE=$(default_portable_prompt_template)
+        PROMPT_SOURCE="built-in portable prompt"
+    fi
+}
+
+select_init_scope() {
+    local project_available=false
+    local choice=""
+
+    if git rev-parse --git-dir &> /dev/null; then
+        detect_project_root
+        project_available=true
+    fi
+
+    echo "Initialize start-issue configuration:"
+    if [[ "$project_available" == "true" ]]; then
+        echo "  1) Project config ($PROJECT_ROOT/.start-issue)"
+        echo "  2) User config ($HOME/.config/start-issue)"
+        if ! read -r -p "Choice [1/2]: " choice; then
+            die "No init scope selected. Use --project or --user."
+        fi
+
+        case "$choice" in
+            1|p|P|project|Project)
+                INIT_SCOPE="project"
+                ;;
+            2|u|U|user|User)
+                INIT_SCOPE="user"
+                ;;
+            *)
+                die "Invalid init scope: $choice. Use --project or --user."
+                ;;
+        esac
+    else
+        echo "  1) User config ($HOME/.config/start-issue)"
+        if ! read -r -p "Choice [1]: " choice; then
+            die "No init scope selected. Use --user outside a git repository."
+        fi
+
+        case "$choice" in
+            ""|1|u|U|user|User)
+                INIT_SCOPE="user"
+                ;;
+            *)
+                die "Project config requires a git repository. Use --user outside a git repository."
+                ;;
+        esac
+    fi
+}
+
+write_init_file() {
+    local path="$1"
+    local content="$2"
+    local label="$3"
+
+    if [[ -e "$path" && "$INIT_FORCE" != "true" ]]; then
+        log_warn "$label already exists, keeping: $path"
+        return
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo "   [DRY-RUN] Would write $label: $path"
+        return
+    fi
+
+    mkdir -p "$(dirname "$path")"
+    printf "%s\n" "$content" > "$path"
+    log_success "   Wrote $label: $path"
+}
+
+run_config_init() {
+    if [[ -z "$INIT_SCOPE" ]]; then
+        select_init_scope
+    fi
+
+    case "$INIT_SCOPE" in
+        project)
+            check_git_repo
+            detect_project_root
+            ;;
+        user) ;;
+        *)
+            die "Invalid init scope: $INIT_SCOPE. Use --project or --user."
+            ;;
+    esac
+
+    local target_dir=""
+    local scope_label=""
+
+    if [[ "$INIT_SCOPE" == "project" ]]; then
+        target_dir="$PROJECT_ROOT/.start-issue"
+        scope_label="project config"
+    else
+        target_dir="$HOME/.config/start-issue"
+        scope_label="user config"
+    fi
+
+    resolve_init_agent "$target_dir/agent"
+    resolve_init_prompt_template
+
+    echo "Scope: $scope_label"
+    echo "Directory: $target_dir"
+    echo "Agent: $AGENT ($AGENT_SOURCE)"
+    echo "Prompt source: $PROMPT_SOURCE"
+    echo ""
+
+    write_init_file "$target_dir/agent" "$AGENT" "agent config"
+    write_init_file "$target_dir/prompt.md" "$PROMPT_TEMPLATE" "prompt template"
 }
 
 # ============================================================================
@@ -1014,6 +1180,24 @@ parse_args() {
                 FAST_MODE=false
                 shift
                 ;;
+            --project)
+                if [[ "$INIT_SCOPE" == "user" ]]; then
+                    die "Use either --project or --user, not both."
+                fi
+                INIT_SCOPE="project"
+                shift
+                ;;
+            --user)
+                if [[ "$INIT_SCOPE" == "project" ]]; then
+                    die "Use either --project or --user, not both."
+                fi
+                INIT_SCOPE="user"
+                shift
+                ;;
+            --force)
+                INIT_FORCE=true
+                shift
+                ;;
             --dry-run)
                 DRY_RUN=true
                 shift
@@ -1030,7 +1214,11 @@ parse_args() {
                 die "Unknown option: $1. Use --help for usage."
                 ;;
             *)
-                if [[ -z "$ISSUE_INPUT" ]]; then
+                if [[ "$1" == "init" && -z "$ISSUE_INPUT" && "$INIT_CONFIG" == "false" ]]; then
+                    INIT_CONFIG=true
+                elif [[ "$INIT_CONFIG" == "true" ]]; then
+                    die "Unexpected argument for init: $1"
+                elif [[ -z "$ISSUE_INPUT" ]]; then
                     ISSUE_INPUT="$1"
                 else
                     die "Unexpected argument: $1"
@@ -1039,6 +1227,14 @@ parse_args() {
                 ;;
         esac
     done
+
+    if [[ "$INIT_CONFIG" == "true" ]]; then
+        return
+    fi
+
+    if [[ -n "$INIT_SCOPE" || "$INIT_FORCE" == "true" ]]; then
+        die "--project, --user, and --force are only valid with init."
+    fi
 
     if [[ -z "$ISSUE_INPUT" ]]; then
         MISSING_ISSUE=true
@@ -1064,6 +1260,11 @@ main() {
 
     echo -e "${BLUE}start-issue${NC} v$VERSION"
     echo ""
+
+    if [[ "$INIT_CONFIG" == "true" ]]; then
+        run_config_init
+        return
+    fi
 
     check_core_dependencies
     check_git_repo
