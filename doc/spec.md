@@ -44,6 +44,8 @@ preview. Этот путь не обращается к GitHub и заверша
 | `--no-claude` | Совместимый alias для `--no-agent` | false |
 | `--prompt` | Inline prompt template | См. приоритет prompt |
 | `--prompt-file` | Файл prompt template | См. приоритет prompt |
+| `--improve-prompt` | Сгенерировать reviewable proposal улучшенного prompt template и выйти до создания worktree | false |
+| `--prompt-output-file` | Путь proposal-файла для `--improve-prompt` | Для prompt-файла: рядом с source как `*.improved.md`; иначе `.start-issue/prompt.improved.md` |
 | `--no-init` | Пропустить запуск `init.sh` | false |
 | `--command` / `-c` | Совместимый Claude command для дефолтного Claude prompt | `/task-router:route-task` |
 | `--ai` | Генерировать имя ветки выбранным агентом | false, используется быстрая bash-эвристика |
@@ -79,6 +81,22 @@ git rev-parse --show-toplevel
 5. Built-in default
 
 Если одновременно заданы `--prompt-file` и `--prompt`, скрипт завершает работу с ошибкой. То же правило действует для `START_ISSUE_PROMPT_FILE` и `START_ISSUE_PROMPT`, когда env является активным источником prompt.
+
+### Prompt improvement
+
+`--improve-prompt` включает режим улучшения prompt template, который используется для старта разработки.
+
+Алгоритм режима:
+
+1. Выбрать active prompt template по обычному приоритету.
+2. Получить GitHub issue, чтобы использовать его как контекст улучшения.
+3. Попросить выбранного agent вернуть полный улучшенный prompt template.
+4. Записать результат в reviewable proposal-файл.
+5. Завершить выполнение до переименования Zellij tab, генерации branch, создания worktree, запуска `init.sh` и запуска agent session.
+
+Режим не перезаписывает active prompt template. Если active prompt взят из файла, proposal по умолчанию пишется рядом с ним как `*.improved.md`. Если active prompt built-in или inline, proposal по умолчанию пишется в `.start-issue/prompt.improved.md` в git top-level directory. `--prompt-output-file` задает путь явно.
+
+Если proposal-файл уже существует, скрипт завершается с ошибкой, чтобы не перезаписать reviewable артефакт. `--agent none` в этом режиме невалиден.
 
 ## Инициализация конфигурации
 
@@ -164,6 +182,8 @@ Templating правила:
 7. Определить base branch.
 8. Выбрать agent по приоритету конфигурации.
 9. Проверить наличие CLI выбранного agent, если agent не `none` и режим не `--dry-run`.
+10. Выбрать prompt template.
+11. Если включен `--improve-prompt`, сгенерировать proposal улучшенного prompt template и завершить workflow до worktree/agent launch.
 
 ### Фаза 2: Получение issue
 
@@ -306,6 +326,9 @@ none:
 | Agent неизвестен | `Unknown agent: {agent}` |
 | Agent CLI отсутствует вне `--dry-run` | `{agent} CLI not found. Install it or use --agent none.` |
 | Prompt file отсутствует | `Prompt file not found: {path}` |
+| `--improve-prompt` используется с `--agent none` | `--improve-prompt requires an agent. Use --agent claude, codex, kimi, or pi.` |
+| Proposal-файл уже существует | `Prompt improvement output already exists: {path}` |
+| Agent не смог сгенерировать proposal | `Could not generate improved prompt with {agent}` |
 | Одновременно заданы inline и file prompt | `Use either ... not both.` |
 | Worktree создать не удалось | `Failed to create worktree` |
 | Issue не передан | Печатает help и current configuration, затем выходит с ненулевым кодом |
@@ -329,6 +352,8 @@ start-issue 123 --repo owner/repo
 start-issue 123 --base develop
 start-issue 123 --agent codex
 start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
+start-issue 123 --agent codex --improve-prompt
+start-issue 123 --agent codex --improve-prompt --prompt-output-file .start-issue/prompt.next.md
 start-issue 123 --agent pi --prompt "Implement {ISSUE_URL} in {WORKTREE_PATH}"
 start-issue 123 --no-agent
 start-issue 123 --no-claude
@@ -368,6 +393,7 @@ START_ISSUE_WORKTREE_DIR=~/projects/worktrees start-issue 123
 - [x] Запуск без Issue печатает выбранный agent и prompt details с расположением prompt.
 - [x] `start-issue init` создает project или user config с agent и prompt по умолчанию.
 - [x] `start-issue init --force` перезаписывает существующие config-файлы.
+- [x] `--improve-prompt` создает reviewable proposal улучшенного prompt template и не перезаписывает active prompt.
 - [x] Claude-specific aliases сохранены, help text описывает agent-neutral поведение.
 - [x] `--dry-run` печатает selected agent, prompt source и launch command.
 - [x] `START_ISSUE_WORKTREE_DIR` является env для worktree directory.
