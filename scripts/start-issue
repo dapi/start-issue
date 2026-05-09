@@ -80,25 +80,30 @@ LAUNCH_CMD=()
 
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="$SCRIPT_DIR/lib/start_issue"
+
+if [[ ! -d "$LIB_DIR" ]]; then
+    LIB_DIR="$SCRIPT_DIR/../lib/start-issue"
+fi
 
 # shellcheck source=scripts/lib/start_issue/utils.sh
-source "$SCRIPT_DIR/lib/start_issue/utils.sh"
+source "$LIB_DIR/utils.sh"
 # shellcheck source=scripts/lib/start_issue/config.sh
-source "$SCRIPT_DIR/lib/start_issue/config.sh"
+source "$LIB_DIR/config.sh"
 # shellcheck source=scripts/lib/start_issue/agent.sh
-source "$SCRIPT_DIR/lib/start_issue/agent.sh"
+source "$LIB_DIR/agent.sh"
 # shellcheck source=scripts/lib/start_issue/init.sh
-source "$SCRIPT_DIR/lib/start_issue/init.sh"
+source "$LIB_DIR/init.sh"
 # shellcheck source=scripts/lib/start_issue/github.sh
-source "$SCRIPT_DIR/lib/start_issue/github.sh"
+source "$LIB_DIR/github.sh"
 # shellcheck source=scripts/lib/start_issue/worktree.sh
-source "$SCRIPT_DIR/lib/start_issue/worktree.sh"
+source "$LIB_DIR/worktree.sh"
 # shellcheck source=scripts/lib/start_issue/output.sh
-source "$SCRIPT_DIR/lib/start_issue/output.sh"
+source "$LIB_DIR/output.sh"
 # shellcheck source=scripts/lib/start_issue/cli.sh
-source "$SCRIPT_DIR/lib/start_issue/cli.sh"
+source "$LIB_DIR/cli.sh"
 # shellcheck source=scripts/lib/start_issue/pipeline.sh
-source "$SCRIPT_DIR/lib/start_issue/pipeline.sh"
+source "$LIB_DIR/pipeline.sh"
 
 main() {
     parse_args "$@"
