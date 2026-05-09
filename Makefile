@@ -13,8 +13,10 @@ build:
 
 install:
 	@mkdir -p "$(BINDIR)"
-	@bash scripts/build-start-issue "$(BUILD_OUTPUT)" >/dev/null
-	@cp "$(BUILD_OUTPUT)" "$(BINDIR)/start-issue"
+	@tmpfile="$$(mktemp)"; \
+	trap 'rm -f "$$tmpfile"' EXIT; \
+	bash scripts/build-start-issue "$$tmpfile" >/dev/null; \
+	cp "$$tmpfile" "$(BINDIR)/start-issue"
 	@chmod +x "$(BINDIR)/start-issue"
 	@echo "Installed: $(BINDIR)/start-issue"
 
