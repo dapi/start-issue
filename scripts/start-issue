@@ -79,6 +79,7 @@ WORKTREE_PATH=""
 
 LAUNCH_CWD=""
 LAUNCH_CMD=()
+CONFLICT_CHOICE=""
 
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
@@ -141,6 +142,16 @@ absolute_path() {
         printf "%s" "$path"
     else
         printf "%s/%s" "$(pwd)" "$path"
+    fi
+}
+
+canonicalize_existing_path() {
+    local path="$1"
+
+    if [[ -d "$path" ]]; then
+        (cd "$path" && pwd -P)
+    else
+        printf "%s" "$path"
     fi
 }
 
@@ -929,102 +940,221 @@ generate_branch_name() {
 # Worktree functions
 # ============================================================================
 
-create_worktree() {
-    local worktree_name="$BRANCH_NAME"
+worktree_name_for_branch() {
+    local branch_name="$1"
+    local worktree_name="$branch_name"
+
     if [[ "$FLAT_WORKTREE" == "true" ]]; then
-        worktree_name="${BRANCH_NAME//\//-}"
+        worktree_name="${branch_name//\//-}"
     fi
-    WORKTREE_PATH="$WORKTREE_DIR/$worktree_name"
+
+    printf "%s" "$worktree_name"
+}
+
+plan_worktree_path() {
+    WORKTREE_PATH="$WORKTREE_DIR/$(worktree_name_for_branch "$BRANCH_NAME")"
+}
+
+worktree_branch_ref() {
+    local branch_name="$1"
+    printf "refs/heads/%s" "$branch_name"
+}
+
+find_worktree_path_by_branch() {
+    local target_ref
+    local line
+    local current_path=""
+
+    target_ref=$(worktree_branch_ref "$1")
+
+    while IFS= read -r line; do
+        case "$line" in
+            worktree\ *)
+                current_path="${line#worktree }"
+                ;;
+            branch\ "$target_ref")
+                printf "%s" "$current_path"
+                return 0
+                ;;
+        esac
+    done < <(git worktree list --porcelain)
+
+    return 1
+}
+
+find_worktree_branch_by_path() {
+    local target_path="$1"
+    local line
+    local current_path=""
+
+    target_path=$(canonicalize_existing_path "$target_path")
+
+    while IFS= read -r line; do
+        case "$line" in
+            worktree\ *)
+                current_path="${line#worktree }"
+                ;;
+            branch\ *)
+                if [[ "$current_path" == "$target_path" ]]; then
+                    printf "%s" "${line#branch }"
+                    return 0
+                fi
+                ;;
+        esac
+    done < <(git worktree list --porcelain)
+
+    return 1
+}
+
+validate_reused_worktree() {
+    local registered_branch
+
+    if [[ ! -d "$WORKTREE_PATH" ]]; then
+        die "Cannot reuse worktree path '$WORKTREE_PATH': directory does not exist."
+    fi
+
+    registered_branch=$(find_worktree_branch_by_path "$WORKTREE_PATH" || true)
+
+    if [[ -z "$registered_branch" ]]; then
+        die "Cannot reuse worktree path '$WORKTREE_PATH': path exists but is not a git worktree for this repository."
+    fi
+
+    if [[ "$registered_branch" != "$(worktree_branch_ref "$BRANCH_NAME")" ]]; then
+        die "Cannot reuse worktree path '$WORKTREE_PATH': it belongs to branch '${registered_branch#refs/heads/}', not '$BRANCH_NAME'."
+    fi
+}
+
+prompt_branch_conflict_resolution() {
+    local existing_worktree="$1"
+
+    echo ""
+    log_warn "Branch '$BRANCH_NAME' already exists."
+    if [[ -n "$existing_worktree" ]]; then
+        echo "   Existing worktree: $existing_worktree"
+    fi
+    echo ""
+    echo "  1) Use existing worktree and continue"
+    echo "  2) Create new branch with different name"
+    echo "  3) Delete branch/worktree and recreate"
+    echo "  0) Exit"
+    echo ""
+    read -r -n 1 -p "Choice: " CONFLICT_CHOICE
+    echo ""
+}
+
+plan_branch_reuse_resolution() {
+    local existing_worktree="$1"
+
+    prompt_branch_conflict_resolution "$existing_worktree"
+
+    case "$CONFLICT_CHOICE" in
+        1)
+            if [[ -z "$existing_worktree" ]]; then
+                die "No existing worktree found for branch '$BRANCH_NAME'. Use 3 to delete and recreate."
+            fi
+            WORKTREE_PATH="$existing_worktree"
+            validate_reused_worktree
+            log_info "   Using existing worktree: $WORKTREE_PATH"
+            return 0
+            ;;
+        2)
+            local version=2
+            local new_branch="${BRANCH_NAME}-v${version}"
+
+            while git show-ref --verify --quiet "refs/heads/$new_branch" 2>/dev/null; do
+                ((version++))
+                new_branch="${BRANCH_NAME}-v${version}"
+            done
+
+            BRANCH_NAME="$new_branch"
+            plan_worktree_path
+            log_info "   New branch name: $BRANCH_NAME"
+            return 1
+            ;;
+        3)
+            log_info "   Removing existing branch/worktree..."
+            if [[ -n "$existing_worktree" ]]; then
+                git worktree remove --force "$existing_worktree" 2>/dev/null || rm -rf "$existing_worktree"
+            fi
+            git branch -D "$BRANCH_NAME" 2>/dev/null || true
+            log_success "   ✅ Cleaned up"
+            return 1
+            ;;
+        *)
+            die "Aborted"
+            ;;
+    esac
+}
+
+prompt_path_conflict_resolution() {
+    local path_branch="$1"
+
+    echo ""
+    log_warn "Worktree path already exists: $WORKTREE_PATH"
+    if [[ -n "$path_branch" ]]; then
+        echo "   Registered branch: ${path_branch#refs/heads/}"
+    else
+        echo "   Registered branch: none"
+    fi
+    echo ""
+
+    echo "  1) Use existing worktree"
+    echo "  2) Delete and recreate"
+    echo "  0) Exit"
+    echo ""
+    read -r -n 1 -p "Choice: " CONFLICT_CHOICE
+    echo ""
+}
+
+plan_path_reuse_resolution() {
+    local path_branch="$1"
+
+    prompt_path_conflict_resolution "$path_branch"
+
+    case "$CONFLICT_CHOICE" in
+        1)
+            validate_reused_worktree
+            log_info "   Using existing worktree"
+            return 0
+            ;;
+        2)
+            log_info "   Removing existing worktree..."
+            git worktree remove --force "$WORKTREE_PATH" 2>/dev/null || rm -rf "$WORKTREE_PATH"
+            if [[ -n "$path_branch" ]]; then
+                git branch -D "${path_branch#refs/heads/}" 2>/dev/null || true
+            else
+                git branch -D "$BRANCH_NAME" 2>/dev/null || true
+            fi
+            return 1
+            ;;
+        *)
+            die "Aborted"
+            ;;
+    esac
+}
+
+create_worktree() {
+    local existing_worktree=""
+    local path_branch=""
+
+    plan_worktree_path
 
     log_info "📁 Creating worktree..."
     echo "   Path: $WORKTREE_PATH"
     echo "   Base: $BASE_BRANCH"
 
-    # Check if branch already exists
     if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME" 2>/dev/null; then
-        # Find existing worktree for this branch
-        local existing_worktree
-        existing_worktree=$(git worktree list --porcelain | grep -A2 "^worktree " | \
-            awk -v branch="$BRANCH_NAME" '/^worktree /{path=$2} /^branch refs\/heads\// && $2 ~ branch {print path}' | head -1)
-
-        echo ""
-        log_warn "Branch '$BRANCH_NAME' already exists."
-        if [[ -n "$existing_worktree" ]]; then
-            echo "   Existing worktree: $existing_worktree"
+        existing_worktree=$(find_worktree_path_by_branch "$BRANCH_NAME" || true)
+        if plan_branch_reuse_resolution "$existing_worktree"; then
+            return
         fi
-        echo ""
-        echo "  1) Use existing worktree and continue"
-        echo "  2) Create new branch with different name"
-        echo "  3) Delete branch/worktree and recreate"
-        echo "  0) Exit"
-        echo ""
-        read -r -n 1 -p "Choice: " choice
-        echo ""
-        case "$choice" in
-            1)
-                if [[ -n "$existing_worktree" ]]; then
-                    WORKTREE_PATH="$existing_worktree"
-                    log_info "   Using existing worktree: $WORKTREE_PATH"
-                    return
-                else
-                    die "No existing worktree found for branch '$BRANCH_NAME'. Use 3 to delete and recreate."
-                fi
-                ;;
-            2)
-                # Generate new branch name with version suffix (-v2, -v3, etc.)
-                local version=2
-                local new_branch="${BRANCH_NAME}-v${version}"
-                while git show-ref --verify --quiet "refs/heads/$new_branch" 2>/dev/null; do
-                    ((version++))
-                    new_branch="${BRANCH_NAME}-v${version}"
-                done
-                BRANCH_NAME="$new_branch"
-                local worktree_name="$BRANCH_NAME"
-                if [[ "$FLAT_WORKTREE" == "true" ]]; then
-                    worktree_name="${BRANCH_NAME//\//-}"
-                fi
-                WORKTREE_PATH="$WORKTREE_DIR/$worktree_name"
-                log_info "   New branch name: $BRANCH_NAME"
-                ;;
-            3)
-                log_info "   Removing existing branch/worktree..."
-                if [[ -n "$existing_worktree" ]]; then
-                    git worktree remove --force "$existing_worktree" 2>/dev/null || rm -rf "$existing_worktree"
-                fi
-                git branch -D "$BRANCH_NAME" 2>/dev/null || true
-                log_success "   ✅ Cleaned up"
-                ;;
-            *)
-                die "Aborted"
-                ;;
-        esac
     fi
 
-    # Check if worktree path already exists (without branch)
     if [[ -d "$WORKTREE_PATH" ]]; then
-        echo ""
-        log_warn "Worktree path already exists: $WORKTREE_PATH"
-        echo ""
-        echo "  1) Use existing worktree"
-        echo "  2) Delete and recreate"
-        echo "  0) Exit"
-        echo ""
-        read -r -n 1 -p "Choice: " choice
-        echo ""
-        case "$choice" in
-            1)
-                log_info "   Using existing worktree"
-                return
-                ;;
-            2)
-                log_info "   Removing existing worktree..."
-                git worktree remove --force "$WORKTREE_PATH" 2>/dev/null || rm -rf "$WORKTREE_PATH"
-                git branch -D "$BRANCH_NAME" 2>/dev/null || true
-                ;;
-            *)
-                die "Aborted"
-                ;;
-        esac
+        path_branch=$(find_worktree_branch_by_path "$WORKTREE_PATH" || true)
+        if plan_path_reuse_resolution "$path_branch"; then
+            return
+        fi
     fi
 
     if [[ "$DRY_RUN" == "true" ]]; then

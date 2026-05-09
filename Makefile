@@ -1,4 +1,4 @@
-.PHONY: install uninstall
+.PHONY: install uninstall test
 
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
@@ -12,3 +12,9 @@ install:
 uninstall:
 	@rm -f "$(BINDIR)/start-issue"
 	@echo "Removed: $(BINDIR)/start-issue"
+
+test:
+	bash -n scripts/start-issue
+	shellcheck scripts/start-issue
+	git diff --check
+	bats test

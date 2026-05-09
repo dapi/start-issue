@@ -392,3 +392,80 @@ install_fake_zellij_tab_status() {
   assert_output_contains "Generated branch name doesn't match expected format"
   assert_output_contains "Using fallback: feature/issue-1-add-login-button"
 }
+
+@test "make test target exists and runs local verification stack" {
+  run make -n -f "$REPO_ROOT/Makefile" test
+
+  assert_success
+  assert_output_contains "bash -n scripts/start-issue"
+  assert_output_contains "shellcheck scripts/start-issue"
+  assert_output_contains "git diff --check"
+  assert_output_contains "bats test"
+}
+
+@test "branch reuse matches the exact worktree path" {
+  git worktree add "$TEST_TMPDIR/worktree-v2" -b feature/issue-1-add-login-button-v2 master
+  git worktree add "$TEST_TMPDIR/worktree-exact" -b feature/issue-1-add-login-button master
+  expected_worktree="$(cd "$TEST_TMPDIR/worktree-exact" && pwd -P)"
+
+  run bash -c 'printf "1\n" | "$REPO_ROOT/scripts/start-issue" 1 --agent none --dry-run --no-init'
+
+  assert_success
+  assert_output_contains "Existing worktree: $expected_worktree"
+  assert_output_contains "Using existing worktree: $expected_worktree"
+  assert_output_contains "✅ Worktree ready at: $expected_worktree"
+  [[ "$output" != *"worktree-v2"* ]]
+}
+
+@test "reusing a plain directory is rejected before init or agent launch" {
+  mkdir -p "$HOME/worktrees/feature/issue-1-add-login-button"
+
+  run bash -c 'printf "1\n" | "$REPO_ROOT/scripts/start-issue" 1 --agent none --no-init'
+
+  assert_failure
+  assert_output_contains "path exists but is not a git worktree for this repository"
+  [[ "$output" != *"Worktree ready"* ]]
+}
+
+@test "reusing a path registered to a different branch is rejected" {
+  git worktree add "$HOME/worktrees/feature/issue-1-add-login-button" -b chore/other-branch master
+
+  run bash -c 'printf "1\n" | "$REPO_ROOT/scripts/start-issue" 1 --agent none --no-init'
+
+  assert_failure
+  assert_output_contains "Registered branch: chore/other-branch"
+  assert_output_contains "Cannot reuse worktree path '$HOME/worktrees/feature/issue-1-add-login-button': it belongs to branch 'chore/other-branch', not 'feature/issue-1-add-login-button'."
+  [[ "$output" != *"Worktree ready"* ]]
+}
+
+@test "delete and recreate flow replaces the conflicting branch worktree" {
+  git worktree add "$TEST_TMPDIR/existing-worktree" -b feature/issue-1-add-login-button master
+
+  run bash -c 'printf "3\n" | "$REPO_ROOT/scripts/start-issue" 1 --agent none --no-init'
+
+  assert_success
+  assert_output_contains "Removing existing branch/worktree"
+  assert_output_contains "✅ Cleaned up"
+  assert_output_contains "✅ Worktree created"
+  [[ -d "$HOME/worktrees/feature/issue-1-add-login-button" ]]
+  [[ ! -d "$TEST_TMPDIR/existing-worktree" ]]
+}
+
+@test "flat worktree mode uses flattened path" {
+  run_start_issue 1 --agent none --dry-run --no-init --flat
+
+  assert_success
+  assert_output_contains "Path: $HOME/worktrees/feature-issue-1-add-login-button"
+  assert_output_contains "Would run: git worktree add -b feature/issue-1-add-login-button $HOME/worktrees/feature-issue-1-add-login-button master"
+}
+
+@test "base branch falls back to the current branch when origin HEAD is missing" {
+  git checkout -q -b develop
+
+  run_start_issue 1 --agent none --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Could not detect default branch, using current: develop"
+  assert_output_contains "Base: develop"
+  assert_output_contains "Would run: git worktree add -b feature/issue-1-add-login-button $HOME/worktrees/feature/issue-1-add-login-button develop"
+}
