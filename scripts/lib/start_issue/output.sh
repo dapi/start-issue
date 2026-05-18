@@ -86,7 +86,16 @@ show_current_configuration() {
     echo "  Agent: $AGENT ($AGENT_SOURCE)"
     echo "  Prompt source: $PROMPT_SOURCE"
     echo "  Prompt location: $PROMPT_LOCATION"
+    print_prompt_file_locations "  "
     echo "  Prompt preview: $(prompt_preview)"
+}
+
+print_prompt_file_locations() {
+    local indent="${1:-}"
+
+    echo "${indent}Default prompt files:"
+    echo "${indent}  Project: $PROJECT_ROOT/.start-issue/prompt.md"
+    echo "${indent}  User: $HOME/.config/start-issue/prompt.md"
 }
 
 print_session_header() {
@@ -188,5 +197,8 @@ print_dry_run_launch_command() {
 print_selected_configuration() {
     echo "Agent: $AGENT ($AGENT_SOURCE)"
     echo "Worktree directory: $WORKTREE_DIR ($WORKTREE_DIR_SOURCE)"
+    echo "Prompt source: $PROMPT_SOURCE"
+    echo "Prompt location: $PROMPT_LOCATION"
+    print_prompt_file_locations
     echo ""
 }

@@ -65,6 +65,10 @@ install_fake_zellij_tab_status() {
   assert_output_contains "Agent: claude (built-in default)"
   assert_output_contains "Fetching issue #1 from owner/repo"
   assert_output_contains "Prompt source: built-in Claude command"
+  assert_output_contains "Default prompt files:"
+  assert_output_contains "Project:"
+  assert_output_contains ".start-issue/prompt.md"
+  assert_output_contains "User: $HOME/.config/start-issue/prompt.md"
   assert_output_contains "claude --dangerously-skip-permissions"
   assert_output_contains "/task-router:route-task"
 }
@@ -78,6 +82,10 @@ install_fake_zellij_tab_status() {
   assert_output_contains "Agent: claude (built-in default)"
   assert_output_contains "Prompt source: built-in Claude command"
   assert_output_contains "Prompt location: $REPO_ROOT/scripts/start-issue"
+  assert_output_contains "Default prompt files:"
+  assert_output_contains "Project:"
+  assert_output_contains ".start-issue/prompt.md"
+  assert_output_contains "User: $HOME/.config/start-issue/prompt.md"
   assert_output_contains "Prompt preview: /task-router:route-task {ISSUE_URL}"
   [[ "$output" != *"Fetching issue"* ]]
 }
