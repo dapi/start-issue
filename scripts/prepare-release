@@ -10,7 +10,7 @@ This command:
 1. requires a clean git worktree
 2. bumps VERSION in scripts/start-issue
 3. runs make test and make build
-4. creates a release commit and local git tag
+4. creates a release commit and local annotated git tag
 
 Push the branch and tag afterwards with:
   git push origin master --follow-tags
@@ -52,7 +52,7 @@ make build
 
 git add scripts/start-issue
 git commit -m "Release $tag"
-git tag "$tag"
+git tag -a "$tag" -m "Release $tag"
 
 printf 'Prepared %s\n' "$tag"
 printf 'Next step: git push origin %s --follow-tags\n' "$current_branch"

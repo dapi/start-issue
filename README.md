@@ -24,6 +24,12 @@ curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-is
 chmod +x ~/.local/bin/start-issue
 ```
 
+One-liner:
+
+```bash
+mkdir -p ~/.local/bin && curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o ~/.local/bin/start-issue && chmod +x ~/.local/bin/start-issue
+```
+
 Verify the download if you want:
 
 ```bash
@@ -238,7 +244,7 @@ make release-minor
 make release-major
 ```
 
-Each command requires a clean worktree, bumps `VERSION`, runs `make test` and `make build`, creates a local commit like `Release v1.12.0`, and creates the matching git tag.
+Each command requires a clean worktree, bumps `VERSION`, runs `make test` and `make build`, creates a local commit like `Release v1.12.0`, and creates the matching annotated git tag.
 
 Publish the prepared release with:
 

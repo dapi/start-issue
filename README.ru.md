@@ -24,6 +24,12 @@ curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-is
 chmod +x ~/.local/bin/start-issue
 ```
 
+One-liner:
+
+```bash
+mkdir -p ~/.local/bin && curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o ~/.local/bin/start-issue && chmod +x ~/.local/bin/start-issue
+```
+
 При желании можно проверить checksum:
 
 ```bash
@@ -238,7 +244,7 @@ make release-minor
 make release-major
 ```
 
-Каждая команда требует чистое рабочее дерево, поднимает `VERSION`, запускает `make test` и `make build`, создает локальный commit вида `Release v1.12.0` и создает matching git tag.
+Каждая команда требует чистое рабочее дерево, поднимает `VERSION`, запускает `make test` и `make build`, создает локальный commit вида `Release v1.12.0` и создает matching annotated git tag.
 
 Опубликовать подготовленный релиз:
 
