@@ -59,6 +59,7 @@ Context:
 - Worktree: {WORKTREE_PATH}
 
 Start by reading the issue with gh if needed. Follow repository instructions. Keep changes scoped. Run relevant tests or checks. Summarize changed files and verification before finishing.
+If you open a PR for this work, target the base branch {BASE_BRANCH}.
 EOF
 }
 

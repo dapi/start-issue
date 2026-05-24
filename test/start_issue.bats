@@ -198,6 +198,7 @@ install_fake_zellij_tab_status() {
   assert_output_contains "Agent: codex (CLI)"
   [[ "$(cat .start-issue/agent)" == "codex" ]]
   [[ "$(cat .start-issue/prompt.md)" == *"Implement GitHub issue {ISSUE_URL} in this worktree."* ]]
+  [[ "$(cat .start-issue/prompt.md)" == *"target the base branch {BASE_BRANCH}."* ]]
   [[ "$output" != *"Fetching issue"* ]]
 }
 
@@ -237,6 +238,7 @@ install_fake_zellij_tab_status() {
   assert_output_contains ".start-issue/agent (existing)"
   [[ "$(cat .start-issue/agent)" == "codex" ]]
   [[ "$(cat .start-issue/prompt.md)" == *"Implement GitHub issue {ISSUE_URL} in this worktree."* ]]
+  [[ "$(cat .start-issue/prompt.md)" == *"target the base branch {BASE_BRANCH}."* ]]
   [[ "$(cat .start-issue/prompt.md)" != *"/task-router:route-task"* ]]
 }
 
