@@ -6,8 +6,9 @@ REPO="${START_ISSUE_REPOSITORY:-dapi/start-issue}"
 PREFIX="${PREFIX:-$HOME/.local}"
 BINDIR="${BINDIR:-$PREFIX/bin}"
 TARGET="${TARGET:-$BINDIR/start-issue}"
-ASSET_URL="https://github.com/$REPO/releases/latest/download/start-issue"
-CHECKSUM_URL="https://github.com/$REPO/releases/latest/download/start-issue.sha256"
+ASSET_URL="${START_ISSUE_ASSET_URL:-https://github.com/$REPO/releases/latest/download/start-issue}"
+CHECKSUM_URL="${START_ISSUE_CHECKSUM_URL:-https://github.com/$REPO/releases/latest/download/start-issue.sha256}"
+INSTALL_TMPDIR=""
 
 log() {
     printf '%s\n' "$1"
@@ -16,6 +17,12 @@ log() {
 die() {
     printf 'Error: %s\n' "$1" >&2
     exit 1
+}
+
+cleanup() {
+    if [[ -n "$INSTALL_TMPDIR" ]]; then
+        rm -rf -- "$INSTALL_TMPDIR"
+    fi
 }
 
 fetch() {
@@ -57,17 +64,16 @@ sha256_file() {
 }
 
 main() {
-    local tmpdir
     local tmpfile
     local checksum_file
     local expected_checksum
     local actual_checksum
 
-    tmpdir="$(mktemp -d)"
-    trap 'rm -rf "$tmpdir"' EXIT
+    INSTALL_TMPDIR="$(mktemp -d)"
+    trap cleanup EXIT
 
-    tmpfile="$tmpdir/start-issue"
-    checksum_file="$tmpdir/start-issue.sha256"
+    tmpfile="$INSTALL_TMPDIR/start-issue"
+    checksum_file="$INSTALL_TMPDIR/start-issue.sha256"
 
     log "Downloading latest release from $REPO"
     fetch "$ASSET_URL" "$tmpfile"

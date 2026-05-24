@@ -40,3 +40,41 @@ jobs:
 
       - name: Integration tests
         run: mise exec -- bats test
+
+  install-script:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build local release artifact
+        run: |
+          bash scripts/build-start-issue "$RUNNER_TEMP/start-issue" >/dev/null
+          chmod +x "$RUNNER_TEMP/start-issue"
+
+      - name: Generate checksum file
+        run: |
+          if command -v sha256sum >/dev/null 2>&1; then
+            checksum="$(sha256sum "$RUNNER_TEMP/start-issue" | awk '{ print $1 }')"
+          else
+            checksum="$(shasum -a 256 "$RUNNER_TEMP/start-issue" | awk '{ print $1 }')"
+          fi
+          printf '%s  %s\n' "$checksum" start-issue > "$RUNNER_TEMP/start-issue.sha256"
+
+      - name: Test install.sh via pipe
+        run: |
+          curl -fsSL "file://$GITHUB_WORKSPACE/install.sh" | env \
+            PREFIX="$RUNNER_TEMP/prefix" \
+            START_ISSUE_ASSET_URL="file://$RUNNER_TEMP/start-issue" \
+            START_ISSUE_CHECKSUM_URL="file://$RUNNER_TEMP/start-issue.sha256" \
+            bash
+
+      - name: Verify installed binary
+        run: |
+          test -x "$RUNNER_TEMP/prefix/bin/start-issue"
+          "$RUNNER_TEMP/prefix/bin/start-issue" --version | grep '^start-issue v'
