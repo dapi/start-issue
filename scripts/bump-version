@@ -16,6 +16,7 @@ fi
 kind="$1"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 version_file="$repo_root/scripts/start-issue"
+file_mode="$(stat -f %Lp "$version_file")"
 
 current_version="$(awk -F'"' '/^VERSION="/ { print $2; exit }' "$version_file")"
 if [[ -z "$current_version" ]]; then
@@ -67,6 +68,7 @@ awk -v next_version="$next_version" '
 }
 
 mv "$tmpfile" "$version_file"
+chmod "$file_mode" "$version_file"
 trap - EXIT
 
 printf '%s\n' "$next_version"
