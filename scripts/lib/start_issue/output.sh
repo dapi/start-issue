@@ -65,6 +65,13 @@ Prompt variables:
   {ISSUE_URL}, {ISSUE_NUMBER}, {ISSUE_TITLE}, {ISSUE_BODY}, {ISSUE_LABELS},
   {REPO}, {BRANCH_NAME}, {WORKTREE_PATH}, {BASE_BRANCH}
 
+Environment variables:
+  START_ISSUE_AGENT
+  START_ISSUE_PROMPT
+  START_ISSUE_PROMPT_FILE
+  START_ISSUE_WORKTREE_DIR
+  START_ISSUE_DUMP_PROMPT
+
 Examples:
   start-issue 123
   start-issue https://github.com/owner/repo/issues/123
@@ -86,8 +93,35 @@ show_current_configuration() {
     echo "  Agent: $AGENT ($AGENT_SOURCE)"
     echo "  Prompt source: $PROMPT_SOURCE"
     echo "  Prompt location: $PROMPT_LOCATION"
+    echo "  Worktree dir: $WORKTREE_DIR ($WORKTREE_DIR_SOURCE)"
     print_prompt_file_locations "  "
-    echo "  Prompt preview: $(prompt_preview)"
+}
+
+show_missing_issue_summary() {
+    echo "Error: missing issue URL or issue number"
+    echo ""
+    echo "Run \`start-issue --help\` for full usage and prompt variables."
+}
+
+show_missing_issue_help() {
+    show_version
+    cat << 'EOF'
+
+Start working on a GitHub issue with git worktree and a configurable agent
+
+Usage: start-issue <issue-url-or-number> [options]
+       start-issue init [options]
+
+Examples:
+  start-issue 123
+  start-issue https://github.com/owner/repo/issues/123
+  start-issue 123 --agent codex
+  start-issue init --project
+
+Prompt variables:
+  {ISSUE_URL}, {ISSUE_NUMBER}, {ISSUE_TITLE}, {ISSUE_BODY}, {ISSUE_LABELS},
+  {REPO}, {BRANCH_NAME}, {WORKTREE_PATH}, {BASE_BRANCH}
+EOF
 }
 
 print_prompt_file_locations() {

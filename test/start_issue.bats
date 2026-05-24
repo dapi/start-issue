@@ -77,17 +77,36 @@ install_fake_zellij_tab_status() {
   run_start_issue
 
   assert_failure
+  assert_output_contains "Error: missing issue URL or issue number"
+  assert_output_contains 'Run `start-issue --help` for full usage and prompt variables.'
   assert_output_contains "Usage: start-issue <issue-url-or-number> [options]"
+  assert_output_contains "Examples:"
+  assert_output_contains "Prompt variables:"
   assert_output_contains "Current configuration:"
   assert_output_contains "Agent: claude (built-in default)"
   assert_output_contains "Prompt source: built-in Claude command"
   assert_output_contains "Prompt location: $REPO_ROOT/scripts/start-issue"
+  assert_output_contains "Worktree dir: $HOME/worktrees (built-in default)"
   assert_output_contains "Default prompt files:"
   assert_output_contains "Project:"
   assert_output_contains ".start-issue/prompt.md"
   assert_output_contains "User: $HOME/.config/start-issue/prompt.md"
-  assert_output_contains "Prompt preview: /task-router:route-task {ISSUE_URL}"
+  [[ "$output" != *"Prompt preview:"* ]]
+  [[ "$output" != *"Options:"* ]]
+  [[ "$output" != *"Agent selection precedence:"* ]]
   [[ "$output" != *"Fetching issue"* ]]
+}
+
+@test "help lists environment variables for prompt and config sources" {
+  run_start_issue --help
+
+  assert_success
+  assert_output_contains "Environment variables:"
+  assert_output_contains "START_ISSUE_AGENT"
+  assert_output_contains "START_ISSUE_PROMPT"
+  assert_output_contains "START_ISSUE_PROMPT_FILE"
+  assert_output_contains "START_ISSUE_WORKTREE_DIR"
+  assert_output_contains "START_ISSUE_DUMP_PROMPT"
 }
 
 @test "missing issue prints project agent and prompt file location" {
@@ -98,12 +117,13 @@ install_fake_zellij_tab_status() {
   run_start_issue
 
   assert_failure
+  assert_output_contains "Error: missing issue URL or issue number"
   assert_output_contains "Agent: codex ("
   assert_output_contains ".start-issue/agent)"
   assert_output_contains "Prompt source:"
   assert_output_contains ".start-issue/prompt.md"
   assert_output_contains "Prompt location:"
-  assert_output_contains "Prompt preview: Project prompt for {ISSUE_URL}"
+  [[ "$output" != *"Prompt preview:"* ]]
   [[ "$output" != *"Fetching issue"* ]]
 }
 
