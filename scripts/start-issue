@@ -16,6 +16,8 @@
 #   --no-agent                 Only prepare the worktree, do not launch an agent
 #   --no-init                  Skip init.sh execution
 #   --improve-prompt           Generate an improved prompt template proposal
+#   --human-gate               Run Codex in batch mode and resume on HUMAN_GATE
+#   --human-gate-help          Show dedicated help for the human-gate mode
 #   --dry-run                  Show what would be done without executing
 #   --help, -h                 Show this help
 #
@@ -68,6 +70,8 @@ PROMPT_FILE_CLI=""
 PROMPT_INLINE_CLI=""
 IMPROVE_PROMPT=false
 PROMPT_IMPROVEMENT_OUTPUT_FILE=""
+HUMAN_GATE_MODE=false
+HUMAN_GATE_HELP=false
 AGENT_PROMPT=""
 
 ISSUE_NUMBER=""
@@ -81,7 +85,15 @@ WORKTREE_PATH=""
 
 LAUNCH_CWD=""
 LAUNCH_CMD=()
+HUMAN_GATE_CMD=()
 CONFLICT_CHOICE=""
+HUMAN_GATE_RUN_ID=""
+HUMAN_GATE_STATE_DIR=""
+HUMAN_GATE_EVENTS_PATH=""
+HUMAN_GATE_LAST_MESSAGE_PATH=""
+HUMAN_GATE_THREAD_ID_PATH=""
+HUMAN_GATE_THREAD_ID=""
+HUMAN_GATE_FINAL_STATUS=""
 
 resolve_script_path() {
     local source_path="${BASH_SOURCE[0]}"
@@ -138,6 +150,11 @@ source "$LIB_DIR/pipeline.sh"
 
 main() {
     parse_args "$@"
+
+    if [[ "$HUMAN_GATE_HELP" == "true" ]]; then
+        show_human_gate_help
+        return
+    fi
 
     if [[ "$MISSING_ISSUE" == "true" ]]; then
         handle_missing_issue_mode

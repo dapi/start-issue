@@ -39,6 +39,8 @@ Options:
   --prompt-file <path>       Prompt template file for the launched agent
   --improve-prompt           Ask the selected agent to improve the selected
                              prompt template and write a reviewable proposal
+  --human-gate               Codex-only batch mode that resumes on HUMAN_GATE
+  --human-gate-help          Show detailed help for the human-gate mode
   --prompt-output-file <path>
                              Output path for --improve-prompt proposal
   --no-init                  Skip init.sh execution
@@ -99,6 +101,7 @@ Examples:
   start-issue 123 --repo owner/repo --base develop
   start-issue 123 --agent codex
   start-issue 123 --agent codex --model gpt-5.2
+  start-issue 123 --agent codex --human-gate
   start-issue 123 --agent claude --model sonnet
   start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
   start-issue 123 --no-agent              # Only create worktree
@@ -111,6 +114,90 @@ Examples:
   start-issue init --user --force
   start-issue update
   start-issue --update
+  start-issue --human-gate-help
+EOF
+}
+
+show_human_gate_help() {
+    show_version
+    cat << 'EOF'
+
+Codex human-gate mode
+
+Usage:
+  start-issue <issue-url-or-number> --agent codex --human-gate
+  start-issue --human-gate-help
+
+Flow:
+  1. Resolve the issue, repo, branch, worktree, and prompt exactly like the normal issue flow.
+  2. Create or reuse the worktree and run init.sh when enabled.
+  3. Render the selected prompt.
+  4. Run Codex in non-interactive batch mode with JSON events and a saved last-message file.
+  5. Parse the saved final status.
+  6. Exit 0 on STATUS: DONE.
+  7. Resume the same Codex session with codex resume --include-non-interactive <thread_id> on STATUS: HUMAN_GATE.
+
+Prompt contract:
+  The final output must contain exactly one terminal status line:
+    STATUS: DONE
+  or:
+    STATUS: HUMAN_GATE
+
+  DONE means the issue was completed safely without user intervention.
+  HUMAN_GATE means Codex must stop and ask one concrete user decision.
+  Do not use HUMAN_GATE for ordinary implementation uncertainty that can be
+  resolved from repository conventions or local evidence.
+
+Suggested final output shape for DONE:
+  STATUS: DONE
+
+  Summary:
+  - ...
+
+  Validation:
+  - ...
+
+  Changed files:
+  - ...
+
+Suggested final output shape for HUMAN_GATE:
+  STATUS: HUMAN_GATE
+
+  Blocker:
+  ...
+
+  Question:
+  ...
+
+  Options:
+  - Option A: ...
+  - Option B: ...
+
+  Recommendation:
+  ...
+
+Exit codes:
+  0  Codex returned STATUS: DONE.
+  1  Codex failed, no thread_id was captured, no recognized status was found,
+     or parsing failed.
+  2  Codex returned STATUS: HUMAN_GATE but start-issue could not open
+     interactive resume. The command and thread id are printed for manual use.
+
+State artifacts:
+  <worktree>/.start-issue/runs/<timestamp>/events.jsonl
+  <worktree>/.start-issue/runs/<timestamp>/last-message.txt
+  <worktree>/.start-issue/runs/<timestamp>/thread-id
+
+Examples:
+  start-issue 123 --agent codex --human-gate
+  start-issue https://github.com/owner/repo/issues/123 --agent codex --human-gate
+  start-issue --human-gate-help
+
+Troubleshooting:
+  - If status parsing fails, inspect last-message.txt.
+  - If resume cannot be opened automatically, re-run the printed
+    codex resume --include-non-interactive <thread_id> command.
+  - This mode is Codex-only in the current implementation.
 EOF
 }
 
@@ -287,6 +374,37 @@ print_dry_run_launch_command() {
     else
         echo "   [DRY-RUN] Would run: $cmd"
     fi
+}
+
+print_dry_run_human_gate_command() {
+    local cmd=""
+
+    build_human_gate_command
+
+    echo "   Agent: $AGENT"
+    echo "   Agent source: $AGENT_SOURCE"
+    echo "   Model: $(model_display_value)"
+    echo "   Model source: $MODEL_SOURCE"
+    echo "   Prompt source: $PROMPT_SOURCE"
+    echo "   Prompt length: ${#AGENT_PROMPT} chars"
+    echo "   State dir: $HUMAN_GATE_STATE_DIR"
+    echo "   Events file: $HUMAN_GATE_EVENTS_PATH"
+    echo "   Last message file: $HUMAN_GATE_LAST_MESSAGE_PATH"
+    echo "   Thread id file: $HUMAN_GATE_THREAD_ID_PATH"
+
+    if [[ ${#AGENT_PROMPT} -gt 4000 && "${START_ISSUE_DUMP_PROMPT:-}" != "1" ]]; then
+        echo "   Prompt omitted from command display because it is large."
+        echo "   Set START_ISSUE_DUMP_PROMPT=1 to print the full rendered prompt."
+        if [[ -n "$MODEL" ]]; then
+            cmd=$(shell_join codex exec --model "$MODEL" --cd "$WORKTREE_PATH" --ask-for-approval never --sandbox workspace-write --json --output-last-message "$HUMAN_GATE_LAST_MESSAGE_PATH" "<rendered prompt via stdin>")
+        else
+            cmd=$(shell_join codex exec --cd "$WORKTREE_PATH" --ask-for-approval never --sandbox workspace-write --json --output-last-message "$HUMAN_GATE_LAST_MESSAGE_PATH" "<rendered prompt via stdin>")
+        fi
+    else
+        cmd="$(shell_join "${HUMAN_GATE_CMD[@]}") < <(rendered prompt via stdin)"
+    fi
+
+    echo "   [DRY-RUN] Would run: $cmd"
 }
 
 print_selected_configuration() {

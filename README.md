@@ -79,6 +79,7 @@ start-issue https://github.com/owner/repo/issues/123
 start-issue 123 --repo owner/repo --base develop
 start-issue 123 --agent codex
 start-issue 123 --agent codex --model gpt-5.2
+start-issue 123 --agent codex --human-gate
 start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
 start-issue 123 --no-agent
 start-issue 123 --dry-run
@@ -86,6 +87,7 @@ start-issue init
 start-issue init --project --agent codex --model gpt-5.2
 start-issue update
 start-issue --update
+start-issue --human-gate-help
 ```
 
 Running `start-issue` without an issue prints the normal help plus the currently
@@ -162,6 +164,8 @@ The project should keep Bash as long as lifecycle commands, configuration shape,
 | `--prompt TEXT` | Inline prompt template for the selected agent. With `init`, the prompt template to write. Mutually exclusive with `--prompt-file`. |
 | `--prompt-file PATH` | Prompt template file for the selected agent. With `init`, the file content to write. Mutually exclusive with `--prompt`. |
 | `--improve-prompt` | Ask the selected agent to generate a reviewable improved prompt template proposal, then exit before creating a worktree. |
+| `--human-gate` | Codex-only batch mode for issue work. Runs `codex exec`, exits on `STATUS: DONE`, and resumes the same session on `STATUS: HUMAN_GATE`. |
+| `--human-gate-help` | Show dedicated help for the Codex human-gate workflow, including prompt contract, exit codes, and state files. |
 | `--prompt-output-file PATH` | Proposal output path for `--improve-prompt`. |
 | `--no-init` | Do not run `init.sh` even if it exists in the created worktree. |
 | `--command COMMAND`, `-c COMMAND` | Claude command prefix used by the default Claude prompt. Default: `/task-router:route-task`. |
@@ -218,6 +222,44 @@ The workflow:
 5. If a newer published release exists, downloads `start-issue` and `start-issue.sha256`, verifies the checksum, and installs the update into the same executable path the user invoked.
 
 The update workflow works outside a git repository. It requires `gh`, `jq`, and either `curl` or `wget`.
+
+## Codex Human-Gate
+
+`start-issue 123 --agent codex --human-gate` keeps the normal issue-start workflow through worktree creation, optional `init.sh`, and prompt rendering, but replaces the final interactive Codex launch with a resumable batch run.
+
+The batch flow:
+
+1. runs `codex exec` with JSON event output and a saved last-message file;
+2. captures `thread_id` from the `thread.started` event;
+3. exits `0` on `STATUS: DONE`;
+4. opens `codex resume --include-non-interactive <thread_id>` on `STATUS: HUMAN_GATE`.
+
+This mode is intentionally Codex-only. `--human-gate` with any other agent fails clearly instead of being ignored.
+
+Dedicated help:
+
+```bash
+start-issue --human-gate-help
+```
+
+Prompt contract:
+
+- The final message must contain exactly one terminal status line: `STATUS: DONE` or `STATUS: HUMAN_GATE`.
+- `HUMAN_GATE` is only for real user decisions such as destructive actions, missing credentials, incompatible product choices, or unresolved test failures that cannot be fixed safely inside scope.
+
+Exit codes:
+
+- `0`: Codex returned `STATUS: DONE`.
+- `1`: Codex failed, no `thread_id` was captured, no recognized final status was found, or parsing failed.
+- `2`: Codex returned `STATUS: HUMAN_GATE`, but `start-issue` could not open interactive resume. The resume command and thread id are printed for manual reuse.
+
+State files:
+
+```text
+<worktree>/.start-issue/runs/<timestamp>/events.jsonl
+<worktree>/.start-issue/runs/<timestamp>/last-message.txt
+<worktree>/.start-issue/runs/<timestamp>/thread-id
+```
 
 Configuration precedence:
 

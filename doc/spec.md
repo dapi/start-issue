@@ -75,6 +75,8 @@ preview. Этот путь не обращается к GitHub и заверша
 | `--prompt` | Inline prompt template | См. приоритет prompt |
 | `--prompt-file` | Файл prompt template | См. приоритет prompt |
 | `--improve-prompt` | Сгенерировать reviewable proposal улучшенного prompt template и выйти до создания worktree | false |
+| `--human-gate` | Codex-only batch mode для issue workflow с resume на `STATUS: HUMAN_GATE` | false |
+| `--human-gate-help` | Показать отдельную справку по human-gate mode | false |
 | `--prompt-output-file` | Путь proposal-файла для `--improve-prompt` | Для prompt-файла: рядом с source как `*.improved.md`; иначе `.start-issue/prompt.improved.md` |
 | `--no-init` | Пропустить запуск `init.sh` | false |
 | `--command` / `-c` | Совместимый Claude command для дефолтного Claude prompt | `/task-router:route-task` |
@@ -172,6 +174,72 @@ git rev-parse --show-toplevel
 - `install`
 - один из `sha256sum`, `shasum` или `openssl`
 
+## Codex human-gate mode
+
+`--human-gate` вводит отдельный Codex-only launch path для issue workflow.
+
+Контракт режима:
+
+1. Режим валиден только для `agent=codex`; для остальных agent он завершается явной ошибкой.
+2. До agent launch workflow остается обычным: parse input, resolve config, fetch issue, plan branch, create/reuse worktree, run optional `init.sh`, render prompt.
+3. Вместо интерактивного Codex launch выполняется:
+
+```bash
+codex exec \
+  [--model "$MODEL"] \
+  --cd "$WORKTREE_PATH" \
+  --ask-for-approval never \
+  --sandbox workspace-write \
+  --json \
+  --output-last-message "$STATE_DIR/last-message.txt" \
+  -
+```
+
+4. Rendered prompt передается в `codex exec` через stdin.
+5. Из JSONL event stream извлекается `thread_id` из события `thread.started`.
+6. Saved `last-message.txt` является единственным источником final status.
+7. Поддерживаются только два terminal status:
+   - `STATUS: DONE`
+   - `STATUS: HUMAN_GATE`
+8. На `STATUS: DONE` команда завершается с кодом `0`, не открывая Codex TUI.
+9. На `STATUS: HUMAN_GATE` выполняется:
+
+```bash
+codex resume --include-non-interactive "$thread_id"
+```
+
+10. `codex resume --last` не используется как primary mechanism.
+11. `codex exec --ephemeral` не используется, потому что session должна быть resumable.
+
+Dedicated help доступен через:
+
+```bash
+start-issue --human-gate-help
+```
+
+Там документируются:
+
+- полный flow;
+- prompt contract;
+- examples;
+- exit codes;
+- state files;
+- troubleshooting.
+
+State files:
+
+```text
+<worktree>/.start-issue/runs/<timestamp>/events.jsonl
+<worktree>/.start-issue/runs/<timestamp>/last-message.txt
+<worktree>/.start-issue/runs/<timestamp>/thread-id
+```
+
+Exit codes:
+
+- `0` - `STATUS: DONE`
+- `1` - Codex failed, `thread_id` missing, final status missing/unknown, или parse failed
+- `2` - `STATUS: HUMAN_GATE`, но interactive resume не открылся
+
 ## Prompt templates
 
 Claude без явного override использует совместимый plugin-native prompt:
@@ -264,6 +332,18 @@ Templating правила:
 9. Проверить наличие CLI выбранного agent, если agent не `none` и режим не `--dry-run`.
 10. Выбрать prompt template.
 11. Если включен `--improve-prompt`, сгенерировать proposal улучшенного prompt template и завершить workflow до worktree/agent launch.
+
+Если включен `--human-gate`:
+
+1. После `render_prompt_template` проверить, что resolved agent равен `codex`.
+2. Создать `STATE_DIR=<worktree>/.start-issue/runs/<timestamp>`.
+3. Запустить `codex exec` в batch mode с `--json` и `--output-last-message`.
+4. Сохранить event stream в `events.jsonl`.
+5. Извлечь `thread_id` и записать его в `thread-id`.
+6. Прочитать `last-message.txt` и определить final status.
+7. На `DONE` завершиться с кодом `0`.
+8. На `HUMAN_GATE` запустить `codex resume --include-non-interactive "$thread_id"`.
+9. На missing/unknown status или missing `thread_id` завершиться ошибкой и указать путь к diagnostic artifact.
 
 Если включен update mode:
 
@@ -455,6 +535,7 @@ start-issue 123 --repo owner/repo
 start-issue 123 --base develop
 start-issue 123 --agent codex
 start-issue 123 --agent codex --model gpt-5.2
+start-issue 123 --agent codex --human-gate
 start-issue 123 --agent claude --model sonnet
 start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
 start-issue 123 --agent codex --improve-prompt
@@ -469,6 +550,7 @@ start-issue init --user --force
 START_ISSUE_AGENT=codex start-issue 123
 START_ISSUE_MODEL=sonnet start-issue 123
 START_ISSUE_WORKTREE_DIR=~/projects/worktrees start-issue 123
+start-issue --human-gate-help
 ```
 
 ## Зависимости
@@ -492,6 +574,7 @@ START_ISSUE_WORKTREE_DIR=~/projects/worktrees start-issue 123
 
 - [x] `start-issue 123` по умолчанию выбирает `claude`.
 - [x] `start-issue 123 --agent codex` создает worktree и запускает Codex в этом worktree.
+- [x] `start-issue 123 --agent codex --human-gate` запускает Codex через `codex exec`, а не через обычный интерактивный launch.
 - [x] `start-issue 123 --agent kimi` запускает Kimi в этом worktree.
 - [x] `start-issue 123 --agent pi` запускает Pi в этом worktree.
 - [x] `start-issue 123 --no-agent` только готовит worktree и печатает следующие шаги.
@@ -501,6 +584,10 @@ START_ISSUE_WORKTREE_DIR=~/projects/worktrees start-issue 123
 - [x] Запуск без Issue печатает выбранные agent/model и prompt details с расположением config файлов.
 - [x] `start-issue init` создает project или user config с agent и prompt по умолчанию и пишет `model`, если она явно задана.
 - [x] `start-issue init --force` перезаписывает существующие config-файлы.
+- [x] `STATUS: DONE` завершает workflow без открытия Codex TUI.
+- [x] `STATUS: HUMAN_GATE` резюмирует ту же Codex session по explicit `thread_id`.
+- [x] Missing final status или missing `thread_id` завершаются явной ошибкой с указанием diagnostic artifact.
+- [x] `start-issue --human-gate-help` документирует flow, prompt contract, exit codes и state files.
 - [x] `--improve-prompt` создает reviewable proposal улучшенного prompt template и не перезаписывает active prompt.
 - [x] Claude-specific aliases сохранены, help text описывает agent-neutral поведение.
 - [x] `--dry-run` печатает selected agent, selected model, prompt source и launch command.

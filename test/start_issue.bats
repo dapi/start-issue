@@ -32,6 +32,13 @@ setup() {
   unset START_ISSUE_FAKE_FORBID_MODEL
   unset START_ISSUE_FAKE_LATEST_RELEASE_JSON
   unset START_ISSUE_REPOSITORY
+  unset START_ISSUE_RUN_ID
+  unset START_ISSUE_FAKE_CODEX_STATUS
+  unset START_ISSUE_FAKE_CODEX_LAST_MESSAGE
+  unset START_ISSUE_FAKE_CODEX_THREAD_ID
+  unset START_ISSUE_FAKE_CODEX_OMIT_THREAD_ID
+  unset START_ISSUE_FAKE_CODEX_RESUME_FAIL
+  unset START_ISSUE_FAKE_CODEX_BATCH_EXIT
 }
 
 run_start_issue() {
@@ -226,6 +233,26 @@ install_fake_zellij_tab_status() {
   assert_output_contains "START_ISSUE_MODEL"
   assert_output_contains ".start-issue/model"
   assert_output_contains "~/.config/start-issue/model"
+}
+
+@test "help documents human-gate entry points" {
+  run_start_issue --help
+
+  assert_success
+  assert_output_contains "--human-gate"
+  assert_output_contains "--human-gate-help"
+  assert_output_contains "start-issue 123 --agent codex --human-gate"
+}
+
+@test "dedicated human-gate help documents the contract" {
+  run_start_issue --human-gate-help
+
+  assert_success
+  assert_output_contains "Codex human-gate mode"
+  assert_output_contains "STATUS: DONE"
+  assert_output_contains "STATUS: HUMAN_GATE"
+  assert_output_contains "codex resume --include-non-interactive <thread_id>"
+  assert_output_contains ".start-issue/runs/<timestamp>/events.jsonl"
 }
 
 @test "prompt improvement without issue prints explicit error" {
@@ -594,6 +621,94 @@ install_fake_zellij_tab_status() {
   run_start_issue 1 --agent pi --dry-run --no-init
   assert_success
   assert_output_contains "cd $HOME/worktrees/feature/issue-1-add-login-button && pi"
+}
+
+@test "human-gate rejects non-codex agents before fetching the issue" {
+  run_start_issue 1 --agent kimi --human-gate --dry-run --no-init
+
+  assert_failure
+  assert_output_contains "--human-gate requires agent 'codex'"
+  [[ "$output" != *"Fetching issue"* ]]
+}
+
+@test "human-gate dry-run renders the Codex batch command and state artifacts" {
+  export START_ISSUE_RUN_ID="20260524-010203"
+
+  run_start_issue 1 --agent codex --human-gate --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Starting codex human-gate batch session"
+  assert_output_contains "--ask-for-approval never"
+  assert_output_contains "--sandbox workspace-write"
+  assert_output_contains "--json"
+  assert_output_contains "--output-last-message"
+  assert_output_contains ".start-issue/runs/20260524-010203/events.jsonl"
+  assert_output_contains ".start-issue/runs/20260524-010203/last-message.txt"
+  assert_output_contains ".start-issue/runs/20260524-010203/thread-id"
+}
+
+@test "human-gate exits successfully on DONE without resuming Codex" {
+  export START_ISSUE_RUN_ID="20260524-020304"
+
+  run_start_issue 1 --agent codex --human-gate --no-init
+
+  assert_success
+  assert_output_contains "Codex finished with STATUS: DONE"
+  [[ "$output" != *"fake codex resume"* ]]
+  run_dir="$HOME/worktrees/feature/issue-1-add-login-button/.start-issue/runs/20260524-020304"
+  [[ -f "$run_dir/events.jsonl" ]]
+  [[ -f "$run_dir/last-message.txt" ]]
+  [[ -f "$run_dir/thread-id" ]]
+  [[ "$(cat "$run_dir/thread-id")" == "019e5b45-f9ac-76c1-8177-4317c42d04f9" ]]
+}
+
+@test "human-gate resumes the same Codex session on HUMAN_GATE" {
+  export START_ISSUE_RUN_ID="20260524-030405"
+  export START_ISSUE_FAKE_CODEX_STATUS="HUMAN_GATE"
+  export START_ISSUE_FAKE_CODEX_THREAD_ID="thread-human-gate"
+
+  run_start_issue 1 --agent codex --human-gate --no-init
+
+  assert_success
+  assert_output_contains "Thread ID: thread-human-gate"
+  assert_output_contains "Resume command: codex resume --include-non-interactive thread-human-gate"
+  assert_output_contains "fake codex resume --include-non-interactive thread-human-gate"
+}
+
+@test "human-gate exits 2 when HUMAN_GATE resume cannot be opened" {
+  export START_ISSUE_RUN_ID="20260524-040506"
+  export START_ISSUE_FAKE_CODEX_STATUS="HUMAN_GATE"
+  export START_ISSUE_FAKE_CODEX_THREAD_ID="thread-resume-fail"
+  export START_ISSUE_FAKE_CODEX_RESUME_FAIL=1
+
+  run_start_issue 1 --agent codex --human-gate --no-init
+
+  [ "$status" -eq 2 ]
+  assert_output_contains "Could not open Codex resume session."
+  assert_output_contains "Resume command: codex resume --include-non-interactive thread-resume-fail"
+  assert_output_contains "Thread ID: thread-resume-fail"
+}
+
+@test "human-gate fails clearly when no recognized final status is found" {
+  export START_ISSUE_RUN_ID="20260524-050607"
+  export START_ISSUE_FAKE_CODEX_LAST_MESSAGE="Summary only"
+
+  run_start_issue 1 --agent codex --human-gate --no-init
+
+  assert_failure
+  assert_output_contains "No recognized final status found."
+  assert_output_contains ".start-issue/runs/20260524-050607/last-message.txt"
+}
+
+@test "human-gate fails clearly when no thread id is captured" {
+  export START_ISSUE_RUN_ID="20260524-060708"
+  export START_ISSUE_FAKE_CODEX_OMIT_THREAD_ID=1
+
+  run_start_issue 1 --agent codex --human-gate --no-init
+
+  assert_failure
+  assert_output_contains "did not capture thread_id"
+  assert_output_contains ".start-issue/runs/20260524-060708/events.jsonl"
 }
 
 @test "dry-run renders explicit model for supported launch adapters" {

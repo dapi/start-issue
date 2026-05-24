@@ -52,6 +52,174 @@ validate_prompt_improvement_mode() {
     fi
 }
 
+validate_human_gate_mode() {
+    if [[ "$HUMAN_GATE_MODE" != "true" ]]; then
+        return
+    fi
+
+    if [[ "$AGENT" != "codex" ]]; then
+        die "--human-gate requires agent 'codex'. Current agent: $AGENT."
+    fi
+}
+
+human_gate_run_id() {
+    if [[ -n "$HUMAN_GATE_RUN_ID" ]]; then
+        printf "%s" "$HUMAN_GATE_RUN_ID"
+        return
+    fi
+
+    if [[ -n "${START_ISSUE_RUN_ID:-}" ]]; then
+        HUMAN_GATE_RUN_ID="$START_ISSUE_RUN_ID"
+    else
+        HUMAN_GATE_RUN_ID="$(date +%Y%m%d-%H%M%S)"
+    fi
+
+    printf "%s" "$HUMAN_GATE_RUN_ID"
+}
+
+prepare_human_gate_state_paths() {
+    local run_id
+    run_id="$(human_gate_run_id)"
+
+    HUMAN_GATE_STATE_DIR="$WORKTREE_PATH/.start-issue/runs/$run_id"
+    HUMAN_GATE_EVENTS_PATH="$HUMAN_GATE_STATE_DIR/events.jsonl"
+    HUMAN_GATE_LAST_MESSAGE_PATH="$HUMAN_GATE_STATE_DIR/last-message.txt"
+    HUMAN_GATE_THREAD_ID_PATH="$HUMAN_GATE_STATE_DIR/thread-id"
+}
+
+build_human_gate_command() {
+    HUMAN_GATE_CMD=()
+    validate_human_gate_mode
+    prepare_human_gate_state_paths
+
+    if [[ -n "$MODEL" ]]; then
+        HUMAN_GATE_CMD=(
+            codex exec
+            --model "$MODEL"
+            --cd "$WORKTREE_PATH"
+            --ask-for-approval never
+            --sandbox workspace-write
+            --json
+            --output-last-message "$HUMAN_GATE_LAST_MESSAGE_PATH"
+            -
+        )
+    else
+        HUMAN_GATE_CMD=(
+            codex exec
+            --cd "$WORKTREE_PATH"
+            --ask-for-approval never
+            --sandbox workspace-write
+            --json
+            --output-last-message "$HUMAN_GATE_LAST_MESSAGE_PATH"
+            -
+        )
+    fi
+}
+
+capture_human_gate_thread_id() {
+    HUMAN_GATE_THREAD_ID=""
+
+    if [[ ! -f "$HUMAN_GATE_EVENTS_PATH" ]]; then
+        return 1
+    fi
+
+    HUMAN_GATE_THREAD_ID="$(
+        jq -r 'select(.type == "thread.started") | .thread_id // empty' "$HUMAN_GATE_EVENTS_PATH" 2>/dev/null | head -n 1
+    )"
+
+    [[ -n "$HUMAN_GATE_THREAD_ID" ]] || return 1
+
+    printf "%s\n" "$HUMAN_GATE_THREAD_ID" > "$HUMAN_GATE_THREAD_ID_PATH"
+}
+
+parse_human_gate_final_status() {
+    HUMAN_GATE_FINAL_STATUS=""
+
+    if [[ ! -f "$HUMAN_GATE_LAST_MESSAGE_PATH" ]]; then
+        return 1
+    fi
+
+    HUMAN_GATE_FINAL_STATUS="$(
+        awk '
+            /^STATUS:[[:space:]]*/ {
+                sub(/^STATUS:[[:space:]]*/, "")
+                gsub(/[[:space:]]+$/, "")
+                print
+                exit
+            }
+        ' "$HUMAN_GATE_LAST_MESSAGE_PATH"
+    )"
+
+    case "$HUMAN_GATE_FINAL_STATUS" in
+        DONE|HUMAN_GATE)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+run_codex_human_gate_session() {
+    local batch_exit=0
+
+    log_info "🤖 Starting codex human-gate batch session..."
+    build_human_gate_command
+
+    echo "   State dir: $HUMAN_GATE_STATE_DIR"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        print_dry_run_human_gate_command
+        return
+    fi
+
+    mkdir -p "$HUMAN_GATE_STATE_DIR"
+
+    if printf "%s" "$AGENT_PROMPT" | "${HUMAN_GATE_CMD[@]}" > "$HUMAN_GATE_EVENTS_PATH"; then
+        :
+    else
+        batch_exit=$?
+    fi
+
+    if ! capture_human_gate_thread_id; then
+        if [[ $batch_exit -ne 0 ]]; then
+            echo "   Codex batch exit code: $batch_exit"
+        fi
+        die "Codex human-gate run did not capture thread_id. Inspect: $HUMAN_GATE_EVENTS_PATH"
+    fi
+
+    echo "   Thread ID: $HUMAN_GATE_THREAD_ID"
+
+    if ! parse_human_gate_final_status; then
+        if [[ $batch_exit -ne 0 ]]; then
+            echo "   Codex batch exit code: $batch_exit"
+        fi
+        die "No recognized final status found. Inspect: $HUMAN_GATE_LAST_MESSAGE_PATH"
+    fi
+
+    case "$HUMAN_GATE_FINAL_STATUS" in
+        DONE)
+            log_success "✅ Codex finished with STATUS: DONE"
+            echo "   Last message: $HUMAN_GATE_LAST_MESSAGE_PATH"
+            return 0
+            ;;
+        HUMAN_GATE)
+            log_info "🧭 Codex finished with STATUS: HUMAN_GATE"
+            echo "   Resume command: codex resume --include-non-interactive $HUMAN_GATE_THREAD_ID"
+            if codex resume --include-non-interactive "$HUMAN_GATE_THREAD_ID"; then
+                return 0
+            fi
+            log_error "Could not open Codex resume session."
+            echo "Resume command: codex resume --include-non-interactive $HUMAN_GATE_THREAD_ID"
+            echo "Thread ID: $HUMAN_GATE_THREAD_ID"
+            return 2
+            ;;
+        *)
+            die "Unsupported human-gate final status: $HUMAN_GATE_FINAL_STATUS"
+            ;;
+    esac
+}
+
 default_prompt_improvement_output_path() {
     if [[ -n "$PROMPT_IMPROVEMENT_OUTPUT_FILE" ]]; then
         printf "%s" "$PROMPT_IMPROVEMENT_OUTPUT_FILE"
