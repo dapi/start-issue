@@ -1,4 +1,18 @@
 # shellcheck shell=bash disable=SC2034
+sanitize_branch_slug() {
+    local input="$1"
+    local slug
+
+    slug=$(printf "%s" "$input" | tr '[:upper:]' '[:lower:]' | \
+        sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | cut -c1-40 | sed 's/^-*//' | sed 's/-*$//')
+
+    if [[ -z "$slug" ]]; then
+        slug="work"
+    fi
+
+    printf "%s" "$slug"
+}
+
 generate_fast_branch_name() {
     local branch_type="feature"
     local short_name
@@ -17,8 +31,7 @@ generate_fast_branch_name() {
         branch_type="chore"
     fi
 
-    short_name=$(echo "$ISSUE_TITLE" | tr '[:upper:]' '[:lower:]' | \
-        sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-40)
+    short_name=$(sanitize_branch_slug "$ISSUE_TITLE")
 
     BRANCH_NAME="$branch_type/issue-$ISSUE_NUMBER-$short_name"
 }
@@ -26,7 +39,7 @@ generate_fast_branch_name() {
 validate_branch_name_or_fallback() {
     local elapsed="$1"
 
-    if [[ "$BRANCH_NAME" =~ ^(feature|fix|hotfix|refactor|docs|test|chore)/issue-[0-9]+-[a-z0-9-]+$ ]]; then
+    if [[ "$BRANCH_NAME" =~ ^(feature|fix|hotfix|refactor|docs|test|chore)/issue-[0-9]+-[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]]; then
         log_success "   Branch: $BRANCH_NAME (${elapsed}s, ai:$AGENT)"
         return
     fi

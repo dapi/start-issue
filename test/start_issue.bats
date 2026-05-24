@@ -574,6 +574,41 @@ install_fake_zellij_tab_status() {
   assert_output_contains "Using fallback: feature/issue-1-add-login-button"
 }
 
+@test "AI branch naming falls back when branch ends with a trailing dash" {
+  export START_ISSUE_FAKE_BRANCH_NAME="feature/issue-1-ai-generated-"
+
+  run_start_issue 1 --agent codex --ai --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Generated branch name doesn't match expected format"
+  assert_output_contains "Using fallback: feature/issue-1-add-login-button"
+}
+
+@test "fast branch naming trims a trailing dash after truncation" {
+  local long_prefix
+  long_prefix="$(printf 'a%.0s' {1..39})"
+  cat > "$TEST_TMPDIR/issue-trailing-dash.json" <<EOF
+{
+  "number": 1,
+  "title": "${long_prefix} b",
+  "body": "Trailing dash truncation case.",
+  "html_url": "https://github.com/owner/repo/issues/1",
+  "labels": [
+    {
+      "name": "enhancement"
+    }
+  ]
+}
+EOF
+  export START_ISSUE_FAKE_ISSUE_JSON="$TEST_TMPDIR/issue-trailing-dash.json"
+
+  run_start_issue 1 --agent none --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Path: $HOME/worktrees/feature/issue-1-${long_prefix}"
+  [[ "$output" != *"feature/issue-1-${long_prefix}-"* ]]
+}
+
 @test "make test target exists and runs local verification stack" {
   run make -n -f "$REPO_ROOT/Makefile" test
 
