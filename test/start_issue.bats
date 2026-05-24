@@ -133,8 +133,10 @@ install_fake_zellij_tab_status() {
   run_start_issue 1 --dry-run --no-init
 
   assert_success
-  assert_output_contains "Agent: claude (built-in default)"
-  assert_output_contains "Model: <unset> (built-in default)"
+  assert_output_contains "Agent: claude"
+  assert_output_contains "Agent source: built-in default"
+  assert_output_contains "Model: <unset>"
+  assert_output_contains "Model source: built-in default"
   assert_output_contains "Fetching issue #1 from owner/repo"
   assert_output_contains "Prompt source: built-in Claude command"
   assert_output_contains "Default prompt files:"
@@ -155,8 +157,10 @@ install_fake_zellij_tab_status() {
   assert_output_contains "Examples:"
   assert_output_contains "Prompt variables:"
   assert_output_contains "Current configuration:"
-  assert_output_contains "Agent: claude (built-in default)"
-  assert_output_contains "Model: <unset> (built-in default)"
+  assert_output_contains "Agent: claude"
+  assert_output_contains "Agent source: built-in default"
+  assert_output_contains "Model: <unset>"
+  assert_output_contains "Model source: built-in default"
   assert_output_contains "Prompt source: built-in Claude command"
   assert_output_contains "Prompt location: $REPO_ROOT/scripts/start-issue"
   assert_output_contains "Project model:"
@@ -204,8 +208,9 @@ install_fake_zellij_tab_status() {
 
   assert_failure
   assert_output_contains "Error: missing issue URL or issue number"
-  assert_output_contains "Agent: codex ("
-  assert_output_contains ".start-issue/agent)"
+  assert_output_contains "Agent: codex"
+  assert_output_contains "Agent source: "
+  assert_output_contains ".start-issue/agent"
   assert_output_contains "Prompt source:"
   assert_output_contains ".start-issue/prompt.md"
   assert_output_contains "Prompt location:"
@@ -370,7 +375,8 @@ install_fake_zellij_tab_status() {
   run_start_issue 1 --agent codex --dry-run --no-init
 
   assert_success
-  assert_output_contains "Agent: codex (CLI)"
+  assert_output_contains "Agent: codex"
+  assert_output_contains "Agent source: CLI"
   assert_output_contains "codex --cd"
 }
 
@@ -384,7 +390,8 @@ install_fake_zellij_tab_status() {
   run_start_issue 1 --agent codex --model cli-model --dry-run --no-init
 
   assert_success
-  assert_output_contains "Model: cli-model (CLI)"
+  assert_output_contains "Model: cli-model"
+  assert_output_contains "Model source: CLI"
   assert_output_contains "codex --model cli-model --cd"
 }
 
@@ -396,8 +403,9 @@ install_fake_zellij_tab_status() {
   run_start_issue 1 --agent codex --dry-run --no-init
 
   assert_success
-  assert_output_contains "Model: project-model ("
-  assert_output_contains ".start-issue/model)"
+  assert_output_contains "Model: project-model"
+  assert_output_contains "Model source: "
+  assert_output_contains ".start-issue/model"
   assert_output_contains "codex --model project-model --cd"
 }
 
@@ -409,7 +417,8 @@ install_fake_zellij_tab_status() {
   run_start_issue 1 --agent pi --dry-run --no-init
 
   assert_success
-  assert_output_contains "Model: user-model ($HOME/.config/start-issue/model)"
+  assert_output_contains "Model: user-model"
+  assert_output_contains "Model source: $HOME/.config/start-issue/model"
   assert_output_contains "pi --model user-model"
 }
 
@@ -421,8 +430,9 @@ install_fake_zellij_tab_status() {
   run_start_issue 1 --dry-run --no-init
 
   assert_success
-  assert_output_contains "Agent: codex ("
-  assert_output_contains ".start-issue/agent)"
+  assert_output_contains "Agent: codex"
+  assert_output_contains "Agent source: "
+  assert_output_contains ".start-issue/agent"
 }
 
 @test "user agent config wins over environment" {
@@ -433,7 +443,8 @@ install_fake_zellij_tab_status() {
   run_start_issue 1 --dry-run --no-init
 
   assert_success
-  assert_output_contains "Agent: pi ($HOME/.config/start-issue/agent)"
+  assert_output_contains "Agent: pi"
+  assert_output_contains "Agent source: $HOME/.config/start-issue/agent"
   assert_output_contains "cd $HOME/worktrees/feature/issue-1-add-login-button && pi"
 }
 
@@ -442,7 +453,8 @@ install_fake_zellij_tab_status() {
 
   assert_success
   assert_output_contains "Scope: project config"
-  assert_output_contains "Agent: codex (CLI)"
+  assert_output_contains "Agent: codex"
+  assert_output_contains "Agent source: CLI"
   [[ "$(cat .start-issue/agent)" == "codex" ]]
   [[ "$(cat .start-issue/prompt.md)" == *"Implement GitHub issue {ISSUE_URL} in this worktree."* ]]
   [[ "$(cat .start-issue/prompt.md)" == *"target the base branch {BASE_BRANCH}."* ]]
@@ -453,7 +465,8 @@ install_fake_zellij_tab_status() {
   run_start_issue init --project --agent codex --model gpt-5.2
 
   assert_success
-  assert_output_contains "Model: gpt-5.2 (CLI)"
+  assert_output_contains "Model: gpt-5.2"
+  assert_output_contains "Model source: CLI"
   [[ "$(cat .start-issue/model)" == "gpt-5.2" ]]
 }
 
@@ -489,7 +502,8 @@ install_fake_zellij_tab_status() {
   run_start_issue init --project
 
   assert_success
-  assert_output_contains "Agent: codex ("
+  assert_output_contains "Agent: codex"
+  assert_output_contains "Agent source: "
   assert_output_contains ".start-issue/agent (existing)"
   [[ "$(cat .start-issue/agent)" == "codex" ]]
   [[ "$(cat .start-issue/prompt.md)" == *"Implement GitHub issue {ISSUE_URL} in this worktree."* ]]
@@ -585,12 +599,14 @@ install_fake_zellij_tab_status() {
 @test "dry-run renders explicit model for supported launch adapters" {
   run_start_issue 1 --agent codex --model gpt-5.2 --dry-run --no-init
   assert_success
-  assert_output_contains "Model: gpt-5.2 (CLI)"
+  assert_output_contains "Model: gpt-5.2"
+  assert_output_contains "Model source: CLI"
   assert_output_contains "codex --model gpt-5.2 --cd $HOME/worktrees/feature/issue-1-add-login-button"
 
   run_start_issue 1 --agent claude --model sonnet --dry-run --no-init
   assert_success
-  assert_output_contains "Model: sonnet (CLI)"
+  assert_output_contains "Model: sonnet"
+  assert_output_contains "Model source: CLI"
   assert_output_contains "claude --model sonnet --dangerously-skip-permissions"
 }
 
@@ -735,7 +751,8 @@ install_fake_zellij_tab_status() {
 
   assert_success
   assert_output_contains "Branch: fix/issue-1-ai-generated-name"
-  assert_output_contains "Model: gpt-5.2 (CLI)"
+  assert_output_contains "Model: gpt-5.2"
+  assert_output_contains "Model source: CLI"
 }
 
 @test "no-model branch naming keeps existing adapter behavior" {

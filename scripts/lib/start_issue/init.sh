@@ -186,8 +186,10 @@ run_config_init() {
 
     echo "Scope: $scope_label"
     echo "Directory: $target_dir"
-    echo "Agent: $AGENT ($AGENT_SOURCE)"
-    echo "Model: ${MODEL:-<unset>} ($MODEL_SOURCE)"
+    echo "Agent: $AGENT"
+    echo "Agent source: $AGENT_SOURCE"
+    echo "Model: ${MODEL:-<unset>}"
+    echo "Model source: $MODEL_SOURCE"
     echo "Prompt source: $PROMPT_SOURCE"
     echo ""
 

@@ -116,8 +116,10 @@ EOF
 
 show_current_configuration() {
     echo "Current configuration:"
-    echo "  Agent: $AGENT ($AGENT_SOURCE)"
-    echo "  Model: $(model_display_value) ($MODEL_SOURCE)"
+    echo "  Agent: $AGENT"
+    echo "  Agent source: $AGENT_SOURCE"
+    echo "  Model: $(model_display_value)"
+    echo "  Model source: $MODEL_SOURCE"
     echo "  Prompt source: $PROMPT_SOURCE"
     echo "  Prompt location: $PROMPT_LOCATION"
     print_agent_model_file_locations "  "
@@ -233,8 +235,10 @@ print_dry_run_launch_command() {
 
     build_launch_command
 
-    echo "   Agent: $AGENT ($AGENT_SOURCE)"
-    echo "   Model: $(model_display_value) ($MODEL_SOURCE)"
+    echo "   Agent: $AGENT"
+    echo "   Agent source: $AGENT_SOURCE"
+    echo "   Model: $(model_display_value)"
+    echo "   Model source: $MODEL_SOURCE"
     echo "   Prompt source: $PROMPT_SOURCE"
     echo "   Prompt length: ${#AGENT_PROMPT} chars"
 
@@ -286,8 +290,10 @@ print_dry_run_launch_command() {
 }
 
 print_selected_configuration() {
-    echo "Agent: $AGENT ($AGENT_SOURCE)"
-    echo "Model: $(model_display_value) ($MODEL_SOURCE)"
+    echo "Agent: $AGENT"
+    echo "Agent source: $AGENT_SOURCE"
+    echo "Model: $(model_display_value)"
+    echo "Model source: $MODEL_SOURCE"
     echo "Worktree directory: $WORKTREE_DIR ($WORKTREE_DIR_SOURCE)"
     echo "Prompt source: $PROMPT_SOURCE"
     echo "Prompt location: $PROMPT_LOCATION"
