@@ -59,6 +59,18 @@ This builds a self-contained `start-issue` script from the modular sources and i
 
 Make sure `~/.local/bin` is in your `PATH`.
 
+Update an existing installation to the latest published GitHub Release:
+
+```bash
+start-issue update
+start-issue --update
+```
+
+The update workflow resolves the latest GitHub Release for `dapi/start-issue`,
+compares it with the running executable version, and updates the same
+executable path when a newer release exists. If the installed version is
+already current, the command exits successfully with a clear no-op message.
+
 ## Usage
 
 ```bash
@@ -72,6 +84,8 @@ start-issue 123 --no-agent
 start-issue 123 --dry-run
 start-issue init
 start-issue init --project --agent codex --model gpt-5.2
+start-issue update
+start-issue --update
 ```
 
 Running `start-issue` without an issue prints the normal help plus the currently
@@ -113,6 +127,8 @@ The CLI entrypoint remains `scripts/start-issue`, but the implementation is now 
 - `github.sh` resolves repository context and fetches issue metadata.
 - `worktree.sh` plans branch/worktree behavior and runs worktree-side effects.
 - `agent.sh` owns agent adapter operations: validation, launch command construction, AI branch naming, and prompt improvement.
+- `release.sh` owns release download, checksum, and version-normalization helpers shared by install and update paths.
+- `update.sh` owns the self-update workflow and latest-release resolution.
 - `output.sh` renders help, status, dry-run output, and session framing.
 - `init.sh` owns `start-issue init`.
 - `pipeline.sh` makes the orchestration pipeline explicit.
@@ -134,6 +150,7 @@ The project should keep Bash as long as lifecycle commands, configuration shape,
 |----------|-------------|
 | `ISSUE` | GitHub issue number or full GitHub issue URL. Required. |
 | `init` | Create default configuration files for either the current project or the current user. |
+| `update` | Update the running `start-issue` executable from the latest published GitHub Release. |
 | `--repo OWNER/REPO`, `-r OWNER/REPO` | Repository to read the issue from when `ISSUE` is a number. If omitted, `start-issue` detects the repository from `origin`. |
 | `--base BRANCH`, `-b BRANCH` | Base branch for the new worktree branch. If omitted, `start-issue` uses the repository default when available, otherwise the current branch. |
 | `--worktree-dir DIR`, `-w DIR` | Parent directory for created worktrees. Overrides `START_ISSUE_WORKTREE_DIR`. |
@@ -153,6 +170,7 @@ The project should keep Bash as long as lifecycle commands, configuration shape,
 | `--user` | With `init`, write user config under `~/.config/start-issue`. |
 | `--force` | With `init`, overwrite existing `agent` and `prompt.md` files, and reset `model` to the selected value or to built-in unset when `--model` is omitted. Existing files are kept by default without `--force`. |
 | `--dry-run` | Print the selected configuration and launch command without creating a worktree, running `init.sh`, or launching an agent. With `init`, print planned config writes without creating files. |
+| `--update` | Update the running `start-issue` executable from the latest published GitHub Release. Equivalent to `start-issue update`. |
 | `--version`, `-v` | Show version. |
 | `--help`, `-h` | Show help. |
 
@@ -186,6 +204,20 @@ Related Claude Code marketplace workflows:
 | `~/.config/start-issue/prompt.md` | User default prompt template. |
 
 Run `start-issue init` to create these files. If neither `--project` nor `--user` is provided, the command asks which scope to initialize. It writes the built-in default agent and prompt unless `--agent`, `--prompt`, or `--prompt-file` is provided. `--model` writes a sibling `model` file; when `--model` is omitted, built-in behavior stays unset and no new model file is created. If an existing `agent` file is kept without `--force`, the generated default prompt is chosen for that kept agent.
+
+## Self-Update
+
+`start-issue update` and `start-issue --update` are equivalent entry points.
+
+The workflow:
+
+1. Resolves the latest published GitHub Release for `dapi/start-issue`.
+2. Reads the version of the executable the user is currently running.
+3. Normalizes version strings so `1.11.1` and `v1.11.1` compare as equal.
+4. If the running version is current or newer than the latest published release, exits `0` with a clear status message.
+5. If a newer published release exists, downloads `start-issue` and `start-issue.sha256`, verifies the checksum, and installs the update into the same executable path the user invoked.
+
+The update workflow works outside a git repository. It requires `gh`, `jq`, and either `curl` or `wget`.
 
 Configuration precedence:
 
@@ -243,7 +275,7 @@ Optional dependency for Zellij support:
 - `jq`
 - selected agent CLI unless `--agent none` or `--dry-run` is used
 
-The `curl | bash` installer needs `bash` plus either `curl` or `wget`.
+The `curl | bash` installer and self-update workflow need `bash` plus either `curl` or `wget`.
 
 ## Releases
 

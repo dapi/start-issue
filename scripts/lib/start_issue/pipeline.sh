@@ -67,3 +67,7 @@ run_start_issue_pipeline() {
     render_prompt_template
     start_agent_session
 }
+
+run_update_mode() {
+    run_update_pipeline
+}

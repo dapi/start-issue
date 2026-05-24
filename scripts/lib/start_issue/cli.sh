@@ -103,6 +103,10 @@ parse_args() {
                 show_version
                 exit 0
                 ;;
+            --update)
+                UPDATE_MODE=true
+                shift
+                ;;
             --help|-h)
                 show_help
                 exit 0
@@ -113,8 +117,12 @@ parse_args() {
             *)
                 if [[ "$1" == "init" && -z "$ISSUE_INPUT" && "$INIT_CONFIG" == "false" ]]; then
                     INIT_CONFIG=true
+                elif [[ "$1" == "update" && -z "$ISSUE_INPUT" && "$INIT_CONFIG" == "false" && "$UPDATE_MODE" == "false" ]]; then
+                    UPDATE_MODE=true
                 elif [[ "$INIT_CONFIG" == "true" ]]; then
                     die "Unexpected argument for init: $1"
+                elif [[ "$UPDATE_MODE" == "true" ]]; then
+                    die "Unexpected argument for update: $1"
                 elif [[ -z "$ISSUE_INPUT" ]]; then
                     ISSUE_INPUT="$1"
                 else
@@ -126,6 +134,16 @@ parse_args() {
     done
 
     if [[ "$INIT_CONFIG" == "true" ]]; then
+        if [[ "$UPDATE_MODE" == "true" ]]; then
+            die "Use either init or update, not both."
+        fi
+        return
+    fi
+
+    if [[ "$UPDATE_MODE" == "true" ]]; then
+        if [[ -n "$ISSUE_INPUT" ]]; then
+            die "Use either update or <issue-url-or-number>, not both."
+        fi
         return
     fi
 

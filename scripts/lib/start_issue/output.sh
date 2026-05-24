@@ -15,11 +15,13 @@ Start working on a GitHub issue with git worktree and a configurable agent
 
 Usage: start-issue <issue-url-or-number> [options]
        start-issue init [options]
+       start-issue update [options]
 
 Arguments:
   <issue-url-or-number>    GitHub issue URL or issue number
                            Examples: 123, https://github.com/owner/repo/issues/123
   init                     Create default start-issue configuration
+  update                   Update the running start-issue installation
 
 Options:
   --repo, -r <owner/repo>    Repository (default: detected from git remote)
@@ -47,6 +49,7 @@ Options:
   --user                     With init: write config in ~/.config/start-issue
   --force                    With init: overwrite existing config files
   --dry-run                  Show what would be done without executing
+  --update                   Update the running start-issue installation
   --version, -v              Show version
   --help, -h                 Show this help
 
@@ -106,6 +109,8 @@ Examples:
   start-issue init --project --agent codex --model gpt-5.2
   start-issue init --project --agent codex
   start-issue init --user --force
+  start-issue update
+  start-issue --update
 EOF
 }
 
@@ -134,6 +139,7 @@ Start working on a GitHub issue with git worktree and a configurable agent
 
 Usage: start-issue <issue-url-or-number> [options]
        start-issue init [options]
+       start-issue update [options]
 
 Examples:
   start-issue 123

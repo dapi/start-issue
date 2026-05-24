@@ -14,6 +14,8 @@ modules=(
     agent.sh
     init.sh
     github.sh
+    release.sh
+    update.sh
     worktree.sh
     output.sh
     cli.sh

@@ -59,6 +59,18 @@ make install
 
 Убедитесь, что `~/.local/bin` есть в вашем `PATH`.
 
+Обновить уже установленный `start-issue` до последнего опубликованного GitHub Release:
+
+```bash
+start-issue update
+start-issue --update
+```
+
+Workflow обновления определяет последний GitHub Release для `dapi/start-issue`,
+сравнивает его с версией запущенного executable и, если доступен более новый
+релиз, обновляет тот же путь executable. Если установленная версия уже актуальна,
+команда успешно завершается и печатает понятный no-op статус.
+
 ## Использование
 
 ```bash
@@ -72,6 +84,8 @@ start-issue 123 --no-agent
 start-issue 123 --dry-run
 start-issue init
 start-issue init --project --agent codex --model gpt-5.2
+start-issue update
+start-issue --update
 ```
 
 Запуск `start-issue` без issue печатает обычную справку, а также текущий
@@ -113,6 +127,8 @@ CLI entrypoint остается `scripts/start-issue`, но реализация
 - `github.sh` определяет контекст репозитория и получает metadata issue.
 - `worktree.sh` планирует поведение branch/worktree и выполняет worktree-side effects.
 - `agent.sh` владеет операциями agent adapter: validation, сборка launch command, AI branch naming и prompt improvement.
+- `release.sh` владеет download/checksum/version-normalization helper-логикой, общей для install и update paths.
+- `update.sh` владеет workflow self-update и определением latest release.
 - `output.sh` рендерит help, status, dry-run output и session framing.
 - `init.sh` владеет `start-issue init`.
 - `pipeline.sh` делает orchestration pipeline явным.
@@ -134,6 +150,7 @@ Bash стоит сохранять, пока lifecycle commands, shape конф�
 |----------|----------|
 | `ISSUE` | Номер GitHub issue или полный URL GitHub issue. Обязательный аргумент. |
 | `init` | Создать файлы конфигурации по умолчанию для текущего проекта или текущего пользователя. |
+| `update` | Обновить запущенный executable `start-issue` из последнего опубликованного GitHub Release. |
 | `--repo OWNER/REPO`, `-r OWNER/REPO` | Репозиторий, из которого нужно прочитать issue, если `ISSUE` передан номером. Если не задан, `start-issue` определяет репозиторий из `origin`. |
 | `--base BRANCH`, `-b BRANCH` | Базовая ветка для новой worktree branch. Если не задана, `start-issue` использует default branch репозитория, когда она доступна, иначе текущую ветку. |
 | `--worktree-dir DIR`, `-w DIR` | Родительская директория для создаваемых worktree. Переопределяет `START_ISSUE_WORKTREE_DIR`. |
@@ -153,6 +170,7 @@ Bash стоит сохранять, пока lifecycle commands, shape конф�
 | `--user` | С `init` - записать пользовательскую конфигурацию в `~/.config/start-issue`. |
 | `--force` | С `init` - перезаписать существующие файлы `agent` и `prompt.md`, а также сбросить `model` к выбранному значению или к built-in unset, если `--model` не передан. Без `--force` существующие файлы сохраняются. |
 | `--dry-run` | Напечатать выбранную конфигурацию и launch command без создания worktree, запуска `init.sh` или запуска агента. С `init` - напечатать план записи конфигурации без создания файлов. |
+| `--update` | Обновить запущенный executable `start-issue` из последнего опубликованного GitHub Release. Эквивалентно `start-issue update`. |
 | `--version`, `-v` | Показать версию. |
 | `--help`, `-h` | Показать справку. |
 
@@ -186,6 +204,20 @@ Bash стоит сохранять, пока lifecycle commands, shape конф�
 | `~/.config/start-issue/prompt.md` | Пользовательский prompt template по умолчанию. |
 
 Запустите `start-issue init`, чтобы создать эти файлы. Если не переданы `--project` или `--user`, команда спросит, какой scope инициализировать. Она записывает встроенные agent и prompt по умолчанию, если не переданы `--agent`, `--prompt` или `--prompt-file`. `--model` записывает соседний файл `model`; если `--model` не передан, встроенное поведение остается unset и новый model-файл не создается. Если существующий файл `agent` сохраняется без `--force`, default prompt выбирается для этого сохраненного agent.
+
+## Self-update
+
+`start-issue update` и `start-issue --update` являются эквивалентными entry point.
+
+Workflow:
+
+1. Определяет последний опубликованный GitHub Release для `dapi/start-issue`.
+2. Читает версию executable, который пользователь запустил.
+3. Нормализует версии, поэтому `1.11.1` и `v1.11.1` считаются равными.
+4. Если текущая версия уже актуальна или новее последнего опубликованного релиза, команда завершается с кодом `0` и печатает понятный статус.
+5. Если опубликован более новый релиз, команда скачивает `start-issue` и `start-issue.sha256`, проверяет checksum и устанавливает обновление в тот же executable path, который был вызван.
+
+Workflow обновления работает вне git repository. Для него нужны `gh`, `jq` и либо `curl`, либо `wget`.
 
 Приоритет конфигурации:
 
@@ -243,7 +275,7 @@ Prompt templates поддерживают:
 - `jq`
 - CLI выбранного агента, если не используется `--agent none` или `--dry-run`
 
-Для `curl | bash` installer нужны `bash` и либо `curl`, либо `wget`.
+Для `curl | bash` installer и workflow self-update нужны `bash` и либо `curl`, либо `wget`.
 
 ## Релизы
 

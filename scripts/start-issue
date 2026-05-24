@@ -52,6 +52,7 @@ PROJECT_ROOT=""
 INIT_CONFIG=false
 INIT_SCOPE=""
 INIT_FORCE=false
+UPDATE_MODE=false
 
 AGENT=""
 AGENT_CLI=""
@@ -121,6 +122,10 @@ source "$LIB_DIR/agent.sh"
 source "$LIB_DIR/init.sh"
 # shellcheck source=scripts/lib/start_issue/github.sh
 source "$LIB_DIR/github.sh"
+# shellcheck source=scripts/lib/start_issue/release.sh
+source "$LIB_DIR/release.sh"
+# shellcheck source=scripts/lib/start_issue/update.sh
+source "$LIB_DIR/update.sh"
 # shellcheck source=scripts/lib/start_issue/worktree.sh
 source "$LIB_DIR/worktree.sh"
 # shellcheck source=scripts/lib/start_issue/output.sh
@@ -143,6 +148,11 @@ main() {
 
     if [[ "$INIT_CONFIG" == "true" ]]; then
         run_config_init
+        return
+    fi
+
+    if [[ "$UPDATE_MODE" == "true" ]]; then
+        run_update_mode
         return
     fi
 
