@@ -104,16 +104,6 @@ resolve_prompt_template() {
         PROMPT_TEMPLATE="$PROMPT_INLINE_CLI"
         PROMPT_SOURCE="CLI --prompt"
         PROMPT_LOCATION="inline CLI argument"
-    elif [[ -f "$project_prompt_file" ]]; then
-        read_prompt_file "$project_prompt_file"
-        PROMPT_SOURCE="$project_prompt_file"
-        PROMPT_LOCATION="$project_prompt_file"
-        PROMPT_TEMPLATE_PATH="$PROMPT_LOCATION"
-    elif [[ -f "$user_prompt_file" ]]; then
-        read_prompt_file "$user_prompt_file"
-        PROMPT_SOURCE="$user_prompt_file"
-        PROMPT_LOCATION="$user_prompt_file"
-        PROMPT_TEMPLATE_PATH="$PROMPT_LOCATION"
     elif [[ -n "${START_ISSUE_PROMPT_FILE:-}" || -n "${START_ISSUE_PROMPT:-}" ]]; then
         if [[ -n "${START_ISSUE_PROMPT_FILE:-}" && -n "${START_ISSUE_PROMPT:-}" ]]; then
             die "Use either START_ISSUE_PROMPT_FILE or START_ISSUE_PROMPT, not both."
@@ -129,6 +119,16 @@ resolve_prompt_template() {
             PROMPT_SOURCE="START_ISSUE_PROMPT"
             PROMPT_LOCATION="START_ISSUE_PROMPT environment variable"
         fi
+    elif [[ -f "$project_prompt_file" ]]; then
+        read_prompt_file "$project_prompt_file"
+        PROMPT_SOURCE="$project_prompt_file"
+        PROMPT_LOCATION="$project_prompt_file"
+        PROMPT_TEMPLATE_PATH="$PROMPT_LOCATION"
+    elif [[ -f "$user_prompt_file" ]]; then
+        read_prompt_file "$user_prompt_file"
+        PROMPT_SOURCE="$user_prompt_file"
+        PROMPT_LOCATION="$user_prompt_file"
+        PROMPT_TEMPLATE_PATH="$PROMPT_LOCATION"
     else
         if [[ "$AGENT" == "claude" ]]; then
             PROMPT_TEMPLATE=$(default_claude_prompt_template)

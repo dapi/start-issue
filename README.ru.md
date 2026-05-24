@@ -130,8 +130,8 @@ Bash стоит сохранять, пока lifecycle commands, shape конф�
 | Переменная | Описание |
 |------------|----------|
 | `START_ISSUE_AGENT` | Агент по умолчанию, когда `--agent` не передан и agent не задан в файлах конфигурации. Поддерживаются: `claude`, `codex`, `kimi`, `pi`, `none`. Встроенное значение по умолчанию: `claude`. |
-| `START_ISSUE_PROMPT` | Inline prompt template, который используется, если prompt не задан через CLI или файлы конфигурации. Нельзя использовать вместе с `START_ISSUE_PROMPT_FILE`, когда prompt берется из переменных окружения. |
-| `START_ISSUE_PROMPT_FILE` | Файл prompt template, который используется, если prompt не задан через CLI или файлы конфигурации. Нельзя использовать вместе с `START_ISSUE_PROMPT`, когда prompt берется из переменных окружения. |
+| `START_ISSUE_PROMPT` | Inline prompt template, который используется, если prompt не задан через CLI. Перебивает project и user prompt files. Нельзя использовать вместе с `START_ISSUE_PROMPT_FILE`, когда prompt не задан через CLI. |
+| `START_ISSUE_PROMPT_FILE` | Файл prompt template, который используется, если prompt не задан через CLI. Перебивает project и user prompt files. Нельзя использовать вместе с `START_ISSUE_PROMPT`, когда prompt не задан через CLI. |
 | `START_ISSUE_WORKTREE_DIR` | Родительская директория по умолчанию для создаваемых worktree, если `--worktree-dir` не передан. Встроенное значение по умолчанию: `~/worktrees`. |
 | `START_ISSUE_DUMP_PROMPT` | Если задана в `1`, dry-run выводит полный rendered prompt вместо краткой информации. |
 

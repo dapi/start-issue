@@ -130,8 +130,8 @@ Related Claude Code marketplace workflows:
 | Variable | Description |
 |----------|-------------|
 | `START_ISSUE_AGENT` | Default agent when `--agent` is not provided and no config file sets an agent. Supported: `claude`, `codex`, `kimi`, `pi`, `none`. Built-in default: `claude`. |
-| `START_ISSUE_PROMPT` | Inline prompt template used when no CLI or config prompt is provided. Mutually exclusive with `START_ISSUE_PROMPT_FILE` when the environment prompt is active. |
-| `START_ISSUE_PROMPT_FILE` | Prompt template file used when no CLI or config prompt is provided. Mutually exclusive with `START_ISSUE_PROMPT` when the environment prompt is active. |
+| `START_ISSUE_PROMPT` | Inline prompt template used when no CLI prompt is provided. It overrides project and user prompt files. Mutually exclusive with `START_ISSUE_PROMPT_FILE` when no CLI prompt is provided. |
+| `START_ISSUE_PROMPT_FILE` | Prompt template file used when no CLI prompt is provided. It overrides project and user prompt files. Mutually exclusive with `START_ISSUE_PROMPT` when no CLI prompt is provided. |
 | `START_ISSUE_WORKTREE_DIR` | Default parent directory for created worktrees when `--worktree-dir` is not provided. Built-in default: `~/worktrees`. |
 | `START_ISSUE_DUMP_PROMPT` | When set to `1`, dry-run output includes the full rendered prompt instead of only summary information. |
 

@@ -49,9 +49,9 @@ Agent selection precedence:
 
 Prompt template precedence:
   CLI --prompt-file / --prompt
+  START_ISSUE_PROMPT_FILE / START_ISSUE_PROMPT
   .start-issue/prompt.md in the git root
   ~/.config/start-issue/prompt.md
-  START_ISSUE_PROMPT_FILE / START_ISSUE_PROMPT
   built-in default
 
 Prompt improvement:

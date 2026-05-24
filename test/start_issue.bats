@@ -297,6 +297,22 @@ install_fake_zellij_tab_status() {
   assert_output_contains "UNKNOWN"
 }
 
+@test "environment prompt file overrides user and project prompt files" {
+  mkdir -p .start-issue "$HOME/.config/start-issue"
+  printf "Project prompt {ISSUE_NUMBER}\n" > .start-issue/prompt.md
+  printf "User prompt {ISSUE_NUMBER}\n" > "$HOME/.config/start-issue/prompt.md"
+  printf "Env prompt {ISSUE_NUMBER}\n" > "$TEST_TMPDIR/env-prompt.md"
+  export START_ISSUE_PROMPT_FILE="$TEST_TMPDIR/env-prompt.md"
+
+  run_start_issue 1 --agent codex --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Prompt source: START_ISSUE_PROMPT_FILE: $TEST_TMPDIR/env-prompt.md"
+  assert_output_contains "Env\\ prompt\\ 1"
+  [[ "$output" != *"Project prompt 1"* ]]
+  [[ "$output" != *"User prompt 1"* ]]
+}
+
 @test "prompt improvement writes proposal next to project prompt and exits before worktree" {
   mkdir -p .start-issue
   printf "Prompt {ISSUE_NUMBER}\n" > .start-issue/prompt.md
