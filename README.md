@@ -16,6 +16,31 @@ It fetches issue metadata with `gh`, creates a git worktree with a branch name b
 
 ## Install
 
+Install the latest published release:
+
+```bash
+mkdir -p ~/.local/bin
+curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o ~/.local/bin/start-issue
+chmod +x ~/.local/bin/start-issue
+```
+
+One-liner:
+
+```bash
+mkdir -p ~/.local/bin && curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o ~/.local/bin/start-issue && chmod +x ~/.local/bin/start-issue
+```
+
+Verify the download if you want:
+
+```bash
+tmpdir="$(mktemp -d)"
+curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o "$tmpdir/start-issue"
+curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue.sha256 -o "$tmpdir/start-issue.sha256"
+(cd "$tmpdir" && shasum -a 256 -c start-issue.sha256)
+```
+
+Build and install from source:
+
 ```bash
 make install
 ```
@@ -134,8 +159,8 @@ Related Claude Code marketplace workflows:
 |----------|-------------|
 | `START_ISSUE_AGENT` | Default agent when `--agent` is not provided and no config file sets an agent. Supported: `claude`, `codex`, `kimi`, `pi`, `none`. Built-in default: `claude`. |
 | `START_ISSUE_MODEL` | Default model when `--model` is not provided and no config file sets a model. Built-in default: unset, which lets the selected agent CLI decide. |
-| `START_ISSUE_PROMPT` | Inline prompt template used when no CLI or config prompt is provided. Mutually exclusive with `START_ISSUE_PROMPT_FILE` when the environment prompt is active. |
-| `START_ISSUE_PROMPT_FILE` | Prompt template file used when no CLI or config prompt is provided. Mutually exclusive with `START_ISSUE_PROMPT` when the environment prompt is active. |
+| `START_ISSUE_PROMPT` | Inline prompt template used when no CLI prompt is provided. It overrides project and user prompt files. Mutually exclusive with `START_ISSUE_PROMPT_FILE` when no CLI prompt is provided. |
+| `START_ISSUE_PROMPT_FILE` | Prompt template file used when no CLI prompt is provided. It overrides project and user prompt files. Mutually exclusive with `START_ISSUE_PROMPT` when no CLI prompt is provided. |
 | `START_ISSUE_WORKTREE_DIR` | Default parent directory for created worktrees when `--worktree-dir` is not provided. Built-in default: `~/worktrees`. |
 | `START_ISSUE_DUMP_PROMPT` | When set to `1`, dry-run output includes the full rendered prompt instead of only summary information. |
 
@@ -207,6 +232,29 @@ Optional dependency for Zellij support:
 - `gh` CLI with authenticated GitHub session
 - `jq`
 - selected agent CLI unless `--agent none` or `--dry-run` is used
+
+## Releases
+
+GitHub Releases are published automatically when a SemVer tag like `v1.12.0` is pushed. The release workflow reruns the test suite, verifies that the tag matches `VERSION` in `scripts/start-issue`, builds the bundled `start-issue` script, and uploads:
+
+- `start-issue`
+- `start-issue.sha256`
+
+To prepare a release locally:
+
+```bash
+make release-patch
+make release-minor
+make release-major
+```
+
+Each command requires a clean worktree, bumps `VERSION`, runs `make test` and `make build`, creates a local commit like `Release v1.12.0`, and creates the matching annotated git tag.
+
+Publish the prepared release with:
+
+```bash
+git push origin master --follow-tags
+```
 
 ## Specification
 

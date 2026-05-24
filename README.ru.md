@@ -16,6 +16,31 @@
 
 ## Установка
 
+Установить последний опубликованный релиз:
+
+```bash
+mkdir -p ~/.local/bin
+curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o ~/.local/bin/start-issue
+chmod +x ~/.local/bin/start-issue
+```
+
+One-liner:
+
+```bash
+mkdir -p ~/.local/bin && curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o ~/.local/bin/start-issue && chmod +x ~/.local/bin/start-issue
+```
+
+При желании можно проверить checksum:
+
+```bash
+tmpdir="$(mktemp -d)"
+curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o "$tmpdir/start-issue"
+curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue.sha256 -o "$tmpdir/start-issue.sha256"
+(cd "$tmpdir" && shasum -a 256 -c start-issue.sha256)
+```
+
+Сборка и установка из исходников:
+
 ```bash
 make install
 ```
@@ -134,8 +159,8 @@ Bash стоит сохранять, пока lifecycle commands, shape конф�
 |------------|----------|
 | `START_ISSUE_AGENT` | Агент по умолчанию, когда `--agent` не передан и agent не задан в файлах конфигурации. Поддерживаются: `claude`, `codex`, `kimi`, `pi`, `none`. Встроенное значение по умолчанию: `claude`. |
 | `START_ISSUE_MODEL` | Model по умолчанию, когда `--model` не передан и model не задана в файлах конфигурации. Встроенное поведение по умолчанию: unset, решение принимает CLI выбранного агента. |
-| `START_ISSUE_PROMPT` | Inline prompt template, который используется, если prompt не задан через CLI или файлы конфигурации. Нельзя использовать вместе с `START_ISSUE_PROMPT_FILE`, когда prompt берется из переменных окружения. |
-| `START_ISSUE_PROMPT_FILE` | Файл prompt template, который используется, если prompt не задан через CLI или файлы конфигурации. Нельзя использовать вместе с `START_ISSUE_PROMPT`, когда prompt берется из переменных окружения. |
+| `START_ISSUE_PROMPT` | Inline prompt template, который используется, если prompt не задан через CLI. Перебивает project и user prompt files. Нельзя использовать вместе с `START_ISSUE_PROMPT_FILE`, когда prompt не задан через CLI. |
+| `START_ISSUE_PROMPT_FILE` | Файл prompt template, который используется, если prompt не задан через CLI. Перебивает project и user prompt files. Нельзя использовать вместе с `START_ISSUE_PROMPT`, когда prompt не задан через CLI. |
 | `START_ISSUE_WORKTREE_DIR` | Родительская директория по умолчанию для создаваемых worktree, если `--worktree-dir` не передан. Встроенное значение по умолчанию: `~/worktrees`. |
 | `START_ISSUE_DUMP_PROMPT` | Если задана в `1`, dry-run выводит полный rendered prompt вместо краткой информации. |
 
@@ -207,6 +232,29 @@ Prompt templates поддерживают:
 - `gh` CLI с авторизованной GitHub session
 - `jq`
 - CLI выбранного агента, если не используется `--agent none` или `--dry-run`
+
+## Релизы
+
+GitHub Releases публикуются автоматически, когда в репозиторий пушится SemVer tag вроде `v1.12.0`. Release workflow заново прогоняет тесты, проверяет, что tag совпадает с `VERSION` в `scripts/start-issue`, собирает bundled-скрипт `start-issue` и загружает:
+
+- `start-issue`
+- `start-issue.sha256`
+
+Подготовить релиз локально можно так:
+
+```bash
+make release-patch
+make release-minor
+make release-major
+```
+
+Каждая команда требует чистое рабочее дерево, поднимает `VERSION`, запускает `make test` и `make build`, создает локальный commit вида `Release v1.12.0` и создает matching annotated git tag.
+
+Опубликовать подготовленный релиз:
+
+```bash
+git push origin master --follow-tags
+```
 
 ## Спецификация
 

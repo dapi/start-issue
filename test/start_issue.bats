@@ -81,7 +81,11 @@ install_fake_zellij_tab_status() {
   run_start_issue
 
   assert_failure
+  assert_output_contains "Error: missing issue URL or issue number"
+  assert_output_contains 'Run `start-issue --help` for full usage and prompt variables.'
   assert_output_contains "Usage: start-issue <issue-url-or-number> [options]"
+  assert_output_contains "Examples:"
+  assert_output_contains "Prompt variables:"
   assert_output_contains "Current configuration:"
   assert_output_contains "Agent: claude (built-in default)"
   assert_output_contains "Model: <unset> (built-in default)"
@@ -90,12 +94,27 @@ install_fake_zellij_tab_status() {
   assert_output_contains "Project model:"
   assert_output_contains ".start-issue/model"
   assert_output_contains "User model:"
+  assert_output_contains "Worktree dir: $HOME/worktrees (built-in default)"
   assert_output_contains "Default prompt files:"
   assert_output_contains "Project:"
   assert_output_contains ".start-issue/prompt.md"
   assert_output_contains "User: $HOME/.config/start-issue/prompt.md"
-  assert_output_contains "Prompt preview: /task-router:route-task {ISSUE_URL}"
+  [[ "$output" != *"Prompt preview:"* ]]
+  [[ "$output" != *"Options:"* ]]
+  [[ "$output" != *"Agent selection precedence:"* ]]
   [[ "$output" != *"Fetching issue"* ]]
+}
+
+@test "help lists environment variables for prompt and config sources" {
+  run_start_issue --help
+
+  assert_success
+  assert_output_contains "Environment variables:"
+  assert_output_contains "START_ISSUE_AGENT"
+  assert_output_contains "START_ISSUE_PROMPT"
+  assert_output_contains "START_ISSUE_PROMPT_FILE"
+  assert_output_contains "START_ISSUE_WORKTREE_DIR"
+  assert_output_contains "START_ISSUE_DUMP_PROMPT"
 }
 
 @test "missing issue prints project agent and prompt file location" {
@@ -106,12 +125,13 @@ install_fake_zellij_tab_status() {
   run_start_issue
 
   assert_failure
+  assert_output_contains "Error: missing issue URL or issue number"
   assert_output_contains "Agent: codex ("
   assert_output_contains ".start-issue/agent)"
   assert_output_contains "Prompt source:"
   assert_output_contains ".start-issue/prompt.md"
   assert_output_contains "Prompt location:"
-  assert_output_contains "Prompt preview: Project prompt for {ISSUE_URL}"
+  [[ "$output" != *"Prompt preview:"* ]]
   [[ "$output" != *"Fetching issue"* ]]
 }
 
@@ -235,6 +255,7 @@ install_fake_zellij_tab_status() {
   assert_output_contains "Agent: codex (CLI)"
   [[ "$(cat .start-issue/agent)" == "codex" ]]
   [[ "$(cat .start-issue/prompt.md)" == *"Implement GitHub issue {ISSUE_URL} in this worktree."* ]]
+  [[ "$(cat .start-issue/prompt.md)" == *"target the base branch {BASE_BRANCH}."* ]]
   [[ "$output" != *"Fetching issue"* ]]
 }
 
@@ -282,6 +303,7 @@ install_fake_zellij_tab_status() {
   assert_output_contains ".start-issue/agent (existing)"
   [[ "$(cat .start-issue/agent)" == "codex" ]]
   [[ "$(cat .start-issue/prompt.md)" == *"Implement GitHub issue {ISSUE_URL} in this worktree."* ]]
+  [[ "$(cat .start-issue/prompt.md)" == *"target the base branch {BASE_BRANCH}."* ]]
   [[ "$(cat .start-issue/prompt.md)" != *"/task-router:route-task"* ]]
 }
 
@@ -393,6 +415,22 @@ install_fake_zellij_tab_status() {
   assert_output_contains ".start-issue/prompt.md"
   assert_output_contains "Prompt-1-owner/repo-master"
   assert_output_contains "UNKNOWN"
+}
+
+@test "environment prompt file overrides user and project prompt files" {
+  mkdir -p .start-issue "$HOME/.config/start-issue"
+  printf "Project prompt {ISSUE_NUMBER}\n" > .start-issue/prompt.md
+  printf "User prompt {ISSUE_NUMBER}\n" > "$HOME/.config/start-issue/prompt.md"
+  printf "Env prompt {ISSUE_NUMBER}\n" > "$TEST_TMPDIR/env-prompt.md"
+  export START_ISSUE_PROMPT_FILE="$TEST_TMPDIR/env-prompt.md"
+
+  run_start_issue 1 --agent codex --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Prompt source: START_ISSUE_PROMPT_FILE: $TEST_TMPDIR/env-prompt.md"
+  assert_output_contains "Env\\ prompt\\ 1"
+  [[ "$output" != *"Project prompt 1"* ]]
+  [[ "$output" != *"User prompt 1"* ]]
 }
 
 @test "prompt improvement writes proposal next to project prompt and exits before worktree" {

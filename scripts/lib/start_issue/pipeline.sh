@@ -31,7 +31,9 @@ handle_missing_issue_mode() {
     resolve_agent
     resolve_model
     resolve_prompt_template
-    show_help
+    show_missing_issue_summary
+    echo ""
+    show_missing_issue_help
     echo ""
     show_current_configuration
     exit 1

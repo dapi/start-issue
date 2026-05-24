@@ -110,12 +110,12 @@ git rev-parse --show-toplevel
 ### Prompt
 
 1. CLI: `--prompt-file path/to/prompt.md` или `--prompt "..."`
-2. Project config: `.start-issue/prompt.md`
-3. User config: `~/.config/start-issue/prompt.md`
-4. Environment: `START_ISSUE_PROMPT_FILE` или `START_ISSUE_PROMPT`
+2. Environment: `START_ISSUE_PROMPT_FILE` или `START_ISSUE_PROMPT`
+3. Project config: `.start-issue/prompt.md`
+4. User config: `~/.config/start-issue/prompt.md`
 5. Built-in default
 
-Если одновременно заданы `--prompt-file` и `--prompt`, скрипт завершает работу с ошибкой. То же правило действует для `START_ISSUE_PROMPT_FILE` и `START_ISSUE_PROMPT`, когда env является активным источником prompt.
+Если одновременно заданы `--prompt-file` и `--prompt`, скрипт завершает работу с ошибкой. То же правило действует для `START_ISSUE_PROMPT_FILE` и `START_ISSUE_PROMPT`, когда prompt не задан через CLI.
 
 ### Prompt improvement
 
@@ -167,6 +167,7 @@ Context:
 - Worktree: {WORKTREE_PATH}
 
 Start by reading the issue with gh if needed. Follow repository instructions. Keep changes scoped. Run relevant tests or checks. Summarize changed files and verification before finishing.
+If you open a PR for this work, target the base branch {BASE_BRANCH}.
 ```
 
 Поддерживаемые переменные:
