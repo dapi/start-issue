@@ -22,7 +22,7 @@
 
 set -euo pipefail
 
-VERSION="1.13.0"
+VERSION="1.13.1"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
