@@ -19,15 +19,17 @@ It fetches issue metadata with `gh`, creates a git worktree with a branch name b
 Install the latest published release:
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/dapi/start-issue/master/install.sh | bash
+```
+
+The installer downloads the latest GitHub Release asset into `~/.local/bin/start-issue` by default.
+
+Manual install:
+
+```bash
 mkdir -p ~/.local/bin
 curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o ~/.local/bin/start-issue
 chmod +x ~/.local/bin/start-issue
-```
-
-One-liner:
-
-```bash
-mkdir -p ~/.local/bin && curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o ~/.local/bin/start-issue && chmod +x ~/.local/bin/start-issue
 ```
 
 Verify the download if you want:
@@ -228,6 +230,8 @@ Optional dependency for Zellij support:
 - `gh` CLI with authenticated GitHub session
 - `jq`
 - selected agent CLI unless `--agent none` or `--dry-run` is used
+
+The `curl | bash` installer needs `bash` plus either `curl` or `wget`.
 
 ## Releases
 

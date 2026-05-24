@@ -444,7 +444,7 @@ install_fake_zellij_tab_status() {
 
   assert_success
   assert_output_contains "bash -n scripts/start-issue"
-  assert_output_contains "shellcheck scripts/start-issue"
+  assert_output_contains "shellcheck install.sh scripts/start-issue"
   assert_output_contains "git diff --check"
   assert_output_contains "bats test"
 }

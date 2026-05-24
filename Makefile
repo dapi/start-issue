@@ -27,7 +27,7 @@ uninstall:
 
 test:
 	bash -n scripts/start-issue
-	shellcheck scripts/start-issue scripts/build-start-issue scripts/bump-version scripts/prepare-release scripts/lib/start_issue/*.sh
+	shellcheck install.sh scripts/start-issue scripts/build-start-issue scripts/bump-version scripts/prepare-release scripts/lib/start_issue/*.sh
 	git diff --check
 	bats test
 

@@ -19,15 +19,17 @@
 Установить последний опубликованный релиз:
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/dapi/start-issue/master/install.sh | bash
+```
+
+Скрипт установки скачивает asset из последнего GitHub Release в `~/.local/bin/start-issue` по умолчанию.
+
+Ручная установка:
+
+```bash
 mkdir -p ~/.local/bin
 curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o ~/.local/bin/start-issue
 chmod +x ~/.local/bin/start-issue
-```
-
-One-liner:
-
-```bash
-mkdir -p ~/.local/bin && curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o ~/.local/bin/start-issue && chmod +x ~/.local/bin/start-issue
 ```
 
 При желании можно проверить checksum:
@@ -228,6 +230,8 @@ Prompt templates поддерживают:
 - `gh` CLI с авторизованной GitHub session
 - `jq`
 - CLI выбранного агента, если не используется `--agent none` или `--dry-run`
+
+Для `curl | bash` installer нужны `bash` и либо `curl`, либо `wget`.
 
 ## Релизы
 
