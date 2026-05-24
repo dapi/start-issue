@@ -1,4 +1,12 @@
 # shellcheck shell=bash disable=SC2153
+model_display_value() {
+    if [[ -n "$MODEL" ]]; then
+        printf "%s" "$MODEL"
+    else
+        printf "%s" "<unset>"
+    fi
+}
+
 show_help() {
     show_version
     cat << 'EOF'
@@ -21,6 +29,8 @@ Options:
   --flat                     Use flat worktree structure (replace / with - in path)
   --agent <name>             Agent to launch: claude, codex, kimi, pi, none
                              With init: default agent to write
+  --model <name>             Model to use for the selected agent
+                             With init: default model config to write
   --no-agent                 Only create worktree, do not start an agent session
   --no-claude                Compatibility alias for --no-agent
   --prompt <text>            Prompt template for the launched agent
@@ -47,11 +57,18 @@ Agent selection precedence:
   START_ISSUE_AGENT
   built-in default: claude
 
+Model selection precedence:
+  CLI --model
+  .start-issue/model in the git root
+  ~/.config/start-issue/model
+  START_ISSUE_MODEL
+  built-in default: unset (agent CLI decides)
+
 Prompt template precedence:
   CLI --prompt-file / --prompt
-  START_ISSUE_PROMPT_FILE / START_ISSUE_PROMPT
   .start-issue/prompt.md in the git root
   ~/.config/start-issue/prompt.md
+  START_ISSUE_PROMPT_FILE / START_ISSUE_PROMPT
   built-in default
 
 Prompt improvement:
@@ -67,6 +84,7 @@ Prompt variables:
 
 Environment variables:
   START_ISSUE_AGENT
+  START_ISSUE_MODEL
   START_ISSUE_PROMPT
   START_ISSUE_PROMPT_FILE
   START_ISSUE_WORKTREE_DIR
@@ -77,12 +95,15 @@ Examples:
   start-issue https://github.com/owner/repo/issues/123
   start-issue 123 --repo owner/repo --base develop
   start-issue 123 --agent codex
+  start-issue 123 --agent codex --model gpt-5.2
+  start-issue 123 --agent claude --model sonnet
   start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
   start-issue 123 --no-agent              # Only create worktree
   start-issue 123 --command "/debug"      # Claude command prefix
   start-issue 123 --flat                  # Flat worktree path
   start-issue 123 --dry-run
   start-issue init
+  start-issue init --project --agent codex --model gpt-5.2
   start-issue init --project --agent codex
   start-issue init --user --force
 EOF
@@ -91,8 +112,10 @@ EOF
 show_current_configuration() {
     echo "Current configuration:"
     echo "  Agent: $AGENT ($AGENT_SOURCE)"
+    echo "  Model: $(model_display_value) ($MODEL_SOURCE)"
     echo "  Prompt source: $PROMPT_SOURCE"
     echo "  Prompt location: $PROMPT_LOCATION"
+    print_agent_model_file_locations "  "
     echo "  Worktree dir: $WORKTREE_DIR ($WORKTREE_DIR_SOURCE)"
     print_prompt_file_locations "  "
 }
@@ -122,6 +145,16 @@ Prompt variables:
   {ISSUE_URL}, {ISSUE_NUMBER}, {ISSUE_TITLE}, {ISSUE_BODY}, {ISSUE_LABELS},
   {REPO}, {BRANCH_NAME}, {WORKTREE_PATH}, {BASE_BRANCH}
 EOF
+}
+
+print_agent_model_file_locations() {
+    local indent="${1:-}"
+
+    echo "${indent}Default agent/model files:"
+    echo "${indent}  Project agent: $PROJECT_ROOT/.start-issue/agent"
+    echo "${indent}  Project model: $PROJECT_ROOT/.start-issue/model"
+    echo "${indent}  User agent: $HOME/.config/start-issue/agent"
+    echo "${indent}  User model: $HOME/.config/start-issue/model"
 }
 
 print_prompt_file_locations() {
@@ -177,6 +210,7 @@ print_manual_next_steps() {
     log_success "✅ Worktree ready at: $WORKTREE_PATH"
     echo ""
     echo "Selected agent: none ($AGENT_SOURCE)"
+    echo "Resolved model: $(model_display_value) ($MODEL_SOURCE)"
     echo "Prompt source: $PROMPT_SOURCE"
     echo "To start working:"
     echo "  cd $(shell_join "$WORKTREE_PATH")"
@@ -194,6 +228,7 @@ print_dry_run_launch_command() {
     build_launch_command
 
     echo "   Agent: $AGENT ($AGENT_SOURCE)"
+    echo "   Model: $(model_display_value) ($MODEL_SOURCE)"
     echo "   Prompt source: $PROMPT_SOURCE"
     echo "   Prompt length: ${#AGENT_PROMPT} chars"
 
@@ -202,16 +237,32 @@ print_dry_run_launch_command() {
         echo "   Set START_ISSUE_DUMP_PROMPT=1 to print the full rendered prompt."
         case "$AGENT" in
             claude)
-                cmd=$(shell_join claude --dangerously-skip-permissions "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                if [[ -n "$MODEL" ]]; then
+                    cmd=$(shell_join claude --model "$MODEL" --dangerously-skip-permissions "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                else
+                    cmd=$(shell_join claude --dangerously-skip-permissions "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                fi
                 ;;
             codex)
-                cmd=$(shell_join codex --cd "$WORKTREE_PATH" --dangerously-bypass-approvals-and-sandbox "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                if [[ -n "$MODEL" ]]; then
+                    cmd=$(shell_join codex --model "$MODEL" --cd "$WORKTREE_PATH" --dangerously-bypass-approvals-and-sandbox "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                else
+                    cmd=$(shell_join codex --cd "$WORKTREE_PATH" --dangerously-bypass-approvals-and-sandbox "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                fi
                 ;;
             kimi)
-                cmd=$(shell_join kimi --work-dir "$WORKTREE_PATH" --yolo -p "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                if [[ -n "$MODEL" ]]; then
+                    cmd=$(shell_join kimi --model "$MODEL" --work-dir "$WORKTREE_PATH" --yolo -p "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                else
+                    cmd=$(shell_join kimi --work-dir "$WORKTREE_PATH" --yolo -p "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                fi
                 ;;
             pi)
-                cmd=$(shell_join pi "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                if [[ -n "$MODEL" ]]; then
+                    cmd=$(shell_join pi --model "$MODEL" "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                else
+                    cmd=$(shell_join pi "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                fi
                 ;;
             *)
                 cmd=""
@@ -230,9 +281,11 @@ print_dry_run_launch_command() {
 
 print_selected_configuration() {
     echo "Agent: $AGENT ($AGENT_SOURCE)"
+    echo "Model: $(model_display_value) ($MODEL_SOURCE)"
     echo "Worktree directory: $WORKTREE_DIR ($WORKTREE_DIR_SOURCE)"
     echo "Prompt source: $PROMPT_SOURCE"
     echo "Prompt location: $PROMPT_LOCATION"
+    print_agent_model_file_locations
     print_prompt_file_locations
     echo ""
 }

@@ -58,15 +58,17 @@ start-issue 123
 start-issue https://github.com/owner/repo/issues/123
 start-issue 123 --repo owner/repo --base develop
 start-issue 123 --agent codex
+start-issue 123 --agent codex --model gpt-5.2
 start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
 start-issue 123 --no-agent
 start-issue 123 --dry-run
 start-issue init
+start-issue init --project --agent codex --model gpt-5.2
 ```
 
 Запуск `start-issue` без issue печатает обычную справку, а также текущий
-выбранный agent, источник prompt, расположение prompt и короткий preview prompt,
-после чего выходит без обращения к GitHub.
+выбранный agent, выбранную model, источник prompt, расположение prompt и короткий
+preview prompt, после чего выходит без обращения к GitHub.
 
 ## Процесс
 
@@ -99,7 +101,7 @@ CLI entrypoint остается `scripts/start-issue`, но реализация
 `make build` и `make install` собирают эти модули обратно в single-file script для дистрибуции и локальной установки.
 
 - `cli.sh` парсит аргументы и нормализует флаги в состояние workflow.
-- `config.sh` разрешает конфигурацию agent и prompt.
+- `config.sh` разрешает конфигурацию agent, model и prompt.
 - `github.sh` определяет контекст репозитория и получает metadata issue.
 - `worktree.sh` планирует поведение branch/worktree и выполняет worktree-side effects.
 - `agent.sh` владеет операциями agent adapter: validation, сборка launch command, AI branch naming и prompt improvement.
@@ -129,6 +131,7 @@ Bash стоит сохранять, пока lifecycle commands, shape конф�
 | `--worktree-dir DIR`, `-w DIR` | Родительская директория для создаваемых worktree. Переопределяет `START_ISSUE_WORKTREE_DIR`. |
 | `--flat` | Использовать плоский путь worktree, заменяя `/` в имени ветки на `-`. |
 | `--agent AGENT` | Агент, который будет запущен после подготовки worktree. С `init` - agent по умолчанию, который нужно записать. Поддерживаются: `claude`, `codex`, `kimi`, `pi`, `none`. |
+| `--model MODEL` | Явная model для выбранного агента. С `init` - model config, который нужно записать. Если не задана, встроенное поведение остается unset, и решение принимает CLI выбранного агента. |
 | `--no-agent` | Подготовить worktree и напечатать ручные следующие шаги без запуска агента. Alias для `--agent none`. |
 | `--no-claude` | Совместимый alias для `--no-agent`. |
 | `--prompt TEXT` | Inline prompt template для выбранного агента. С `init` - prompt template, который нужно записать. Нельзя использовать вместе с `--prompt-file`. |
@@ -140,7 +143,7 @@ Bash стоит сохранять, пока lifecycle commands, shape конф�
 | `--ai` | Попросить выбранного агента сгенерировать имя ветки. Если генерация не удалась, используется локальная эвристика. |
 | `--project` | С `init` - записать проектную конфигурацию в `.start-issue` в git root. |
 | `--user` | С `init` - записать пользовательскую конфигурацию в `~/.config/start-issue`. |
-| `--force` | С `init` - перезаписать существующие файлы `agent` и `prompt.md`. По умолчанию существующие файлы сохраняются. |
+| `--force` | С `init` - перезаписать существующие файлы `agent` и `prompt.md`, а также сбросить `model` к выбранному значению или к built-in unset, если `--model` не передан. Без `--force` существующие файлы сохраняются. |
 | `--dry-run` | Напечатать выбранную конфигурацию и launch command без создания worktree, запуска `init.sh` или запуска агента. С `init` - напечатать план записи конфигурации без создания файлов. |
 | `--version`, `-v` | Показать версию. |
 | `--help`, `-h` | Показать справку. |
@@ -157,6 +160,7 @@ Bash стоит сохранять, пока lifecycle commands, shape конф�
 | Переменная | Описание |
 |------------|----------|
 | `START_ISSUE_AGENT` | Агент по умолчанию, когда `--agent` не передан и agent не задан в файлах конфигурации. Поддерживаются: `claude`, `codex`, `kimi`, `pi`, `none`. Встроенное значение по умолчанию: `claude`. |
+| `START_ISSUE_MODEL` | Model по умолчанию, когда `--model` не передан и model не задана в файлах конфигурации. Встроенное поведение по умолчанию: unset, решение принимает CLI выбранного агента. |
 | `START_ISSUE_PROMPT` | Inline prompt template, который используется, если prompt не задан через CLI. Перебивает project и user prompt files. Нельзя использовать вместе с `START_ISSUE_PROMPT_FILE`, когда prompt не задан через CLI. |
 | `START_ISSUE_PROMPT_FILE` | Файл prompt template, который используется, если prompt не задан через CLI. Перебивает project и user prompt files. Нельзя использовать вместе с `START_ISSUE_PROMPT`, когда prompt не задан через CLI. |
 | `START_ISSUE_WORKTREE_DIR` | Родительская директория по умолчанию для создаваемых worktree, если `--worktree-dir` не передан. Встроенное значение по умолчанию: `~/worktrees`. |
@@ -167,19 +171,19 @@ Bash стоит сохранять, пока lifecycle commands, shape конф�
 | Файл | Описание |
 |------|----------|
 | `.start-issue/agent` | Агент по умолчанию для проекта. Читается из git root. |
+| `.start-issue/model` | Model по умолчанию для проекта. Читается из git root, если файл существует. |
 | `.start-issue/prompt.md` | Prompt template по умолчанию для проекта. Читается из git root. |
 | `~/.config/start-issue/agent` | Пользовательский agent по умолчанию. |
+| `~/.config/start-issue/model` | Пользовательская model по умолчанию. Читается, если файл существует. |
 | `~/.config/start-issue/prompt.md` | Пользовательский prompt template по умолчанию. |
 
-Запустите `start-issue init`, чтобы создать эти файлы. Если не переданы `--project` или `--user`, команда спросит, какой scope инициализировать. Она записывает встроенные agent и prompt по умолчанию, если не переданы `--agent`, `--prompt` или `--prompt-file`. Если существующий файл `agent` сохраняется без `--force`, default prompt выбирается для этого сохраненного agent.
+Запустите `start-issue init`, чтобы создать эти файлы. Если не переданы `--project` или `--user`, команда спросит, какой scope инициализировать. Она записывает встроенные agent и prompt по умолчанию, если не переданы `--agent`, `--prompt` или `--prompt-file`. `--model` записывает соседний файл `model`; если `--model` не передан, встроенное поведение остается unset и новый model-файл не создается. Если существующий файл `agent` сохраняется без `--force`, default prompt выбирается для этого сохраненного agent.
 
 Приоритет конфигурации:
 
-1. Аргументы CLI
-2. Конфигурация проекта
-3. Пользовательская конфигурация
-4. Переменные окружения
-5. Встроенные значения по умолчанию
+1. Agent: CLI `--agent` / `--no-agent`, затем project config, user config, `START_ISSUE_AGENT`, затем built-in default `claude`
+2. Model: CLI `--model`, затем project config, user config, `START_ISSUE_MODEL`, затем built-in unset
+3. Prompt: CLI, затем project config, user config, env prompt, затем built-in default
 
 Claude по умолчанию использует plugin-native команду:
 

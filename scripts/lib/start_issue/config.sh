@@ -19,6 +19,12 @@ validate_agent() {
     esac
 }
 
+validate_model_config() {
+    if [[ -z "$MODEL" ]]; then
+        die "Model config is empty. Remove the empty model config or set a value."
+    fi
+}
+
 resolve_agent() {
     local project_agent_file="$PROJECT_ROOT/.start-issue/agent"
     local user_agent_file="$HOME/.config/start-issue/agent"
@@ -45,6 +51,32 @@ resolve_agent() {
     fi
 
     validate_agent
+}
+
+resolve_model() {
+    local project_model_file="$PROJECT_ROOT/.start-issue/model"
+    local user_model_file="$HOME/.config/start-issue/model"
+
+    if [[ -n "$MODEL_CLI" ]]; then
+        MODEL=$(trim "$MODEL_CLI")
+        MODEL_SOURCE="CLI"
+    elif [[ -f "$project_model_file" ]]; then
+        MODEL=$(read_first_config_value "$project_model_file")
+        MODEL_SOURCE="$project_model_file"
+    elif [[ -f "$user_model_file" ]]; then
+        MODEL=$(read_first_config_value "$user_model_file")
+        MODEL_SOURCE="$user_model_file"
+    elif [[ -n "${START_ISSUE_MODEL:-}" ]]; then
+        MODEL=$(trim "$START_ISSUE_MODEL")
+        MODEL_SOURCE="START_ISSUE_MODEL"
+    else
+        MODEL=""
+        MODEL_SOURCE="built-in default"
+    fi
+
+    if [[ -n "$MODEL_SOURCE" && "$MODEL_SOURCE" != "built-in default" ]]; then
+        validate_model_config
+    fi
 }
 
 default_portable_prompt_template() {

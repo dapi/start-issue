@@ -29,6 +29,7 @@ handle_missing_issue_mode() {
 
     detect_project_root_if_available
     resolve_agent
+    resolve_model
     resolve_prompt_template
     show_missing_issue_summary
     echo ""
@@ -46,6 +47,7 @@ run_start_issue_pipeline() {
     detect_repo_from_remote
     detect_base_branch
     resolve_agent
+    resolve_model
     check_selected_agent_dependency
     resolve_prompt_template
     validate_prompt_improvement_mode

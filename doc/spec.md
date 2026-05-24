@@ -66,6 +66,7 @@ preview. Этот путь не обращается к GitHub и заверша
 | `--worktree-dir` / `-w` | Директория для worktree | `START_ISSUE_WORKTREE_DIR`, затем `~/worktrees` |
 | `--flat` | Использовать плоский путь worktree, заменяя `/` на `-` | false |
 | `--agent` | Агент: `claude`, `codex`, `kimi`, `pi`, `none` | См. приоритет выбора агента |
+| `--model` | Явная model для выбранного агента | См. приоритет выбора model |
 | `--no-agent` | Alias для `--agent none` | false |
 | `--no-claude` | Совместимый alias для `--no-agent` | false |
 | `--prompt` | Inline prompt template | См. приоритет prompt |
@@ -77,7 +78,7 @@ preview. Этот путь не обращается к GitHub и заверша
 | `--ai` | Генерировать имя ветки выбранным агентом | false, используется быстрая bash-эвристика |
 | `--project` | Для `init`: записать конфигурацию проекта в `.start-issue` | интерактивный выбор |
 | `--user` | Для `init`: записать пользовательскую конфигурацию в `~/.config/start-issue` | интерактивный выбор |
-| `--force` | Для `init`: перезаписать существующие `agent` и `prompt.md` | false |
+| `--force` | Для `init`: перезаписать существующие `agent`, `prompt.md` и при необходимости сбросить `model` к unset | false |
 | `--dry-run` | Показать действия, не выполняя worktree/init/agent launch | false |
 
 ## Приоритет конфигурации
@@ -97,6 +98,14 @@ git rev-parse --show-toplevel
 ```
 
 Если поддержка запуска вне git repo будет добавлена позже, fallback root может быть текущей директорией.
+
+### Model
+
+1. CLI: `--model`
+2. Project config: `.start-issue/model` в git top-level directory
+3. User config: `~/.config/start-issue/model`
+4. Environment: `START_ISSUE_MODEL`
+5. Built-in default: unset, решение принимает CLI выбранного агента
 
 ### Prompt
 
@@ -128,14 +137,14 @@ git rev-parse --show-toplevel
 
 `start-issue init` создает файлы конфигурации:
 
-- project scope: `{git-root}/.start-issue/agent` и `{git-root}/.start-issue/prompt.md`
-- user scope: `~/.config/start-issue/agent` и `~/.config/start-issue/prompt.md`
+- project scope: `{git-root}/.start-issue/agent`, optional `{git-root}/.start-issue/model` и `{git-root}/.start-issue/prompt.md`
+- user scope: `~/.config/start-issue/agent`, optional `~/.config/start-issue/model` и `~/.config/start-issue/prompt.md`
 
 Если не передан `--project` или `--user`, команда интерактивно спрашивает scope. Project scope требует запуск внутри git repository; user scope может выполняться вне git repository. Режим `init` не требует issue, `gh` или `jq`.
 
-По умолчанию записывается agent `claude` и стандартный Claude prompt. `--agent` меняет записываемый agent; `--prompt` или `--prompt-file` меняют записываемый prompt. Если выбран не `claude` и prompt явно не задан, записывается portable prompt. Если существующий `agent` сохраняется без `--force`, default prompt выбирается по сохраненному agent, а не по built-in default или CLI override.
+По умолчанию записывается agent `claude` и стандартный Claude prompt. `--agent` меняет записываемый agent; `--model` записывает sibling `model` config; `--prompt` или `--prompt-file` меняют записываемый prompt. Если `--model` не передан, built-in behavior остается unset и новый `model` файл не создается. Если выбран не `claude` и prompt явно не задан, записывается portable prompt. Если существующий `agent` сохраняется без `--force`, default prompt выбирается по сохраненному agent, а не по built-in default или CLI override.
 
-Существующие файлы не перезаписываются. `--force` перезаписывает `agent` и `prompt.md`.
+Существующие файлы не перезаписываются. `--force` перезаписывает `agent` и `prompt.md`; существующий `model` файл либо заменяется новым значением, либо удаляется для возврата к built-in unset.
 
 ## Prompt templates
 
@@ -272,7 +281,7 @@ zellij-tab-status --set-name "#{ISSUE_NUMBER}"
 {type}/issue-{number}-{kebab-case-title}
 ```
 
-`--ai` пытается сгенерировать имя ветки через выбранный agent в non-interactive mode и fallback-ится на bash-эвристику при ошибке или невалидном формате.
+`--ai` пытается сгенерировать имя ветки через выбранный agent в non-interactive mode и fallback-ится на bash-эвристику при ошибке или невалидном формате. Если задана explicit model, adapter обязан передать ее в non-interactive command вместо тихого игнорирования.
 
 ### Фаза 5: Создание worktree
 
@@ -319,17 +328,17 @@ Launch adapters:
 ```bash
 claude:
   cd "$WORKTREE_PATH"
-  exec claude --dangerously-skip-permissions "$PROMPT"
+  exec claude [--model "$MODEL"] --dangerously-skip-permissions "$PROMPT"
 
 codex:
-  exec codex --cd "$WORKTREE_PATH" --dangerously-bypass-approvals-and-sandbox "$PROMPT"
+  exec codex [--model "$MODEL"] --cd "$WORKTREE_PATH" --dangerously-bypass-approvals-and-sandbox "$PROMPT"
 
 kimi:
-  exec kimi --work-dir "$WORKTREE_PATH" --yolo -p "$PROMPT"
+  exec kimi [--model "$MODEL"] --work-dir "$WORKTREE_PATH" --yolo -p "$PROMPT"
 
 pi:
   cd "$WORKTREE_PATH"
-  exec pi "$PROMPT"
+  exec pi [--model "$MODEL"] "$PROMPT"
 
 none:
   print_manual_next_steps
@@ -342,6 +351,7 @@ none:
 `--dry-run` не создает worktree, не запускает `init.sh` и не запускает agent. Он печатает:
 
 - выбранный agent и источник
+- выбранную model и источник
 - worktree directory и источник
 - выбранный prompt source
 - длину rendered prompt
@@ -360,6 +370,7 @@ none:
 | `jq` отсутствует | `jq not found. Please install jq.` |
 | Issue не найден | `Issue #{number} not found in {owner}/{repo}` |
 | Agent неизвестен | `Unknown agent: {agent}` |
+| Model config пустая | `Model config is empty. Remove the empty model config or set a value.` |
 | Agent CLI отсутствует вне `--dry-run` | `{agent} CLI not found. Install it or use --agent none.` |
 | Prompt file отсутствует | `Prompt file not found: {path}` |
 | `--improve-prompt` используется с `--agent none` | `--improve-prompt requires an agent. Use --agent claude, codex, kimi, or pi.` |
@@ -387,6 +398,8 @@ start-issue https://github.com/owner/repo/issues/123
 start-issue 123 --repo owner/repo
 start-issue 123 --base develop
 start-issue 123 --agent codex
+start-issue 123 --agent codex --model gpt-5.2
+start-issue 123 --agent claude --model sonnet
 start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
 start-issue 123 --agent codex --improve-prompt
 start-issue 123 --agent codex --improve-prompt --prompt-output-file .start-issue/prompt.next.md
@@ -394,9 +407,11 @@ start-issue 123 --agent pi --prompt "Implement {ISSUE_URL} in {WORKTREE_PATH}"
 start-issue 123 --no-agent
 start-issue 123 --no-claude
 start-issue init
+start-issue init --project --agent codex --model gpt-5.2
 start-issue init --project --agent codex
 start-issue init --user --force
 START_ISSUE_AGENT=codex start-issue 123
+START_ISSUE_MODEL=sonnet start-issue 123
 START_ISSUE_WORKTREE_DIR=~/projects/worktrees start-issue 123
 ```
 
@@ -425,12 +440,13 @@ START_ISSUE_WORKTREE_DIR=~/projects/worktrees start-issue 123
 - [x] `start-issue 123 --agent pi` запускает Pi в этом worktree.
 - [x] `start-issue 123 --no-agent` только готовит worktree и печатает следующие шаги.
 - [x] Agent выбирается через CLI, `.start-issue/agent`, `~/.config/start-issue/agent`, `START_ISSUE_AGENT`.
+- [x] Model выбирается через CLI, `.start-issue/model`, `~/.config/start-issue/model`, `START_ISSUE_MODEL`, затем built-in unset.
 - [x] Prompt выбирается через CLI, `.start-issue/prompt.md`, `~/.config/start-issue/prompt.md`, env.
-- [x] Запуск без Issue печатает выбранный agent и prompt details с расположением prompt.
-- [x] `start-issue init` создает project или user config с agent и prompt по умолчанию.
+- [x] Запуск без Issue печатает выбранные agent/model и prompt details с расположением config файлов.
+- [x] `start-issue init` создает project или user config с agent и prompt по умолчанию и пишет `model`, если она явно задана.
 - [x] `start-issue init --force` перезаписывает существующие config-файлы.
 - [x] `--improve-prompt` создает reviewable proposal улучшенного prompt template и не перезаписывает active prompt.
 - [x] Claude-specific aliases сохранены, help text описывает agent-neutral поведение.
-- [x] `--dry-run` печатает selected agent, prompt source и launch command.
+- [x] `--dry-run` печатает selected agent, selected model, prompt source и launch command.
 - [x] `START_ISSUE_WORKTREE_DIR` является env для worktree directory.
 - [x] Если `zellij-tab-status` установлен, `start-issue` опционально переименовывает вкладку Zellij.

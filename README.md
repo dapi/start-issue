@@ -58,15 +58,17 @@ start-issue 123
 start-issue https://github.com/owner/repo/issues/123
 start-issue 123 --repo owner/repo --base develop
 start-issue 123 --agent codex
+start-issue 123 --agent codex --model gpt-5.2
 start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
 start-issue 123 --no-agent
 start-issue 123 --dry-run
 start-issue init
+start-issue init --project --agent codex --model gpt-5.2
 ```
 
 Running `start-issue` without an issue prints the normal help plus the currently
-selected agent, prompt source, prompt location, and a short prompt preview, then
-exits without contacting GitHub.
+selected agent, selected model, prompt source, prompt location, and a short
+prompt preview, then exits without contacting GitHub.
 
 ## Workflow
 
@@ -99,7 +101,7 @@ The CLI entrypoint remains `scripts/start-issue`, but the implementation is now 
 `make build` and `make install` bundle those modules back into a single-file script for distribution and local installation.
 
 - `cli.sh` parses arguments and normalizes flags into workflow state.
-- `config.sh` resolves agent and prompt configuration.
+- `config.sh` resolves agent, model, and prompt configuration.
 - `github.sh` resolves repository context and fetches issue metadata.
 - `worktree.sh` plans branch/worktree behavior and runs worktree-side effects.
 - `agent.sh` owns agent adapter operations: validation, launch command construction, AI branch naming, and prompt improvement.
@@ -129,6 +131,7 @@ The project should keep Bash as long as lifecycle commands, configuration shape,
 | `--worktree-dir DIR`, `-w DIR` | Parent directory for created worktrees. Overrides `START_ISSUE_WORKTREE_DIR`. |
 | `--flat` | Use a flat worktree path by replacing `/` in the branch name with `-`. |
 | `--agent AGENT` | Agent to launch after preparing the worktree. With `init`, the default agent to write. Supported: `claude`, `codex`, `kimi`, `pi`, `none`. |
+| `--model MODEL` | Explicit model for the selected agent. With `init`, the model config to write. If omitted, built-in behavior stays unset and the selected agent CLI decides. |
 | `--no-agent` | Prepare the worktree and print manual next steps without launching an agent. Alias for `--agent none`. |
 | `--no-claude` | Compatibility alias for `--no-agent`. |
 | `--prompt TEXT` | Inline prompt template for the selected agent. With `init`, the prompt template to write. Mutually exclusive with `--prompt-file`. |
@@ -140,7 +143,7 @@ The project should keep Bash as long as lifecycle commands, configuration shape,
 | `--ai` | Ask the selected agent to generate the branch name. Falls back to the local branch-name heuristic if generation fails. |
 | `--project` | With `init`, write project config under `.start-issue` in the git root. |
 | `--user` | With `init`, write user config under `~/.config/start-issue`. |
-| `--force` | With `init`, overwrite existing `agent` and `prompt.md` files. Existing files are kept by default. |
+| `--force` | With `init`, overwrite existing `agent` and `prompt.md` files, and reset `model` to the selected value or to built-in unset when `--model` is omitted. Existing files are kept by default without `--force`. |
 | `--dry-run` | Print the selected configuration and launch command without creating a worktree, running `init.sh`, or launching an agent. With `init`, print planned config writes without creating files. |
 | `--version`, `-v` | Show version. |
 | `--help`, `-h` | Show help. |
@@ -157,6 +160,7 @@ Related Claude Code marketplace workflows:
 | Variable | Description |
 |----------|-------------|
 | `START_ISSUE_AGENT` | Default agent when `--agent` is not provided and no config file sets an agent. Supported: `claude`, `codex`, `kimi`, `pi`, `none`. Built-in default: `claude`. |
+| `START_ISSUE_MODEL` | Default model when `--model` is not provided and no config file sets a model. Built-in default: unset, which lets the selected agent CLI decide. |
 | `START_ISSUE_PROMPT` | Inline prompt template used when no CLI prompt is provided. It overrides project and user prompt files. Mutually exclusive with `START_ISSUE_PROMPT_FILE` when no CLI prompt is provided. |
 | `START_ISSUE_PROMPT_FILE` | Prompt template file used when no CLI prompt is provided. It overrides project and user prompt files. Mutually exclusive with `START_ISSUE_PROMPT` when no CLI prompt is provided. |
 | `START_ISSUE_WORKTREE_DIR` | Default parent directory for created worktrees when `--worktree-dir` is not provided. Built-in default: `~/worktrees`. |
@@ -167,19 +171,19 @@ Related Claude Code marketplace workflows:
 | File | Description |
 |------|-------------|
 | `.start-issue/agent` | Project default agent. Read from the git root. |
+| `.start-issue/model` | Project default model. Read from the git root when present. |
 | `.start-issue/prompt.md` | Project default prompt template. Read from the git root. |
 | `~/.config/start-issue/agent` | User default agent. |
+| `~/.config/start-issue/model` | User default model. Read when present. |
 | `~/.config/start-issue/prompt.md` | User default prompt template. |
 
-Run `start-issue init` to create these files. If neither `--project` nor `--user` is provided, the command asks which scope to initialize. It writes the built-in default agent and prompt unless `--agent`, `--prompt`, or `--prompt-file` is provided. If an existing `agent` file is kept without `--force`, the generated default prompt is chosen for that kept agent.
+Run `start-issue init` to create these files. If neither `--project` nor `--user` is provided, the command asks which scope to initialize. It writes the built-in default agent and prompt unless `--agent`, `--prompt`, or `--prompt-file` is provided. `--model` writes a sibling `model` file; when `--model` is omitted, built-in behavior stays unset and no new model file is created. If an existing `agent` file is kept without `--force`, the generated default prompt is chosen for that kept agent.
 
 Configuration precedence:
 
-1. CLI arguments
-2. Project config
-3. User config
-4. Environment variables
-5. Built-in defaults
+1. Agent: CLI `--agent` / `--no-agent`, then project config, user config, `START_ISSUE_AGENT`, then built-in default `claude`
+2. Model: CLI `--model`, then project config, user config, `START_ISSUE_MODEL`, then built-in unset
+3. Prompt: CLI, then project config, user config, environment prompt, then built-in default
 
 Claude uses the plugin-native command by default:
 

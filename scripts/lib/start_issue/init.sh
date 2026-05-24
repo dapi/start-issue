@@ -1,4 +1,23 @@
 # shellcheck shell=bash disable=SC2034
+resolve_init_model() {
+    local model_file="$1"
+
+    if [[ -f "$model_file" && "$INIT_FORCE" != "true" ]]; then
+        MODEL=$(read_first_config_value "$model_file")
+        MODEL_SOURCE="$model_file (existing)"
+    elif [[ -n "$MODEL_CLI" ]]; then
+        MODEL=$(trim "$MODEL_CLI")
+        MODEL_SOURCE="CLI"
+    else
+        MODEL=""
+        MODEL_SOURCE="built-in default"
+    fi
+
+    if [[ -n "$MODEL_SOURCE" && "$MODEL_SOURCE" != "built-in default" ]]; then
+        validate_model_config
+    fi
+}
+
 resolve_init_agent() {
     local agent_file="$1"
 
@@ -105,6 +124,34 @@ write_init_file() {
     log_success "   Wrote $label: $path"
 }
 
+write_init_model_file() {
+    local path="$1"
+
+    if [[ -n "$MODEL" ]]; then
+        write_init_file "$path" "$MODEL" "model config"
+        return
+    fi
+
+    if [[ -e "$path" && "$INIT_FORCE" != "true" ]]; then
+        log_warn "model config already exists, keeping: $path"
+        return
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        if [[ -e "$path" ]]; then
+            echo "   [DRY-RUN] Would remove model config: $path"
+        else
+            echo "   [DRY-RUN] No model config to write (built-in default: unset)"
+        fi
+        return
+    fi
+
+    if [[ -e "$path" ]]; then
+        rm -f "$path"
+        log_success "   Removed model config: $path"
+    fi
+}
+
 run_config_init() {
     if [[ -z "$INIT_SCOPE" ]]; then
         select_init_scope
@@ -133,14 +180,18 @@ run_config_init() {
     fi
 
     resolve_init_agent "$target_dir/agent"
+    resolve_init_model "$target_dir/model"
+    validate_model_selection_support "launch"
     resolve_init_prompt_template
 
     echo "Scope: $scope_label"
     echo "Directory: $target_dir"
     echo "Agent: $AGENT ($AGENT_SOURCE)"
+    echo "Model: ${MODEL:-<unset>} ($MODEL_SOURCE)"
     echo "Prompt source: $PROMPT_SOURCE"
     echo ""
 
     write_init_file "$target_dir/agent" "$AGENT" "agent config"
+    write_init_model_file "$target_dir/model"
     write_init_file "$target_dir/prompt.md" "$PROMPT_TEMPLATE" "prompt template"
 }
