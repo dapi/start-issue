@@ -1,4 +1,180 @@
 # shellcheck shell=bash disable=SC2034
+USER_CONFIG_DIR="$HOME/.config/start-issue"
+SETUP_AGENT_FILE_VALUE=""
+SETUP_SAVE_PROMPT=false
+
+confirm_yes_default() {
+    local prompt="$1"
+    local reply=""
+
+    printf "%s" "$prompt"
+    if ! read -r reply; then
+        die "No response received."
+    fi
+
+    case "$reply" in
+        ""|y|Y|yes|YES|Yes)
+            return 0
+            ;;
+        n|N|no|NO|No)
+            return 1
+            ;;
+        *)
+            die "Invalid response: $reply. Use y or n."
+            ;;
+    esac
+}
+
+ensure_directory_exists() {
+    local path="$1"
+    local label="$2"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo "   [DRY-RUN] Would create $label: $path"
+        return
+    fi
+
+    mkdir -p "$path"
+}
+
+write_setup_file() {
+    local path="$1"
+    local content="$2"
+    local label="$3"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo "   [DRY-RUN] Would write $label: $path"
+        return
+    fi
+
+    mkdir -p "$(dirname "$path")"
+    printf "%s\n" "$content" > "$path"
+    log_success "   Wrote $label: $path"
+}
+
+remove_setup_file_if_present() {
+    local path="$1"
+    local label="$2"
+
+    if [[ ! -e "$path" ]]; then
+        if [[ "$DRY_RUN" == "true" ]]; then
+            echo "   [DRY-RUN] No $label to remove: $path"
+        fi
+        return
+    fi
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo "   [DRY-RUN] Would remove $label: $path"
+        return
+    fi
+
+    rm -f "$path"
+    log_success "   Removed $label: $path"
+}
+
+select_setup_agent() {
+    local choice=""
+
+    echo "Select default agent:"
+    echo "1) claude"
+    echo "2) codex"
+    echo "3) kimi"
+    echo "4) pi"
+    echo "5) skip"
+    echo ""
+
+    printf "Choice: "
+    if ! read -r choice; then
+        die "No setup agent selected."
+    fi
+
+    case "$choice" in
+        1|claude|Claude)
+            AGENT="claude"
+            AGENT_SOURCE="setup selection"
+            SETUP_AGENT_FILE_VALUE="claude"
+            ;;
+        2|codex|Codex)
+            AGENT="codex"
+            AGENT_SOURCE="setup selection"
+            SETUP_AGENT_FILE_VALUE="codex"
+            ;;
+        3|kimi|Kimi)
+            AGENT="kimi"
+            AGENT_SOURCE="setup selection"
+            SETUP_AGENT_FILE_VALUE="kimi"
+            ;;
+        4|pi|Pi)
+            AGENT="pi"
+            AGENT_SOURCE="setup selection"
+            SETUP_AGENT_FILE_VALUE="pi"
+            ;;
+        5|skip|Skip|"")
+            AGENT="claude"
+            AGENT_SOURCE="built-in default"
+            SETUP_AGENT_FILE_VALUE=""
+            ;;
+        *)
+            die "Invalid setup choice: $choice. Use 1-5."
+            ;;
+    esac
+}
+
+resolve_setup_prompt_template() {
+    if [[ "$AGENT" == "claude" ]]; then
+        PROMPT_TEMPLATE=$(default_claude_prompt_template)
+        PROMPT_SOURCE="built-in Claude command"
+    else
+        PROMPT_TEMPLATE=$(default_portable_prompt_template)
+        PROMPT_SOURCE="built-in portable prompt"
+    fi
+}
+
+show_setup_prompt_preview() {
+    echo "Default prompt:"
+    echo ""
+    printf "%s\n" "$PROMPT_TEMPLATE"
+    echo ""
+}
+
+run_setup_flow() {
+    local target_dir="$USER_CONFIG_DIR"
+    local agent_file="$target_dir/agent"
+    local prompt_file="$target_dir/prompt.md"
+
+    ensure_directory_exists "$target_dir" "user config directory"
+    select_setup_agent
+    resolve_setup_prompt_template
+    show_setup_prompt_preview
+
+    if confirm_yes_default "Save this prompt to $prompt_file? [Y/n] "; then
+        SETUP_SAVE_PROMPT=true
+    else
+        SETUP_SAVE_PROMPT=false
+    fi
+
+    echo "Directory: $target_dir"
+    echo "Agent: ${SETUP_AGENT_FILE_VALUE:-<unset>}"
+    echo "Prompt source: $PROMPT_SOURCE"
+    echo ""
+
+    if [[ -n "$SETUP_AGENT_FILE_VALUE" ]]; then
+        write_setup_file "$agent_file" "$SETUP_AGENT_FILE_VALUE" "agent config"
+    else
+        remove_setup_file_if_present "$agent_file" "agent config"
+    fi
+
+    if [[ "$SETUP_SAVE_PROMPT" == "true" ]]; then
+        write_setup_file "$prompt_file" "$PROMPT_TEMPLATE" "prompt template"
+    else
+        remove_setup_file_if_present "$prompt_file" "prompt template"
+    fi
+}
+
+materialize_first_run_marker() {
+    ensure_directory_exists "$USER_CONFIG_DIR" "user config directory"
+}
+
 resolve_init_model() {
     local model_file="$1"
 
@@ -196,4 +372,8 @@ run_config_init() {
     write_init_file "$target_dir/agent" "$AGENT" "agent config"
     write_init_model_file "$target_dir/model"
     write_init_file "$target_dir/prompt.md" "$PROMPT_TEMPLATE" "prompt template"
+}
+
+run_setup_mode() {
+    run_setup_flow
 }

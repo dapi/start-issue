@@ -82,6 +82,8 @@ start-issue 123 --agent codex --model gpt-5.2
 start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
 start-issue 123 --no-agent
 start-issue 123 --dry-run
+start-issue setup
+start-issue --setup
 start-issue init
 start-issue init --project --agent codex --model gpt-5.2
 start-issue update
@@ -89,8 +91,8 @@ start-issue --update
 ```
 
 Running `start-issue` without an issue prints the normal help plus the currently
-selected agent, selected model, prompt source, prompt location, and a short
-prompt preview, then exits without contacting GitHub.
+selected agent, selected model, prompt source, and prompt location, then exits
+without contacting GitHub.
 
 ## Workflow
 
@@ -130,7 +132,7 @@ The CLI entrypoint remains `scripts/start-issue`, but the implementation is now 
 - `release.sh` owns release download, checksum, and version-normalization helpers shared by install and update paths.
 - `update.sh` owns the self-update workflow and latest-release resolution.
 - `output.sh` renders help, status, dry-run output, and session framing.
-- `init.sh` owns `start-issue init`.
+- `init.sh` owns `start-issue init` plus the user-config onboarding helpers behind `setup`.
 - `pipeline.sh` makes the orchestration pipeline explicit.
 
 The internal pipeline is now:
@@ -150,6 +152,7 @@ The project should keep Bash as long as lifecycle commands, configuration shape,
 |----------|-------------|
 | `ISSUE` | GitHub issue number or full GitHub issue URL. Required. |
 | `init` | Create default configuration files for either the current project or the current user. |
+| `setup` | Run first-run onboarding for user config in `~/.config/start-issue`. |
 | `update` | Update the running `start-issue` executable from the latest published GitHub Release. |
 | `--repo OWNER/REPO`, `-r OWNER/REPO` | Repository to read the issue from when `ISSUE` is a number. If omitted, `start-issue` detects the repository from `origin`. |
 | `--base BRANCH`, `-b BRANCH` | Base branch for the new worktree branch. If omitted, `start-issue` uses the repository default when available, otherwise the current branch. |
@@ -170,6 +173,7 @@ The project should keep Bash as long as lifecycle commands, configuration shape,
 | `--user` | With `init`, write user config under `~/.config/start-issue`. |
 | `--force` | With `init`, overwrite existing `agent` and `prompt.md` files, and reset `model` to the selected value or to built-in unset when `--model` is omitted. Existing files are kept by default without `--force`. |
 | `--dry-run` | Print the selected configuration and launch command without creating a worktree, running `init.sh`, or launching an agent. With `init`, print planned config writes without creating files. |
+| `--setup` | Run the same user-config onboarding flow as `start-issue setup`. |
 | `--update` | Update the running `start-issue` executable from the latest published GitHub Release. Equivalent to `start-issue update`. |
 | `--version`, `-v` | Show version. |
 | `--help`, `-h` | Show help. |
@@ -203,7 +207,11 @@ Related Claude Code marketplace workflows:
 | `~/.config/start-issue/model` | User default model. Read when present. |
 | `~/.config/start-issue/prompt.md` | User default prompt template. |
 
-Run `start-issue init` to create these files. If neither `--project` nor `--user` is provided, the command asks which scope to initialize. It writes the built-in default agent and prompt unless `--agent`, `--prompt`, or `--prompt-file` is provided. `--model` writes a sibling `model` file; when `--model` is omitted, built-in behavior stays unset and no new model file is created. If an existing `agent` file is kept without `--force`, the generated default prompt is chosen for that kept agent.
+Run `start-issue setup` or `start-issue --setup` for the friendly user-level onboarding flow. It works only with `~/.config/start-issue`, asks for the default agent (`claude`, `codex`, `kimi`, `pi`, or skip), shows the derived default prompt, and writes `prompt.md` only when the user confirms.
+
+Run `start-issue init` for the existing manual initializer. If neither `--project` nor `--user` is provided, the command asks which scope to initialize. It writes the built-in default agent and prompt unless `--agent`, `--prompt`, or `--prompt-file` is provided. `--model` writes a sibling `model` file; when `--model` is omitted, built-in behavior stays unset and no new model file is created. If an existing `agent` file is kept without `--force`, the generated default prompt is chosen for that kept agent.
+
+On an ordinary non-setup launch, if `~/.config/start-issue` does not exist yet, `start-issue` shows a compact first-run message and asks whether to run setup immediately. If the user declines, it still creates the empty `~/.config/start-issue` directory so the onboarding prompt is not shown again automatically.
 
 ## Self-Update
 

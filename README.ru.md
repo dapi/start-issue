@@ -82,6 +82,8 @@ start-issue 123 --agent codex --model gpt-5.2
 start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
 start-issue 123 --no-agent
 start-issue 123 --dry-run
+start-issue setup
+start-issue --setup
 start-issue init
 start-issue init --project --agent codex --model gpt-5.2
 start-issue update
@@ -89,8 +91,8 @@ start-issue --update
 ```
 
 Запуск `start-issue` без issue печатает обычную справку, а также текущий
-выбранный agent, выбранную model, источник prompt, расположение prompt и короткий
-preview prompt, после чего выходит без обращения к GitHub.
+выбранный agent, выбранную model, источник prompt и расположение prompt, после
+чего выходит без обращения к GitHub.
 
 ## Процесс
 
@@ -130,7 +132,7 @@ CLI entrypoint остается `scripts/start-issue`, но реализация
 - `release.sh` владеет download/checksum/version-normalization helper-логикой, общей для install и update paths.
 - `update.sh` владеет workflow self-update и определением latest release.
 - `output.sh` рендерит help, status, dry-run output и session framing.
-- `init.sh` владеет `start-issue init`.
+- `init.sh` владеет `start-issue init` и helper-логикой user-config onboarding за `setup`.
 - `pipeline.sh` делает orchestration pipeline явным.
 
 Внутренний pipeline теперь такой:
@@ -150,6 +152,7 @@ Bash стоит сохранять, пока lifecycle commands, shape конф�
 |----------|----------|
 | `ISSUE` | Номер GitHub issue или полный URL GitHub issue. Обязательный аргумент. |
 | `init` | Создать файлы конфигурации по умолчанию для текущего проекта или текущего пользователя. |
+| `setup` | Запустить first-run onboarding пользовательской конфигурации в `~/.config/start-issue`. |
 | `update` | Обновить запущенный executable `start-issue` из последнего опубликованного GitHub Release. |
 | `--repo OWNER/REPO`, `-r OWNER/REPO` | Репозиторий, из которого нужно прочитать issue, если `ISSUE` передан номером. Если не задан, `start-issue` определяет репозиторий из `origin`. |
 | `--base BRANCH`, `-b BRANCH` | Базовая ветка для новой worktree branch. Если не задана, `start-issue` использует default branch репозитория, когда она доступна, иначе текущую ветку. |
@@ -170,6 +173,7 @@ Bash стоит сохранять, пока lifecycle commands, shape конф�
 | `--user` | С `init` - записать пользовательскую конфигурацию в `~/.config/start-issue`. |
 | `--force` | С `init` - перезаписать существующие файлы `agent` и `prompt.md`, а также сбросить `model` к выбранному значению или к built-in unset, если `--model` не передан. Без `--force` существующие файлы сохраняются. |
 | `--dry-run` | Напечатать выбранную конфигурацию и launch command без создания worktree, запуска `init.sh` или запуска агента. С `init` - напечатать план записи конфигурации без создания файлов. |
+| `--setup` | Запустить тот же user-config onboarding flow, что и `start-issue setup`. |
 | `--update` | Обновить запущенный executable `start-issue` из последнего опубликованного GitHub Release. Эквивалентно `start-issue update`. |
 | `--version`, `-v` | Показать версию. |
 | `--help`, `-h` | Показать справку. |
@@ -203,7 +207,11 @@ Bash стоит сохранять, пока lifecycle commands, shape конф�
 | `~/.config/start-issue/model` | Пользовательская model по умолчанию. Читается, если файл существует. |
 | `~/.config/start-issue/prompt.md` | Пользовательский prompt template по умолчанию. |
 
-Запустите `start-issue init`, чтобы создать эти файлы. Если не переданы `--project` или `--user`, команда спросит, какой scope инициализировать. Она записывает встроенные agent и prompt по умолчанию, если не переданы `--agent`, `--prompt` или `--prompt-file`. `--model` записывает соседний файл `model`; если `--model` не передан, встроенное поведение остается unset и новый model-файл не создается. Если существующий файл `agent` сохраняется без `--force`, default prompt выбирается для этого сохраненного agent.
+Для дружелюбного user-level onboarding используйте `start-issue setup` или `start-issue --setup`. Команда работает только с `~/.config/start-issue`, спрашивает default agent (`claude`, `codex`, `kimi`, `pi` или skip), показывает derived default prompt и сохраняет `prompt.md` только после явного подтверждения.
+
+Для существующего manual initializer используйте `start-issue init`. Если не переданы `--project` или `--user`, команда спросит, какой scope инициализировать. Она записывает встроенные agent и prompt по умолчанию, если не переданы `--agent`, `--prompt` или `--prompt-file`. `--model` записывает соседний файл `model`; если `--model` не передан, встроенное поведение остается unset и новый model-файл не создается. Если существующий файл `agent` сохраняется без `--force`, default prompt выбирается для этого сохраненного agent.
+
+При обычном non-setup запуске, если `~/.config/start-issue` еще не существует, `start-issue` показывает компактное first-run сообщение и спрашивает, нужно ли сразу запустить setup. Если пользователь отказывается, команда все равно создает пустую директорию `~/.config/start-issue`, чтобы onboarding автоматически не повторялся.
 
 ## Self-update
 

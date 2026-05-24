@@ -103,6 +103,10 @@ parse_args() {
                 show_version
                 exit 0
                 ;;
+            --setup)
+                SETUP_MODE=true
+                shift
+                ;;
             --update)
                 UPDATE_MODE=true
                 shift
@@ -117,10 +121,14 @@ parse_args() {
             *)
                 if [[ "$1" == "init" && -z "$ISSUE_INPUT" && "$INIT_CONFIG" == "false" ]]; then
                     INIT_CONFIG=true
+                elif [[ "$1" == "setup" && -z "$ISSUE_INPUT" && "$INIT_CONFIG" == "false" && "$SETUP_MODE" == "false" && "$UPDATE_MODE" == "false" ]]; then
+                    SETUP_MODE=true
                 elif [[ "$1" == "update" && -z "$ISSUE_INPUT" && "$INIT_CONFIG" == "false" && "$UPDATE_MODE" == "false" ]]; then
                     UPDATE_MODE=true
                 elif [[ "$INIT_CONFIG" == "true" ]]; then
                     die "Unexpected argument for init: $1"
+                elif [[ "$SETUP_MODE" == "true" ]]; then
+                    die "Unexpected argument for setup: $1"
                 elif [[ "$UPDATE_MODE" == "true" ]]; then
                     die "Unexpected argument for update: $1"
                 elif [[ -z "$ISSUE_INPUT" ]]; then
@@ -134,8 +142,21 @@ parse_args() {
     done
 
     if [[ "$INIT_CONFIG" == "true" ]]; then
+        if [[ "$SETUP_MODE" == "true" ]]; then
+            die "Use either init or setup, not both."
+        fi
         if [[ "$UPDATE_MODE" == "true" ]]; then
             die "Use either init or update, not both."
+        fi
+        return
+    fi
+
+    if [[ "$SETUP_MODE" == "true" ]]; then
+        if [[ "$UPDATE_MODE" == "true" ]]; then
+            die "Use either setup or update, not both."
+        fi
+        if [[ -n "$ISSUE_INPUT" ]]; then
+            die "Use either setup or <issue-url-or-number>, not both."
         fi
         return
     fi
