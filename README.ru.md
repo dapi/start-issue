@@ -16,6 +16,25 @@
 
 ## Установка
 
+Установить последний опубликованный релиз:
+
+```bash
+mkdir -p ~/.local/bin
+curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o ~/.local/bin/start-issue
+chmod +x ~/.local/bin/start-issue
+```
+
+При желании можно проверить checksum:
+
+```bash
+tmpdir="$(mktemp -d)"
+curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o "$tmpdir/start-issue"
+curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue.sha256 -o "$tmpdir/start-issue.sha256"
+(cd "$tmpdir" && shasum -a 256 -c start-issue.sha256)
+```
+
+Сборка и установка из исходников:
+
 ```bash
 make install
 ```
@@ -203,6 +222,29 @@ Prompt templates поддерживают:
 - `gh` CLI с авторизованной GitHub session
 - `jq`
 - CLI выбранного агента, если не используется `--agent none` или `--dry-run`
+
+## Релизы
+
+GitHub Releases публикуются автоматически, когда в репозиторий пушится SemVer tag вроде `v1.12.0`. Release workflow заново прогоняет тесты, проверяет, что tag совпадает с `VERSION` в `scripts/start-issue`, собирает bundled-скрипт `start-issue` и загружает:
+
+- `start-issue`
+- `start-issue.sha256`
+
+Подготовить релиз локально можно так:
+
+```bash
+make release-patch
+make release-minor
+make release-major
+```
+
+Каждая команда требует чистое рабочее дерево, поднимает `VERSION`, запускает `make test` и `make build`, создает локальный commit вида `Release v1.12.0` и создает matching git tag.
+
+Опубликовать подготовленный релиз:
+
+```bash
+git push origin master --follow-tags
+```
 
 ## Спецификация
 

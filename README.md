@@ -16,6 +16,25 @@ It fetches issue metadata with `gh`, creates a git worktree with a branch name b
 
 ## Install
 
+Install the latest published release:
+
+```bash
+mkdir -p ~/.local/bin
+curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o ~/.local/bin/start-issue
+chmod +x ~/.local/bin/start-issue
+```
+
+Verify the download if you want:
+
+```bash
+tmpdir="$(mktemp -d)"
+curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o "$tmpdir/start-issue"
+curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue.sha256 -o "$tmpdir/start-issue.sha256"
+(cd "$tmpdir" && shasum -a 256 -c start-issue.sha256)
+```
+
+Build and install from source:
+
 ```bash
 make install
 ```
@@ -203,6 +222,29 @@ Optional dependency for Zellij support:
 - `gh` CLI with authenticated GitHub session
 - `jq`
 - selected agent CLI unless `--agent none` or `--dry-run` is used
+
+## Releases
+
+GitHub Releases are published automatically when a SemVer tag like `v1.12.0` is pushed. The release workflow reruns the test suite, verifies that the tag matches `VERSION` in `scripts/start-issue`, builds the bundled `start-issue` script, and uploads:
+
+- `start-issue`
+- `start-issue.sha256`
+
+To prepare a release locally:
+
+```bash
+make release-patch
+make release-minor
+make release-major
+```
+
+Each command requires a clean worktree, bumps `VERSION`, runs `make test` and `make build`, creates a local commit like `Release v1.12.0`, and creates the matching git tag.
+
+Publish the prepared release with:
+
+```bash
+git push origin master --follow-tags
+```
 
 ## Specification
 

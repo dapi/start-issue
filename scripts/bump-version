@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+    cat <<'EOF'
+Usage: scripts/bump-version <patch|minor|major>
+EOF
+}
+
+if [[ $# -ne 1 ]]; then
+    usage >&2
+    exit 1
+fi
+
+kind="$1"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+version_file="$repo_root/scripts/start-issue"
+
+current_version="$(awk -F'"' '/^VERSION="/ { print $2; exit }' "$version_file")"
+if [[ -z "$current_version" ]]; then
+    echo "Could not read current version from $version_file" >&2
+    exit 1
+fi
+
+IFS=. read -r major minor patch <<< "$current_version"
+
+case "$kind" in
+    patch)
+        patch=$((patch + 1))
+        ;;
+    minor)
+        minor=$((minor + 1))
+        patch=0
+        ;;
+    major)
+        major=$((major + 1))
+        minor=0
+        patch=0
+        ;;
+    *)
+        usage >&2
+        exit 1
+        ;;
+esac
+
+next_version="$major.$minor.$patch"
+tmpfile="$(mktemp)"
+trap 'rm -f "$tmpfile"' EXIT
+
+awk -v next_version="$next_version" '
+    BEGIN { replaced = 0 }
+    /^VERSION="[0-9]+\.[0-9]+\.[0-9]+"$/ && replaced == 0 {
+        print "VERSION=\"" next_version "\""
+        replaced = 1
+        next
+    }
+    { print }
+    END {
+        if (replaced != 1) {
+            exit 1
+        }
+    }
+' "$version_file" > "$tmpfile" || {
+    echo "Expected exactly one VERSION line in $version_file" >&2
+    exit 1
+}
+
+mv "$tmpfile" "$version_file"
+trap - EXIT
+
+printf '%s\n' "$next_version"

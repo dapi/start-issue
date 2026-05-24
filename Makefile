@@ -1,4 +1,4 @@
-.PHONY: build install uninstall test
+.PHONY: build install uninstall test print-version bump-patch bump-minor bump-major release-patch release-minor release-major
 
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
@@ -27,6 +27,27 @@ uninstall:
 
 test:
 	bash -n scripts/start-issue
-	shellcheck scripts/start-issue scripts/build-start-issue scripts/lib/start_issue/*.sh
+	shellcheck scripts/start-issue scripts/build-start-issue scripts/bump-version scripts/prepare-release scripts/lib/start_issue/*.sh
 	git diff --check
 	bats test
+
+print-version:
+	@awk -F'"' '/^VERSION="/ { print $$2; exit }' scripts/start-issue
+
+bump-patch:
+	@bash scripts/bump-version patch
+
+bump-minor:
+	@bash scripts/bump-version minor
+
+bump-major:
+	@bash scripts/bump-version major
+
+release-patch:
+	@bash scripts/prepare-release patch
+
+release-minor:
+	@bash scripts/prepare-release minor
+
+release-major:
+	@bash scripts/prepare-release major

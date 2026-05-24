@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up mise
+        uses: jdx/mise-action@v2
+
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Verify tag matches script version
+        run: |
+          script_version="$(awk -F'"' '/^VERSION="/ { print $2; exit }' scripts/start-issue)"
+          tag_version="${GITHUB_REF_NAME#v}"
+          test "$script_version" = "$tag_version"
+
+      - name: Run checks
+        run: make test
+
+      - name: Build release artifact
+        run: |
+          make build
+          cp .build/start-issue start-issue
+          sha256sum start-issue > start-issue.sha256
+
+      - name: Publish GitHub release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            start-issue \
+            start-issue.sha256 \
+            --generate-notes
