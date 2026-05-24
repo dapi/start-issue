@@ -24,6 +24,14 @@ curl -fsSL https://raw.githubusercontent.com/dapi/start-issue/master/install.sh 
 
 The installer downloads the latest GitHub Release asset into `~/.local/bin/start-issue` by default.
 
+For developer diagnostics on a machine where the install appears to hang:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dapi/start-issue/master/install.sh | bash -s -- --debug
+```
+
+This enables shell tracing plus verbose `curl` or `wget` output so you can see which step is blocking.
+
 Manual install:
 
 ```bash

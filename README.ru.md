@@ -24,6 +24,14 @@ curl -fsSL https://raw.githubusercontent.com/dapi/start-issue/master/install.sh 
 
 Скрипт установки скачивает asset из последнего GitHub Release в `~/.local/bin/start-issue` по умолчанию.
 
+Для диагностики, если установка на машине подвисает:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dapi/start-issue/master/install.sh | bash -s -- --debug
+```
+
+Этот режим включает трассировку shell и подробный вывод `curl` или `wget`, чтобы было видно, на каком шаге всё остановилось.
+
 Ручная установка:
 
 ```bash

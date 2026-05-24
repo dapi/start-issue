@@ -36,6 +36,18 @@ run_start_issue() {
   run "$REPO_ROOT/scripts/start-issue" "$@"
 }
 
+run_install_script() {
+  run env \
+    HOME="$HOME" \
+    PREFIX="$TEST_TMPDIR/install-prefix" \
+    BINDIR="$TEST_TMPDIR/install-prefix/bin" \
+    TARGET="$TEST_TMPDIR/install-prefix/bin/start-issue" \
+    START_ISSUE_REPOSITORY="test/local" \
+    START_ISSUE_ASSET_URL="file://$TEST_TMPDIR/install-fixture/start-issue" \
+    START_ISSUE_CHECKSUM_URL="file://$TEST_TMPDIR/install-fixture/start-issue.sha256" \
+    bash "$REPO_ROOT/install.sh" "$@"
+}
+
 assert_success() {
   [ "$status" -eq 0 ]
 }
@@ -617,6 +629,43 @@ EOF
   assert_output_contains "shellcheck install.sh scripts/start-issue"
   assert_output_contains "git diff --check"
   assert_output_contains "bats test"
+}
+
+@test "install.sh installs local release asset" {
+  mkdir -p "$TEST_TMPDIR/install-fixture"
+  cat > "$TEST_TMPDIR/install-fixture/start-issue" <<'EOF'
+#!/usr/bin/env bash
+printf 'start-issue test-build\n'
+EOF
+  chmod +x "$TEST_TMPDIR/install-fixture/start-issue"
+  shasum -a 256 "$TEST_TMPDIR/install-fixture/start-issue" | awk '{ print $1 "  start-issue" }' > "$TEST_TMPDIR/install-fixture/start-issue.sha256"
+
+  run_install_script
+
+  assert_success
+  assert_output_contains "Downloading latest release from test/local"
+  assert_output_contains "Installed: $TEST_TMPDIR/install-prefix/bin/start-issue"
+  assert_output_contains "Version: start-issue test-build"
+  [[ -x "$TEST_TMPDIR/install-prefix/bin/start-issue" ]]
+}
+
+@test "install.sh debug mode prints diagnostic details" {
+  mkdir -p "$TEST_TMPDIR/install-fixture"
+  cat > "$TEST_TMPDIR/install-fixture/start-issue" <<'EOF'
+#!/usr/bin/env bash
+printf 'start-issue debug-build\n'
+EOF
+  chmod +x "$TEST_TMPDIR/install-fixture/start-issue"
+  shasum -a 256 "$TEST_TMPDIR/install-fixture/start-issue" | awk '{ print $1 "  start-issue" }' > "$TEST_TMPDIR/install-fixture/start-issue.sha256"
+
+  run_install_script --debug
+
+  assert_success
+  assert_output_contains "DEBUG: Repository: test/local"
+  assert_output_contains "DEBUG: Asset URL: file://$TEST_TMPDIR/install-fixture/start-issue"
+  assert_output_contains "DEBUG: Verifying checksum"
+  assert_output_contains "+ install.sh:"
+  assert_output_contains "Version: start-issue debug-build"
 }
 
 @test "branch reuse matches the exact worktree path" {
