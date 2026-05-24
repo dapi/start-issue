@@ -623,6 +623,33 @@ install_fake_zellij_tab_status() {
   [[ "$output" != *"User prompt 1"* ]]
 }
 
+@test "environment inline prompt overrides project and user prompt files" {
+  mkdir -p .start-issue "$HOME/.config/start-issue"
+  printf "Project prompt {ISSUE_NUMBER}\n" > .start-issue/prompt.md
+  printf "User prompt {ISSUE_NUMBER}\n" > "$HOME/.config/start-issue/prompt.md"
+  export START_ISSUE_PROMPT="Env inline {ISSUE_NUMBER} {REPO}"
+
+  run_start_issue 1 --agent codex --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Prompt source: START_ISSUE_PROMPT"
+  assert_output_contains "Env\\ inline\\ 1\\ owner/repo"
+  [[ "$output" != *"Project prompt 1"* ]]
+  [[ "$output" != *"User prompt 1"* ]]
+}
+
+@test "environment prompt conflict fails fast" {
+  printf "Env prompt file {ISSUE_NUMBER}\n" > "$TEST_TMPDIR/env-prompt.md"
+  export START_ISSUE_PROMPT="Env inline"
+  export START_ISSUE_PROMPT_FILE="$TEST_TMPDIR/env-prompt.md"
+
+  run_start_issue 1 --agent none --dry-run --no-init
+
+  assert_failure
+  assert_output_contains "Use either START_ISSUE_PROMPT_FILE or START_ISSUE_PROMPT, not both."
+  [[ "$output" != *"Fetching issue"* ]]
+}
+
 @test "prompt improvement writes proposal next to project prompt and exits before worktree" {
   mkdir -p .start-issue
   printf "Prompt {ISSUE_NUMBER}\n" > .start-issue/prompt.md
@@ -714,6 +741,25 @@ install_fake_zellij_tab_status() {
 
   assert_failure
   assert_output_contains "Unknown agent: unknown"
+  [[ "$output" != *"Fetching issue"* ]]
+}
+
+@test "invalid issue input fails before repository or GitHub access" {
+  run_start_issue not-an-issue --agent none --dry-run --no-init
+
+  assert_failure
+  assert_output_contains "Invalid issue format: not-an-issue. Use issue number or full GitHub URL."
+  [[ "$output" != *"Fetching issue"* ]]
+}
+
+@test "empty project model config fails clearly" {
+  mkdir -p .start-issue
+  : > .start-issue/model
+
+  run_start_issue 1 --agent codex --dry-run --no-init
+
+  assert_failure
+  assert_output_contains "Model config is empty. Remove the empty model config or set a value."
   [[ "$output" != *"Fetching issue"* ]]
 }
 
@@ -892,6 +938,16 @@ EOF
   assert_output_contains "✅ Worktree created"
   [[ -d "$HOME/worktrees/feature/issue-1-add-login-button" ]]
   [[ ! -d "$TEST_TMPDIR/existing-worktree" ]]
+}
+
+@test "branch conflict option creates a versioned branch name" {
+  git worktree add "$TEST_TMPDIR/existing-worktree" -b feature/issue-1-add-login-button master
+
+  run bash -c 'printf "2\n" | "$REPO_ROOT/scripts/start-issue" 1 --agent none --dry-run --no-init'
+
+  assert_success
+  assert_output_contains "New branch name: feature/issue-1-add-login-button-v2"
+  assert_output_contains "Would run: git worktree add -b feature/issue-1-add-login-button-v2 $HOME/worktrees/feature/issue-1-add-login-button-v2 master"
 }
 
 @test "flat worktree mode uses flattened path" {
