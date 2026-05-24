@@ -21,6 +21,12 @@ Use `--command` to keep the Claude slash-command style but change the command pr
 start-issue 123 --agent claude --command "/debug"
 ```
 
+Select a specific Claude model for the session:
+
+```bash
+start-issue 123 --agent claude --model sonnet
+```
+
 Use project config when Claude should be the default for this repository:
 
 ```bash
@@ -35,6 +41,12 @@ Launch Codex for a single issue:
 
 ```bash
 start-issue 123 --agent codex
+```
+
+Launch Codex with an explicit model:
+
+```bash
+start-issue 123 --agent codex --model gpt-5.2
 ```
 
 The script creates the worktree, renders the portable prompt, and launches:
@@ -71,6 +83,12 @@ The script creates the worktree, renders the portable prompt, and launches:
 kimi --work-dir "$WORKTREE_PATH" --yolo -p "$PROMPT"
 ```
 
+Use an explicit Kimi model:
+
+```bash
+start-issue 123 --agent kimi --model kimi-k2
+```
+
 Use Kimi from the environment without changing project files:
 
 ```bash
@@ -96,6 +114,12 @@ The script changes into the worktree and launches:
 ```bash
 cd "$WORKTREE_PATH"
 pi "$PROMPT"
+```
+
+Use an explicit Pi model:
+
+```bash
+start-issue 123 --agent pi --model sonnet
 ```
 
 Use Pi as your user default for all repositories:

@@ -22,11 +22,14 @@ setup() {
   cd "$TEST_REPO"
 
   unset START_ISSUE_AGENT
+  unset START_ISSUE_MODEL
   unset START_ISSUE_PROMPT
   unset START_ISSUE_PROMPT_FILE
   unset START_ISSUE_WORKTREE_DIR
   unset START_ISSUE_FAKE_BRANCH_NAME
   unset START_ISSUE_FAKE_AGENT_FAIL
+  unset START_ISSUE_FAKE_EXPECT_MODEL
+  unset START_ISSUE_FAKE_FORBID_MODEL
 }
 
 run_start_issue() {
@@ -63,6 +66,7 @@ install_fake_zellij_tab_status() {
 
   assert_success
   assert_output_contains "Agent: claude (built-in default)"
+  assert_output_contains "Model: <unset> (built-in default)"
   assert_output_contains "Fetching issue #1 from owner/repo"
   assert_output_contains "Prompt source: built-in Claude command"
   assert_output_contains "Default prompt files:"
@@ -80,8 +84,12 @@ install_fake_zellij_tab_status() {
   assert_output_contains "Usage: start-issue <issue-url-or-number> [options]"
   assert_output_contains "Current configuration:"
   assert_output_contains "Agent: claude (built-in default)"
+  assert_output_contains "Model: <unset> (built-in default)"
   assert_output_contains "Prompt source: built-in Claude command"
   assert_output_contains "Prompt location: $REPO_ROOT/scripts/start-issue"
+  assert_output_contains "Project model:"
+  assert_output_contains ".start-issue/model"
+  assert_output_contains "User model:"
   assert_output_contains "Default prompt files:"
   assert_output_contains "Project:"
   assert_output_contains ".start-issue/prompt.md"
@@ -105,6 +113,16 @@ install_fake_zellij_tab_status() {
   assert_output_contains "Prompt location:"
   assert_output_contains "Prompt preview: Project prompt for {ISSUE_URL}"
   [[ "$output" != *"Fetching issue"* ]]
+}
+
+@test "help documents model option and config surfaces" {
+  run_start_issue --help
+
+  assert_success
+  assert_output_contains "--model <name>"
+  assert_output_contains "START_ISSUE_MODEL"
+  assert_output_contains ".start-issue/model"
+  assert_output_contains "~/.config/start-issue/model"
 }
 
 @test "prompt improvement without issue prints explicit error" {
@@ -146,6 +164,45 @@ install_fake_zellij_tab_status() {
   assert_output_contains "codex --cd"
 }
 
+@test "CLI model wins over project, user, and environment" {
+  mkdir -p .start-issue
+  mkdir -p "$HOME/.config/start-issue"
+  printf "project-model\n" > .start-issue/model
+  printf "user-model\n" > "$HOME/.config/start-issue/model"
+  export START_ISSUE_MODEL=env-model
+
+  run_start_issue 1 --agent codex --model cli-model --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Model: cli-model (CLI)"
+  assert_output_contains "codex --model cli-model --cd"
+}
+
+@test "project model config wins over environment" {
+  mkdir -p .start-issue
+  printf "project-model\n" > .start-issue/model
+  export START_ISSUE_MODEL=env-model
+
+  run_start_issue 1 --agent codex --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Model: project-model ("
+  assert_output_contains ".start-issue/model)"
+  assert_output_contains "codex --model project-model --cd"
+}
+
+@test "user model config wins over environment" {
+  mkdir -p "$HOME/.config/start-issue"
+  printf "user-model\n" > "$HOME/.config/start-issue/model"
+  export START_ISSUE_MODEL=env-model
+
+  run_start_issue 1 --agent pi --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Model: user-model ($HOME/.config/start-issue/model)"
+  assert_output_contains "pi --model user-model"
+}
+
 @test "project agent config wins over environment" {
   mkdir -p .start-issue
   printf "codex\n" > .start-issue/agent
@@ -179,6 +236,14 @@ install_fake_zellij_tab_status() {
   [[ "$(cat .start-issue/agent)" == "codex" ]]
   [[ "$(cat .start-issue/prompt.md)" == *"Implement GitHub issue {ISSUE_URL} in this worktree."* ]]
   [[ "$output" != *"Fetching issue"* ]]
+}
+
+@test "init writes project model config when selected" {
+  run_start_issue init --project --agent codex --model gpt-5.2
+
+  assert_success
+  assert_output_contains "Model: gpt-5.2 (CLI)"
+  [[ "$(cat .start-issue/model)" == "gpt-5.2" ]]
 }
 
 @test "init prompts for user config when scope is omitted" {
@@ -225,8 +290,20 @@ install_fake_zellij_tab_status() {
 
   assert_success
   assert_output_contains "[DRY-RUN] Would write agent config"
+  assert_output_contains "No model config to write"
   [[ ! -e .start-issue/agent ]]
+  [[ ! -e .start-issue/model ]]
   [[ ! -e .start-issue/prompt.md ]]
+}
+
+@test "init --force removes existing model config when no model is selected" {
+  mkdir -p .start-issue
+  printf "old-model\n" > .start-issue/model
+
+  run_start_issue init --project --agent codex --force
+
+  assert_success
+  [[ ! -e .start-issue/model ]]
 }
 
 @test "--no-agent prints manual next steps" {
@@ -236,6 +313,15 @@ install_fake_zellij_tab_status() {
   assert_output_contains "Selected agent: none (CLI)"
   assert_output_contains "To start working:"
   assert_output_contains "codex --cd $HOME/worktrees/feature/issue-1-add-login-button"
+}
+
+@test "--no-agent displays resolved model without passing launch args" {
+  run_start_issue 1 --agent none --model sonnet --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Selected agent: none (CLI)"
+  assert_output_contains "Resolved model: sonnet (CLI)"
+  [[ "$output" != *"--model sonnet"* ]]
 }
 
 @test "zellij-tab-status dry-run rename is shown when installed" {
@@ -284,6 +370,18 @@ install_fake_zellij_tab_status() {
   assert_output_contains "cd $HOME/worktrees/feature/issue-1-add-login-button && pi"
 }
 
+@test "dry-run renders explicit model for supported launch adapters" {
+  run_start_issue 1 --agent codex --model gpt-5.2 --dry-run --no-init
+  assert_success
+  assert_output_contains "Model: gpt-5.2 (CLI)"
+  assert_output_contains "codex --model gpt-5.2 --cd $HOME/worktrees/feature/issue-1-add-login-button"
+
+  run_start_issue 1 --agent claude --model sonnet --dry-run --no-init
+  assert_success
+  assert_output_contains "Model: sonnet (CLI)"
+  assert_output_contains "claude --model sonnet --dangerously-skip-permissions"
+}
+
 @test "prompt template from project file is rendered" {
   mkdir -p .start-issue
   printf "Prompt-{ISSUE_NUMBER}-{REPO}-{BASE_BRANCH}-{UNKNOWN}\n" > .start-issue/prompt.md
@@ -313,6 +411,16 @@ install_fake_zellij_tab_status() {
   assert_output_contains "Prompt improvement written"
   [[ "$(cat .start-issue/prompt.improved.md)" == "Improved prompt {ISSUE_URL} {ISSUE_NUMBER}" ]]
   [[ "$output" != *"Creating worktree"* ]]
+}
+
+@test "prompt improvement passes explicit model to the selected agent" {
+  export START_ISSUE_FAKE_IMPROVED_PROMPT="Improved prompt"
+  export START_ISSUE_FAKE_EXPECT_MODEL=sonnet
+
+  run_start_issue 1 --agent claude --model sonnet --improve-prompt --no-init
+
+  assert_success
+  [[ "$(cat .start-issue/prompt.improved.md)" == "Improved prompt" ]]
 }
 
 @test "built-in prompt improvement writes project proposal by default" {
@@ -389,6 +497,33 @@ install_fake_zellij_tab_status() {
   assert_success
   assert_output_contains "Branch: fix/issue-1-ai-generated-name"
   assert_output_contains "ai:codex"
+}
+
+@test "AI branch naming passes explicit model to the selected agent" {
+  export START_ISSUE_FAKE_BRANCH_NAME=fix/issue-1-ai-generated-name
+  export START_ISSUE_FAKE_EXPECT_MODEL=gpt-5.2
+
+  run_start_issue 1 --agent codex --model gpt-5.2 --ai --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Branch: fix/issue-1-ai-generated-name"
+  assert_output_contains "Model: gpt-5.2 (CLI)"
+}
+
+@test "no-model branch naming keeps existing adapter behavior" {
+  export START_ISSUE_FAKE_BRANCH_NAME=fix/issue-1-ai-generated-name
+  export START_ISSUE_FAKE_FORBID_MODEL=1
+
+  run_start_issue 1 --agent codex --ai --dry-run --no-init
+
+  assert_success
+}
+
+@test "unsupported model selection helper returns a clear error" {
+  run bash -lc 'set -euo pipefail; RED=""; NC=""; source "'"$REPO_ROOT"'/scripts/lib/start_issue/utils.sh"; source "'"$REPO_ROOT"'/scripts/lib/start_issue/agent.sh"; AGENT="unsupported"; MODEL="x"; validate_model_selection_support launch'
+
+  assert_failure
+  assert_output_contains "does not support explicit model selection"
 }
 
 @test "AI branch naming falls back when selected agent returns invalid output" {

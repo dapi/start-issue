@@ -32,6 +32,11 @@ parse_args() {
                 AGENT_CLI="$2"
                 shift 2
                 ;;
+            --model)
+                require_value "$1" "${2:-}"
+                MODEL_CLI="$2"
+                shift 2
+                ;;
             --no-agent|--no-claude)
                 AGENT_CLI="none"
                 shift

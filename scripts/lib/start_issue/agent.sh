@@ -1,4 +1,47 @@
 # shellcheck shell=bash disable=SC2034
+agent_supports_explicit_model_selection() {
+    local operation="$1"
+
+    case "$operation" in
+        launch|branch-name|prompt-improvement)
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+
+    case "$AGENT" in
+        claude|codex|kimi|pi)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+validate_model_selection_support() {
+    local operation="$1"
+
+    if [[ -z "$MODEL" || "$AGENT" == "none" ]]; then
+        return 0
+    fi
+
+    if agent_supports_explicit_model_selection "$operation"; then
+        return 0
+    fi
+
+    die "Agent '$AGENT' does not support explicit model selection for $operation."
+}
+
+claude_noninteractive_model() {
+    if [[ -n "$MODEL" ]]; then
+        printf "%s" "$MODEL"
+    else
+        printf "%s" "haiku"
+    fi
+}
+
 validate_prompt_improvement_mode() {
     if [[ "$IMPROVE_PROMPT" != "true" ]]; then
         return
@@ -94,21 +137,35 @@ generate_improved_prompt_template() {
     local output
 
     request=$(prompt_improvement_request)
+    validate_model_selection_support "prompt-improvement"
 
     case "$AGENT" in
         claude)
-            output=$(claude --print --model haiku --no-session-persistence \
+            output=$(claude --print --model "$(claude_noninteractive_model)" --no-session-persistence \
                 --disable-slash-commands "$request" 2>/dev/null) || return 1
             ;;
         codex)
-            output=$(codex exec --cd "$PROJECT_ROOT" --sandbox read-only \
-                --skip-git-repo-check "$request" 2>/dev/null) || return 1
+            if [[ -n "$MODEL" ]]; then
+                output=$(codex exec --model "$MODEL" --cd "$PROJECT_ROOT" --sandbox read-only \
+                    --skip-git-repo-check "$request" 2>/dev/null) || return 1
+            else
+                output=$(codex exec --cd "$PROJECT_ROOT" --sandbox read-only \
+                    --skip-git-repo-check "$request" 2>/dev/null) || return 1
+            fi
             ;;
         kimi)
-            output=$(kimi --work-dir "$PROJECT_ROOT" --quiet -p "$request" 2>/dev/null) || return 1
+            if [[ -n "$MODEL" ]]; then
+                output=$(kimi --model "$MODEL" --work-dir "$PROJECT_ROOT" --quiet -p "$request" 2>/dev/null) || return 1
+            else
+                output=$(kimi --work-dir "$PROJECT_ROOT" --quiet -p "$request" 2>/dev/null) || return 1
+            fi
             ;;
         pi)
-            output=$(pi --print --no-tools --no-session "$request" 2>/dev/null) || return 1
+            if [[ -n "$MODEL" ]]; then
+                output=$(pi --model "$MODEL" --print --no-tools --no-session "$request" 2>/dev/null) || return 1
+            else
+                output=$(pi --print --no-tools --no-session "$request" 2>/dev/null) || return 1
+            fi
             ;;
         *)
             return 1
@@ -135,20 +192,35 @@ Reply with ONLY the branch name."
         return 1
     fi
 
+    validate_model_selection_support "branch-name"
+
     case "$AGENT" in
         claude)
-            output=$(claude --print --model haiku --no-session-persistence \
+            output=$(claude --print --model "$(claude_noninteractive_model)" --no-session-persistence \
                 --disable-slash-commands "$prompt" 2>/dev/null) || return 1
             ;;
         codex)
-            output=$(codex exec --cd "$PROJECT_ROOT" --sandbox read-only \
-                --skip-git-repo-check "$prompt" 2>/dev/null | tail -n 1) || return 1
+            if [[ -n "$MODEL" ]]; then
+                output=$(codex exec --model "$MODEL" --cd "$PROJECT_ROOT" --sandbox read-only \
+                    --skip-git-repo-check "$prompt" 2>/dev/null | tail -n 1) || return 1
+            else
+                output=$(codex exec --cd "$PROJECT_ROOT" --sandbox read-only \
+                    --skip-git-repo-check "$prompt" 2>/dev/null | tail -n 1) || return 1
+            fi
             ;;
         kimi)
-            output=$(kimi --work-dir "$PROJECT_ROOT" --quiet -p "$prompt" 2>/dev/null) || return 1
+            if [[ -n "$MODEL" ]]; then
+                output=$(kimi --model "$MODEL" --work-dir "$PROJECT_ROOT" --quiet -p "$prompt" 2>/dev/null) || return 1
+            else
+                output=$(kimi --work-dir "$PROJECT_ROOT" --quiet -p "$prompt" 2>/dev/null) || return 1
+            fi
             ;;
         pi)
-            output=$(pi --print --no-tools --no-session "$prompt" 2>/dev/null | tail -n 1) || return 1
+            if [[ -n "$MODEL" ]]; then
+                output=$(pi --model "$MODEL" --print --no-tools --no-session "$prompt" 2>/dev/null | tail -n 1) || return 1
+            else
+                output=$(pi --print --no-tools --no-session "$prompt" 2>/dev/null | tail -n 1) || return 1
+            fi
             ;;
         *)
             return 1
@@ -190,21 +262,38 @@ improve_prompt_template() {
 build_launch_command() {
     LAUNCH_CWD=""
     LAUNCH_CMD=()
+    validate_model_selection_support "launch"
 
     case "$AGENT" in
         claude)
             LAUNCH_CWD="$WORKTREE_PATH"
-            LAUNCH_CMD=(claude --dangerously-skip-permissions "$AGENT_PROMPT")
+            if [[ -n "$MODEL" ]]; then
+                LAUNCH_CMD=(claude --model "$MODEL" --dangerously-skip-permissions "$AGENT_PROMPT")
+            else
+                LAUNCH_CMD=(claude --dangerously-skip-permissions "$AGENT_PROMPT")
+            fi
             ;;
         codex)
-            LAUNCH_CMD=(codex --cd "$WORKTREE_PATH" --dangerously-bypass-approvals-and-sandbox "$AGENT_PROMPT")
+            if [[ -n "$MODEL" ]]; then
+                LAUNCH_CMD=(codex --model "$MODEL" --cd "$WORKTREE_PATH" --dangerously-bypass-approvals-and-sandbox "$AGENT_PROMPT")
+            else
+                LAUNCH_CMD=(codex --cd "$WORKTREE_PATH" --dangerously-bypass-approvals-and-sandbox "$AGENT_PROMPT")
+            fi
             ;;
         kimi)
-            LAUNCH_CMD=(kimi --work-dir "$WORKTREE_PATH" --yolo -p "$AGENT_PROMPT")
+            if [[ -n "$MODEL" ]]; then
+                LAUNCH_CMD=(kimi --model "$MODEL" --work-dir "$WORKTREE_PATH" --yolo -p "$AGENT_PROMPT")
+            else
+                LAUNCH_CMD=(kimi --work-dir "$WORKTREE_PATH" --yolo -p "$AGENT_PROMPT")
+            fi
             ;;
         pi)
             LAUNCH_CWD="$WORKTREE_PATH"
-            LAUNCH_CMD=(pi "$AGENT_PROMPT")
+            if [[ -n "$MODEL" ]]; then
+                LAUNCH_CMD=(pi --model "$MODEL" "$AGENT_PROMPT")
+            else
+                LAUNCH_CMD=(pi "$AGENT_PROMPT")
+            fi
             ;;
         none)
             ;;

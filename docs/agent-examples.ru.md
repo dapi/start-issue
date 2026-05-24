@@ -21,6 +21,12 @@ start-issue 123 --agent claude
 start-issue 123 --agent claude --command "/debug"
 ```
 
+Выбрать конкретную model Claude для сессии:
+
+```bash
+start-issue 123 --agent claude --model sonnet
+```
+
 Используйте project config, если Claude должен быть агентом по умолчанию для этого репозитория:
 
 ```bash
@@ -35,6 +41,12 @@ start-issue 123
 
 ```bash
 start-issue 123 --agent codex
+```
+
+Запустить Codex с явной model:
+
+```bash
+start-issue 123 --agent codex --model gpt-5.2
 ```
 
 Скрипт создает worktree, рендерит portable prompt и запускает:
@@ -71,6 +83,12 @@ start-issue 123 --agent kimi
 kimi --work-dir "$WORKTREE_PATH" --yolo -p "$PROMPT"
 ```
 
+Использовать явную model Kimi:
+
+```bash
+start-issue 123 --agent kimi --model kimi-k2
+```
+
 Использовать Kimi через environment, не меняя project files:
 
 ```bash
@@ -96,6 +114,12 @@ start-issue 123 --agent pi
 ```bash
 cd "$WORKTREE_PATH"
 pi "$PROMPT"
+```
+
+Использовать явную model Pi:
+
+```bash
+start-issue 123 --agent pi --model sonnet
 ```
 
 Использовать Pi как user default для всех репозиториев:

@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ -n "${START_ISSUE_FAKE_EXPECT_MODEL:-}" && "$*" != *"--model ${START_ISSUE_FAKE_EXPECT_MODEL}"* ]]; then
+  printf "%s\n" "expected model flag --model ${START_ISSUE_FAKE_EXPECT_MODEL}" >&2
+  exit 1
+fi
+
+if [[ "${START_ISSUE_FAKE_FORBID_MODEL:-}" == "1" && "$*" == *"--model "* ]]; then
+  printf "%s\n" "unexpected model flag" >&2
+  exit 1
+fi
+
 if [[ "${START_ISSUE_FAKE_AGENT_FAIL:-}" == "1" ]]; then
   exit 1
 fi
