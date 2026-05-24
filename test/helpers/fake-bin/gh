@@ -13,6 +13,10 @@ case "${1:-}" in
       cat "${START_ISSUE_FAKE_ISSUE_JSON:?START_ISSUE_FAKE_ISSUE_JSON is required}"
       exit 0
     fi
+    if [[ "$endpoint" =~ ^repos/[^/]+/[^/]+/releases/latest$ ]]; then
+      cat "${START_ISSUE_FAKE_LATEST_RELEASE_JSON:?START_ISSUE_FAKE_LATEST_RELEASE_JSON is required}"
+      exit 0
+    fi
     ;;
 esac
 

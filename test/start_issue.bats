@@ -30,6 +30,8 @@ setup() {
   unset START_ISSUE_FAKE_AGENT_FAIL
   unset START_ISSUE_FAKE_EXPECT_MODEL
   unset START_ISSUE_FAKE_FORBID_MODEL
+  unset START_ISSUE_FAKE_LATEST_RELEASE_JSON
+  unset START_ISSUE_REPOSITORY
 }
 
 run_start_issue() {
@@ -46,6 +48,60 @@ run_install_script() {
     START_ISSUE_ASSET_URL="file://$TEST_TMPDIR/install-fixture/start-issue" \
     START_ISSUE_CHECKSUM_URL="file://$TEST_TMPDIR/install-fixture/start-issue.sha256" \
     bash "$REPO_ROOT/install.sh" "$@"
+}
+
+build_installed_start_issue() {
+  local output_path="$1"
+  local version="$2"
+  local tmpfile
+
+  bash "$REPO_ROOT/scripts/build-start-issue" "$output_path" >/dev/null
+  tmpfile="$TEST_TMPDIR/versioned-start-issue"
+  awk -v version="$version" '
+    BEGIN { replaced = 0 }
+    /^VERSION="/ && replaced == 0 {
+      print "VERSION=\"" version "\""
+      replaced = 1
+      next
+    }
+    { print }
+  ' "$output_path" > "$tmpfile"
+  mv "$tmpfile" "$output_path"
+  chmod +x "$output_path"
+}
+
+create_fake_release_assets() {
+  local dir="$1"
+  local version="$2"
+  local asset_path="$dir/start-issue"
+  local checksum_path="$dir/start-issue.sha256"
+  local json_path="$dir/release.json"
+  local asset_url
+  local checksum_url
+  local checksum
+
+  mkdir -p "$dir"
+  cat > "$asset_path" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "\${1:-}" == "--version" || "\${1:-}" == "-v" ]]; then
+  echo "start-issue v$version"
+  exit 0
+fi
+echo "updated test binary"
+EOF
+  chmod +x "$asset_path"
+  checksum="$(shasum -a 256 "$asset_path" | awk '{ print $1 }')"
+  printf "%s  start-issue\n" "$checksum" > "$checksum_path"
+  asset_url="file://$asset_path"
+  checksum_url="file://$checksum_path"
+  cat > "$json_path" <<EOF
+{"tag_name":"v$version","assets":[
+  {"name":"start-issue","browser_download_url":"$asset_url"},
+  {"name":"start-issue.sha256","browser_download_url":"$checksum_url"}
+]}
+EOF
+  export START_ISSUE_FAKE_LATEST_RELEASE_JSON="$json_path"
 }
 
 assert_success() {
@@ -129,6 +185,16 @@ install_fake_zellij_tab_status() {
   assert_output_contains "START_ISSUE_DUMP_PROMPT"
 }
 
+@test "help documents update entry points" {
+  run_start_issue --help
+
+  assert_success
+  assert_output_contains "start-issue update [options]"
+  assert_output_contains "--update"
+  assert_output_contains "start-issue update"
+  assert_output_contains "start-issue --update"
+}
+
 @test "missing issue prints project agent and prompt file location" {
   mkdir -p .start-issue
   printf "codex\n" > .start-issue/agent
@@ -173,6 +239,118 @@ install_fake_zellij_tab_status() {
   assert_success
   assert_output_contains "Fetching issue #1 from other/project"
   assert_output_contains "Selected agent: none (CLI)"
+}
+
+@test "update subcommand installs the latest release into the running executable path" {
+  installed_script="$TEST_TMPDIR/bin/start-issue"
+  mkdir -p "$(dirname "$installed_script")"
+  build_installed_start_issue "$installed_script" "1.11.0"
+  create_fake_release_assets "$TEST_TMPDIR/release-assets" "1.11.1"
+  expected_path="$(cd "$(dirname "$installed_script")" && pwd -P)/$(basename "$installed_script")"
+
+  run "$installed_script" update
+
+  assert_success
+  assert_output_contains "Installed version: v1.11.0"
+  assert_output_contains "Latest release: v1.11.1"
+  assert_output_contains "Updated start-issue at: $expected_path"
+  assert_output_contains "Version: start-issue v1.11.1"
+  run "$installed_script" --version
+  assert_success
+  assert_output_contains "start-issue v1.11.1"
+}
+
+@test "--update is equivalent to the update subcommand" {
+  installed_script="$TEST_TMPDIR/bin/start-issue"
+  mkdir -p "$(dirname "$installed_script")"
+  build_installed_start_issue "$installed_script" "1.11.0"
+  create_fake_release_assets "$TEST_TMPDIR/release-assets-flag" "1.11.1"
+  expected_path="$(cd "$(dirname "$installed_script")" && pwd -P)/$(basename "$installed_script")"
+
+  run "$installed_script" --update
+
+  assert_success
+  assert_output_contains "Latest release: v1.11.1"
+  assert_output_contains "Updated start-issue at: $expected_path"
+}
+
+@test "update exits successfully when already on the latest release tag" {
+  installed_script="$TEST_TMPDIR/bin/start-issue"
+  mkdir -p "$(dirname "$installed_script")"
+  build_installed_start_issue "$installed_script" "1.11.1"
+  create_fake_release_assets "$TEST_TMPDIR/release-assets-current" "1.11.1"
+
+  run "$installed_script" update
+
+  assert_success
+  assert_output_contains "Installed version: v1.11.1"
+  assert_output_contains "Latest release: v1.11.1"
+  assert_output_contains "already up to date"
+}
+
+@test "update treats bare and v-prefixed versions as equivalent" {
+  installed_script="$TEST_TMPDIR/bin/start-issue"
+  mkdir -p "$(dirname "$installed_script")"
+  build_installed_start_issue "$installed_script" "1.11.1"
+  create_fake_release_assets "$TEST_TMPDIR/release-assets-normalized" "1.11.1"
+
+  run "$installed_script" --update
+
+  assert_success
+  assert_output_contains "Installed version: v1.11.1"
+  assert_output_contains "Latest release: v1.11.1"
+  assert_output_contains "already up to date"
+}
+
+@test "update does not downgrade when installed version is newer than the latest release" {
+  installed_script="$TEST_TMPDIR/bin/start-issue"
+  mkdir -p "$(dirname "$installed_script")"
+  build_installed_start_issue "$installed_script" "1.12.0"
+  create_fake_release_assets "$TEST_TMPDIR/release-assets-older" "1.11.1"
+
+  run "$installed_script" update
+
+  assert_success
+  assert_output_contains "Installed version: v1.12.0"
+  assert_output_contains "Latest release: v1.11.1"
+  assert_output_contains "newer than the latest published release"
+  run "$installed_script" --version
+  assert_success
+  assert_output_contains "start-issue v1.12.0"
+}
+
+@test "update works outside a git repository" {
+  installed_script="$TEST_TMPDIR/bin/start-issue"
+  outside_dir="$TEST_TMPDIR/outside"
+  mkdir -p "$(dirname "$installed_script")" "$outside_dir"
+  build_installed_start_issue "$installed_script" "1.11.1"
+  create_fake_release_assets "$TEST_TMPDIR/release-assets-outside" "1.11.1"
+  expected_path="$(cd "$(dirname "$installed_script")" && pwd -P)/$(basename "$installed_script")"
+
+  run bash -c "cd '$outside_dir' && '$installed_script' update"
+
+  assert_success
+  assert_output_contains "Executable: $expected_path"
+  assert_output_contains "already up to date"
+}
+
+@test "update fails clearly when latest release lookup fails" {
+  installed_script="$TEST_TMPDIR/bin/start-issue"
+  mkdir -p "$(dirname "$installed_script")"
+  build_installed_start_issue "$installed_script" "1.11.0"
+
+  run "$installed_script" update
+
+  assert_failure
+  assert_output_contains "Failed to resolve the latest GitHub release"
+}
+
+@test "update rejects mixing update mode with issue input" {
+  run_start_issue 1 --update
+
+  assert_failure
+  assert_output_contains "Use either update or <issue-url-or-number>, not both."
+  [[ "$output" != *"Fetching issue"* ]]
 }
 
 @test "HTTPS origin remote is parsed" {

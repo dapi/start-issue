@@ -29,6 +29,8 @@
 | `cli.sh` | CLI parsing и нормализация входных флагов |
 | `config.sh` | Разрешение agent/prompt config и prompt rendering |
 | `github.sh` | Parse issue input, detect repo/base branch, fetch issue metadata |
+| `release.sh` | Release download, checksum verification, and version normalization helpers shared by install/update flows |
+| `update.sh` | Self-update mode, latest-release lookup, version comparison, and install orchestration |
 | `worktree.sh` | Branch naming, worktree planning, worktree/init/zellij side effects |
 | `agent.sh` | Agent adapter contract: validate, branch-name generation, prompt improvement, launch command |
 | `output.sh` | Help, status rendering, dry-run output, session header |
@@ -52,6 +54,7 @@ Agent-specific behavior должен быть централизован за е
 |----------|--------|---------|
 | Issue | URL или номер | `https://github.com/owner/repo/issues/123` или `123` |
 | Config init | Литерал `init` | `start-issue init` |
+| Update | Литерал `update` | `start-issue update` |
 
 Если Issue не передан, команда печатает справку и текущую конфигурацию:
 выбранный agent с источником, prompt source, prompt location и короткий prompt
@@ -80,6 +83,7 @@ preview. Этот путь не обращается к GitHub и заверша
 | `--user` | Для `init`: записать пользовательскую конфигурацию в `~/.config/start-issue` | интерактивный выбор |
 | `--force` | Для `init`: перезаписать существующие `agent`, `prompt.md` и при необходимости сбросить `model` к unset | false |
 | `--dry-run` | Показать действия, не выполняя worktree/init/agent launch | false |
+| `--update` | Включить режим self-update для запущенного executable | false |
 
 ## Приоритет конфигурации
 
@@ -146,6 +150,28 @@ git rev-parse --show-toplevel
 
 Существующие файлы не перезаписываются. `--force` перезаписывает `agent` и `prompt.md`; существующий `model` файл либо заменяется новым значением, либо удаляется для возврата к built-in unset.
 
+## Self-update
+
+`start-issue update` и `start-issue --update` запускают один и тот же update workflow.
+
+Контракт режима:
+
+1. Команда не требует git repository и не должна вызывать repo detection, issue parsing, base branch detection, worktree planning или запуск агента.
+2. Latest release определяется через GitHub Releases для `dapi/start-issue`.
+3. Текущая установленная версия берется из executable, который пользователь реально запустил.
+4. Перед сравнением версии нормализуются удалением одного опционального префикса `v`.
+5. Если текущая версия равна latest release или новее него, команда завершается с кодом `0` и не переустанавливает бинарник.
+6. Если latest release новее, команда скачивает `start-issue` и `start-issue.sha256`, проверяет checksum и устанавливает обновление в тот же executable path.
+7. Ошибки release lookup, download, checksum verification и install являются фатальными и должны давать понятное сообщение.
+
+Зависимости режима:
+
+- `gh` CLI с авторизованной GitHub session
+- `jq`
+- `curl` или `wget`
+- `install`
+- один из `sha256sum`, `shasum` или `openssl`
+
 ## Prompt templates
 
 Claude без явного override использует совместимый plugin-native prompt:
@@ -203,6 +229,15 @@ Templating правила:
 5. Execute the plan.
 6. Launch the selected agent.
 
+Для self-update действует отдельный top-level workflow:
+
+1. Parse input.
+2. Resolve the running executable path and current version.
+3. Resolve the latest GitHub Release metadata.
+4. Normalize and compare installed vs latest release versions.
+5. If latest is newer, download asset and checksum, verify, install, and print the resulting version.
+6. Otherwise print a no-op success status.
+
 ### Фаза 0: Config init
 
 Если первый positional argument равен `init`:
@@ -229,6 +264,27 @@ Templating правила:
 9. Проверить наличие CLI выбранного agent, если agent не `none` и режим не `--dry-run`.
 10. Выбрать prompt template.
 11. Если включен `--improve-prompt`, сгенерировать proposal улучшенного prompt template и завершить workflow до worktree/agent launch.
+
+Если включен update mode:
+
+1. Не требовать `git` и не проверять текущую директорию как git repository.
+2. Проверить зависимости update workflow: `gh`, `jq`, `install` и download/checksum tooling.
+3. Получить latest release metadata через:
+
+```bash
+gh api "repos/dapi/start-issue/releases/latest"
+```
+
+4. Извлечь:
+
+- `tag_name`
+- `browser_download_url` для asset `start-issue`
+- `browser_download_url` для asset `start-issue.sha256`
+
+5. Нормализовать installed version и `tag_name`, удалив один опциональный префикс `v`.
+6. Если versions равны, завершиться с понятным сообщением `already up to date`.
+7. Если installed version новее latest published release, завершиться с кодом `0` и сообщением, что update не нужен.
+8. Если latest published release новее, скачать оба asset, проверить checksum и установить обновление в путь текущего executable.
 
 ### Фаза 2: Получение issue
 
