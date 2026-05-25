@@ -4,6 +4,7 @@
 #
 # Usage: start-issue <issue-url-or-number> [options]
 #        start-issue init [options]
+#        start-issue setup [options]
 #
 # Options:
 #   --repo, -r <owner/repo>    Repository (default: from git remote)
@@ -52,6 +53,7 @@ PROJECT_ROOT=""
 INIT_CONFIG=false
 INIT_SCOPE=""
 INIT_FORCE=false
+SETUP_MODE=false
 UPDATE_MODE=false
 
 AGENT=""
@@ -139,10 +141,6 @@ source "$LIB_DIR/pipeline.sh"
 main() {
     parse_args "$@"
 
-    if [[ "$MISSING_ISSUE" == "true" ]]; then
-        handle_missing_issue_mode
-    fi
-
     echo -e "${BLUE}start-issue${NC} v$VERSION"
     echo ""
 
@@ -151,9 +149,20 @@ main() {
         return
     fi
 
+    if [[ "$SETUP_MODE" == "true" ]]; then
+        run_setup_mode
+        return
+    fi
+
     if [[ "$UPDATE_MODE" == "true" ]]; then
         run_update_mode
         return
+    fi
+
+    maybe_run_first_run_onboarding
+
+    if [[ "$MISSING_ISSUE" == "true" ]]; then
+        handle_missing_issue_mode
     fi
 
     run_start_issue_pipeline

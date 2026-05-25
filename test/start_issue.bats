@@ -9,6 +9,7 @@ setup() {
 
   export HOME="$TEST_TMPDIR/home"
   mkdir -p "$HOME"
+  mkdir -p "$HOME/.config/start-issue"
 
   TEST_REPO="$TEST_TMPDIR/repo"
   mkdir -p "$TEST_REPO"
@@ -199,6 +200,16 @@ install_fake_zellij_tab_status() {
   assert_output_contains "start-issue --update"
 }
 
+@test "help documents setup entry points" {
+  run_start_issue --help
+
+  assert_success
+  assert_output_contains "start-issue setup [options]"
+  assert_output_contains "--setup"
+  assert_output_contains "start-issue setup"
+  assert_output_contains "start-issue --setup"
+}
+
 @test "missing issue prints project agent and prompt file location" {
   mkdir -p .start-issue
   printf "codex\n" > .start-issue/agent
@@ -236,6 +247,85 @@ install_fake_zellij_tab_status() {
   assert_output_contains "Example: start-issue 123 --improve-prompt"
   [[ "$output" != *"Current configuration:"* ]]
   [[ "$output" != *"Fetching issue"* ]]
+}
+
+@test "setup subcommand writes user config with selected agent and prompt" {
+  run bash -c 'printf "2\ny\n" | "$REPO_ROOT/scripts/start-issue" setup'
+
+  assert_success
+  assert_output_contains "Select default agent:"
+  assert_output_contains "Save this prompt to $HOME/.config/start-issue/prompt.md? [Y/n]"
+  [[ "$(cat "$HOME/.config/start-issue/agent")" == "codex" ]]
+  [[ "$(cat "$HOME/.config/start-issue/prompt.md")" == *"Implement GitHub issue {ISSUE_URL} in this worktree."* ]]
+}
+
+@test "--setup supports skip agent and declined prompt" {
+  printf "old-agent\n" > "$HOME/.config/start-issue/agent"
+  printf "old-prompt\n" > "$HOME/.config/start-issue/prompt.md"
+
+  run bash -c 'printf "5\nn\n" | "$REPO_ROOT/scripts/start-issue" --setup'
+
+  assert_success
+  [[ ! -e "$HOME/.config/start-issue/agent" ]]
+  [[ ! -e "$HOME/.config/start-issue/prompt.md" ]]
+}
+
+@test "setup works outside a git repository" {
+  outside_dir="$TEST_TMPDIR/outside-setup"
+  rm -rf "$HOME/.config/start-issue"
+  mkdir -p "$outside_dir"
+
+  run bash -c "cd '$outside_dir' && printf '1\ny\n' | '$REPO_ROOT/scripts/start-issue' setup"
+
+  assert_success
+  assert_output_contains "Directory: $HOME/.config/start-issue"
+  [[ "$(cat "$HOME/.config/start-issue/agent")" == "claude" ]]
+  [[ "$(cat "$HOME/.config/start-issue/prompt.md")" == "/task-router:route-task {ISSUE_URL}" ]]
+}
+
+@test "first run without config prompts onboarding and then shows missing issue guidance" {
+  rm -rf "$HOME/.config/start-issue"
+
+  run bash -c 'printf "n\n" | "$REPO_ROOT/scripts/start-issue"'
+
+  assert_failure
+  assert_output_contains "Configuration is not initialized yet."
+  assert_output_contains "Run setup now? [Y/n]"
+  assert_output_contains "Error: missing issue URL or issue number"
+  [[ -d "$HOME/.config/start-issue" ]]
+  [[ ! -e "$HOME/.config/start-issue/agent" ]]
+  [[ ! -e "$HOME/.config/start-issue/prompt.md" ]]
+}
+
+@test "first run decline continues the requested issue workflow" {
+  rm -rf "$HOME/.config/start-issue"
+
+  run bash -c 'printf "n\n" | "$REPO_ROOT/scripts/start-issue" 1 --no-init --no-agent'
+
+  assert_success
+  assert_output_contains "Configuration is not initialized yet."
+  assert_output_contains "Run setup now? [Y/n]"
+  assert_output_contains "Fetching issue #1 from owner/repo"
+  assert_output_contains "Selected agent: none (CLI)"
+  [[ -d "$HOME/.config/start-issue" ]]
+  [[ ! -e "$HOME/.config/start-issue/agent" ]]
+  [[ ! -e "$HOME/.config/start-issue/prompt.md" ]]
+}
+
+@test "first run accept continues the requested issue workflow with saved config" {
+  rm -rf "$HOME/.config/start-issue"
+
+  run bash -c 'printf "y\n2\ny\n" | "$REPO_ROOT/scripts/start-issue" 1 --no-init'
+
+  assert_success
+  assert_output_contains "Configuration is not initialized yet."
+  assert_output_contains "Run setup now? [Y/n]"
+  assert_output_contains "Fetching issue #1 from owner/repo"
+  assert_output_contains "Agent: codex"
+  assert_output_contains "Agent source: $HOME/.config/start-issue/agent"
+  assert_output_contains "fake codex invoked"
+  [[ "$(cat "$HOME/.config/start-issue/agent")" == "codex" ]]
+  [[ "$(cat "$HOME/.config/start-issue/prompt.md")" == *"Implement GitHub issue {ISSUE_URL} in this worktree."* ]]
 }
 
 @test "full issue URL overrides detected repository" {
