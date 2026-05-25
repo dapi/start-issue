@@ -1,17 +1,16 @@
 ---
-title: "FT-014: Codex batch human-gate mode with resume flow"
+title: "FT-014: First-run setup onboarding for user config"
 doc_kind: feature
 doc_function: canonical
-purpose: "Canonical feature document for adding a Codex batch human-gate workflow to start-issue. Owns only the problem space and verification contract."
+purpose: "Canonical feature document for adding `setup` and first-run user-config onboarding to start-issue. Owns only the problem space and verification contract."
 derived_from:
-  - https://github.com/dapi/start-issue/issues/26
+  - https://github.com/dapi/start-issue/issues/25
   - ../../../README.md
   - ../../../README.ru.md
   - ../../../doc/spec.md
-  - ../../../scripts/lib/start_issue/agent.sh
-  - ../../../scripts/lib/start_issue/cli.sh
+  - ../../../scripts/lib/start_issue/init.sh
+  - ../../../scripts/lib/start_issue/config.sh
   - ../../../scripts/lib/start_issue/output.sh
-  - ../../../scripts/lib/start_issue/pipeline.sh
 status: active
 delivery_status: in_progress
 audience: humans_and_agents
@@ -20,94 +19,94 @@ must_not_define:
   - implementation_sequence
 ---
 
-# FT-014: Codex batch human-gate mode with resume flow
+# FT-014: First-run setup onboarding for user config
 
 ## What
 
 ### Problem
 
-`start-issue` can already prepare an issue worktree and launch Codex interactively, and the repository already uses `codex exec` for non-interactive helper operations such as branch-name generation and prompt improvement. But there is no first-class workflow that lets Codex work unattended on an issue and then reopen the exact same saved session only when a human decision is required.
-
-Issue #26 asks for a Codex-oriented mode that:
-
-1. prepares the issue worktree and prompt exactly like the normal issue flow;
-2. runs Codex non-interactively;
-3. exits successfully without opening an interactive session when the final status is `DONE`;
-4. resumes the same Codex session interactively when the final status is `HUMAN_GATE`.
+`start-issue` already has `init`, and user-scoped config can be stored under `~/.config/start-issue`, but the current UX is oriented toward a technical/manual setup flow. There is no dedicated first-run onboarding entry point, and ordinary launches do not detect that the user config directory has never been initialized.
 
 ### Outcome
 
-`start-issue 123 --agent codex --human-gate` becomes a first-class Codex-only workflow that runs `codex exec` in a resumable, non-ephemeral mode, captures the resulting `thread_id`, interprets the final status from the saved last-message file, and either exits `0` on `DONE` or resumes the same session by explicit thread id on `HUMAN_GATE`.
+`start-issue` exposes a friendly user-level onboarding flow through both `start-issue setup` and `start-issue --setup`, and ordinary non-setup launches offer a one-time first-run prompt when `~/.config/start-issue` does not exist yet.
 
 ### Scope
 
-- `REQ-01` Add a `--human-gate` mode for issue-starting workflows and make it valid only when the resolved agent is `codex`.
-- `REQ-02` Preserve the normal issue-start preparation flow in this mode: resolve issue/repo/base branch, create or reuse the worktree, run optional `init.sh`, and render the selected prompt before invoking Codex.
-- `REQ-03` In `--human-gate` mode, replace the normal interactive Codex launch with a non-interactive `codex exec` invocation that emits JSON events, saves the last message, and remains resumable.
-- `REQ-04` Capture `thread_id` from the `codex exec --json` event stream and store it alongside other per-run state artifacts in a predictable directory under the prepared worktree.
-- `REQ-05` Parse the final status from the saved last-message file, recognize `STATUS: DONE` and `STATUS: HUMAN_GATE`, and fail clearly when the status or required thread id is missing.
-- `REQ-06` If the final status is `DONE`, exit `0` without opening an interactive Codex TUI.
-- `REQ-07` If the final status is `HUMAN_GATE`, resume the same Codex session by explicit thread id using `codex resume --include-non-interactive`, not `--last`.
-- `REQ-08` Document the mode in normal help and provide dedicated help that explains the flow, prompt contract, examples, exit codes, state artifacts, and troubleshooting.
-- `REQ-09` Cover the mode with automated tests for command generation, `DONE`, `HUMAN_GATE`, missing status, missing thread id, and Codex-only validation.
+- `REQ-01` Support both `start-issue setup` and `start-issue --setup` as equivalent entry points for interactive user-config onboarding.
+- `REQ-02` `setup` works against `~/.config/start-issue` only: it creates the directory when missing and never writes project config under `.start-issue`.
+- `REQ-03` `setup` asks the user to choose a default agent from `claude`, `codex`, `kimi`, `pi`, or skip, and if the user skips, no `agent` file is created.
+- `REQ-04` `setup` derives the default prompt from the same built-in prompt contract used by current config initialization, shows that prompt to the user, and writes `prompt.md` only when the user explicitly confirms.
+- `REQ-05` During an ordinary non-setup launch, if `~/.config/start-issue` does not exist, the command prints compact usage, reports that configuration is not initialized, and offers to run setup.
+- `REQ-06` If the user declines first-run onboarding, `start-issue` creates an empty `~/.config/start-issue` directory, does not create `agent` or `prompt.md`, and does not show first-run onboarding automatically again on later launches.
+- `REQ-07` After the first-run gate is resolved, the current command continues in the originally selected mode instead of silently exiting early.
+- `REQ-08` Keep `start-issue init` available for backward compatibility and manual config workflows; `setup` becomes the friendly user-onboarding entry point rather than replacing `init`.
+- `REQ-09` `setup` does not require an issue argument, git repository context, `gh`, or issue-fetch dependencies; it is a user-config workflow only.
+- `REQ-10` Update `README.md`, `README.ru.md`, `doc/spec.md`, help text, and automated coverage for the new setup flow, first-run prompt, user-config file behavior, and `init`/`setup` relationship.
 
 ### Non-Scope
 
-- `NS-01` Do not generalize the mode to Claude, Kimi, Pi, or `agent=none` in this feature.
-- `NS-02` Do not redesign normal interactive Codex launches when `--human-gate` is not selected.
-- `NS-03` Do not add generic session listing, resume browsing, or cleanup subcommands beyond what is required for this Codex-only flow.
-- `NS-04` Do not invent a new prompt templating system; the mode reuses the existing prompt resolution and rendering workflow.
+- `NS-01` Do not redesign project-scoped `.start-issue` initialization.
+- `NS-02` Do not change issue fetching, worktree creation, prompt-improvement behavior, or self-update behavior beyond what the first-run gate requires.
+- `NS-03` Do not add a richer config editor for model, worktree directory, or other settings not named in issue #25.
+- `NS-04` Do not remove `init` or change its existing scope-selection semantics except where docs must distinguish it from `setup`.
 
 ### Constraints
 
-- `CON-01` The mode must be resumable, so it must not rely on ephemeral Codex execution.
-- `CON-02` The resumed interactive session must target the exact saved `thread_id`, not whichever session happens to be most recent.
-- `CON-03` Unknown or missing final status is a hard failure and must point the user to the saved last-message artifact.
-- `CON-04` The normal `start-issue ISSUE` workflow remains behaviorally unchanged when `--human-gate` is absent.
-- `CON-05` Dedicated help must describe the exact final-status contract instead of leaving it implicit in example prompts.
+- `CON-01` The setup target directory is `~/.config/start-issue`.
+- `CON-02` Skipping agent selection must leave the user-level agent config absent rather than writing a sentinel value.
+- `CON-03` Declining prompt persistence must leave `prompt.md` absent.
+- `CON-04` The first-run experience must be compact and must not print the full `--help`.
+- `CON-05` First-run onboarding is one-time per presence of `~/.config/start-issue`; the directory itself is the completion marker.
+- `CON-06` Ordinary issue-starting behavior must remain intact after the first-run gate completes.
+- `CON-07` Explicit setup must remain usable outside a git repository because it owns only user-level configuration.
 
 ## Verify
 
 ### Exit Criteria
 
-- `EC-01` `--human-gate` is accepted only for resolved agent `codex` and leaves other agents on a clear failure path.
-- `EC-02` The mode prepares the issue worktree normally, then runs Codex through a resumable non-interactive `codex exec` path that records JSON events, last message, and thread id.
-- `EC-03` `STATUS: DONE` exits `0` without opening interactive Codex, while `STATUS: HUMAN_GATE` resumes the same session by explicit thread id.
-- `EC-04` Missing or unrecognized final status, missing thread id, or failed resume produce the documented non-zero exit behavior and actionable diagnostics.
-- `EC-05` Help, spec, and automated coverage document the mode consistently, including prompt contract, examples, exit codes, and state-artifact location.
+- `EC-01` `start-issue setup` and `start-issue --setup` both enter the same interactive user-config onboarding workflow.
+- `EC-02` Setup writes only the confirmed user-level files in `~/.config/start-issue` and preserves omission semantics for skipped agent and declined prompt persistence.
+- `EC-03` An ordinary first run without `~/.config/start-issue` shows compact onboarding, creates the directory on acceptance or decline, and does not repeat onboarding automatically once the directory exists.
+- `EC-04` Declining first-run onboarding still allows the originally requested non-setup command to continue with existing defaults.
+- `EC-05` Docs, help text, spec, and tests describe the same `setup` behavior and the same relationship between `setup` and `init`.
+- `EC-06` Explicit setup remains usable outside a git repository and without issue-fetch prerequisites.
 
 ### Acceptance Scenarios
 
-- `SC-01` Given `start-issue 123 --agent codex --human-gate`, when the issue flow reaches agent launch, then the command runs `codex exec` rather than the normal interactive Codex launch and passes the rendered prompt through the batch path.
-- `SC-02` Given `start-issue 123 --agent codex --human-gate`, when `codex exec --json` emits `thread.started`, then the workflow stores the resulting `thread_id` in the per-run state directory.
-- `SC-03` Given the saved last message starts with `STATUS: DONE`, when the batch run completes, then `start-issue` exits `0` without opening interactive Codex.
-- `SC-04` Given the saved last message starts with `STATUS: HUMAN_GATE` and a `thread_id` was captured, when the batch run completes, then `start-issue` resumes `codex resume --include-non-interactive "$thread_id"`.
-- `SC-05` Given `STATUS: HUMAN_GATE` but interactive resume cannot be opened, when the batch run completes, then the command exits `2` after printing the resume command and thread id.
-- `SC-06` Given the saved last message has no recognized final status, when the batch run completes, then the command exits `1` and points to the saved last-message file.
-- `SC-07` Given `--human-gate` is used with resolved agent `claude`, `kimi`, `pi`, or `none`, when parsing and validation complete, then the command exits with a clear Codex-only validation error.
-- `SC-08` Given `start-issue --human-gate-help`, when the command prints dedicated help, then the output explains the mode flow, final-status contract, exit codes, state artifacts, troubleshooting, and examples.
+- `SC-01` Given `~/.config/start-issue` does not exist, when the user runs `start-issue setup`, then the command creates the directory, asks for agent selection, shows the derived default prompt, and writes only the files the user confirms.
+- `SC-02` Given `~/.config/start-issue` does not exist, when the user runs `start-issue --setup`, then the command performs the same onboarding workflow as the subcommand form.
+- `SC-03` Given setup is running and the user chooses `skip` for agent selection, when the workflow completes, then `~/.config/start-issue/agent` is absent.
+- `SC-04` Given setup is running and the user declines prompt persistence, when the workflow completes, then `~/.config/start-issue/prompt.md` is absent.
+- `SC-05` Given an ordinary non-setup launch and `~/.config/start-issue` does not exist, when the command starts, then it prints compact usage plus a setup prompt before the normal workflow continues.
+- `SC-06` Given the user declines first-run onboarding during an ordinary non-setup launch, when the command continues, then `~/.config/start-issue` exists, `agent` and `prompt.md` remain absent, and future ordinary launches no longer show first-run onboarding automatically.
+- `SC-07` Given the user accepts first-run onboarding during an ordinary non-setup launch, when setup finishes, then the original command continues with the normal workflow using the resolved config state.
+- `SC-08` Given the user runs `start-issue init`, when config initialization is requested, then the existing `init` scope-selection and file-writing workflow remains available.
+- `SC-09` Given the user runs `start-issue setup` outside a git repository, when onboarding starts, then it still works against `~/.config/start-issue` without requiring repo discovery or issue fetching.
+- `SC-10` Given the user runs `start-issue` without an issue after first-run onboarding has already been completed or bypassed, when the command prints guidance, then it keeps the compact missing-issue output and does not reopen onboarding.
 
 ### Traceability Matrix
 
 | Requirement ID | Acceptance refs | Checks | Evidence IDs |
 | --- | --- | --- | --- |
-| `REQ-01` | `EC-01`, `SC-07` | `CHK-01`, `CHK-02` | `EVID-01` |
+| `REQ-01` | `EC-01`, `SC-01`, `SC-02` | `CHK-01`, `CHK-02` | `EVID-01` |
 | `REQ-02` | `EC-02`, `SC-01` | `CHK-02` | `EVID-01` |
-| `REQ-03` | `EC-02`, `SC-01` | `CHK-01`, `CHK-02` | `EVID-01` |
-| `REQ-04` | `EC-02`, `SC-02` | `CHK-02` | `EVID-01` |
-| `REQ-05` | `EC-03`, `EC-04`, `SC-03`, `SC-04`, `SC-06` | `CHK-01`, `CHK-02` | `EVID-01` |
-| `REQ-06` | `EC-03`, `SC-03` | `CHK-02` | `EVID-01` |
-| `REQ-07` | `EC-03`, `EC-04`, `SC-04`, `SC-05` | `CHK-01`, `CHK-02` | `EVID-01` |
-| `REQ-08` | `EC-05`, `SC-08` | `CHK-03` | `EVID-01` |
-| `REQ-09` | `EC-05`, `SC-01` - `SC-08` | `CHK-02` | `EVID-01` |
+| `REQ-03` | `EC-02`, `SC-01`, `SC-03` | `CHK-02` | `EVID-01` |
+| `REQ-04` | `EC-02`, `SC-01`, `SC-04` | `CHK-02` | `EVID-01` |
+| `REQ-05` | `EC-03`, `SC-05`, `SC-10` | `CHK-02`, `CHK-03` | `EVID-01` |
+| `REQ-06` | `EC-03`, `EC-04`, `SC-06` | `CHK-02` | `EVID-01` |
+| `REQ-07` | `EC-04`, `SC-06`, `SC-07` | `CHK-02` | `EVID-01` |
+| `REQ-08` | `EC-05`, `SC-08` | `CHK-02`, `CHK-03` | `EVID-01` |
+| `REQ-09` | `EC-06`, `SC-09` | `CHK-02` | `EVID-01` |
+| `REQ-10` | `EC-05`, `SC-05`, `SC-08`, `SC-10` | `CHK-01`, `CHK-02`, `CHK-03` | `EVID-01` |
 
 ### Checks
 
 | Check ID | Covers | How to check | Expected |
 | --- | --- | --- | --- |
-| `CHK-01` | `EC-01`, `EC-02`, `EC-03`, `EC-04` | `bash -n scripts/start-issue scripts/lib/start_issue/*.sh` | CLI/help/pipeline/Codex batch helpers remain syntactically valid. |
-| `CHK-02` | `EC-01`, `EC-02`, `EC-03`, `EC-04`, `EC-05`, `SC-01` - `SC-08` | `mise exec -- bats test/start_issue.bats` | Automated coverage passes for command generation, status parsing, resume behavior, missing-state failures, dedicated help, and Codex-only validation. |
-| `CHK-03` | `EC-05`, `SC-08` | `git diff --check` | Feature docs, help, and spec edits are internally consistent and whitespace-clean. |
+| `CHK-01` | `EC-01`, `EC-05` | `bash -n scripts/start-issue scripts/lib/start_issue/*.sh` | CLI parsing, onboarding helpers, and help/output changes remain syntactically valid. |
+| `CHK-02` | `EC-01`, `EC-02`, `EC-03`, `EC-04`, `EC-05`, `EC-06`, `SC-01` - `SC-10` | `mise exec -- bats test` | Automated coverage proves both setup entry points, outside-git setup, first-run accept/decline behavior, file omission semantics, continued normal execution, and `init` compatibility. |
+| `CHK-03` | `EC-03`, `EC-05`, `SC-05`, `SC-08`, `SC-10` | `git diff --check` | Help, docs, spec, and feature docs remain internally consistent and whitespace-clean. |
 
 ### Test Matrix
 
@@ -119,7 +118,7 @@ Issue #26 asks for a Codex-oriented mode that:
 
 ### Evidence
 
-- `EVID-01` Verification command output showing Codex batch command generation, thread-id capture, final-status handling, resume behavior, and dedicated-help coverage.
+- `EVID-01` Verification command output showing setup entry-point equivalence, outside-git setup, first-run accept/decline behavior, user-config file writes/omissions, continued normal execution, and unchanged `init` availability.
 
 ### Evidence Contract
 

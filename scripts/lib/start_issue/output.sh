@@ -15,12 +15,14 @@ Start working on a GitHub issue with git worktree and a configurable agent
 
 Usage: start-issue <issue-url-or-number> [options]
        start-issue init [options]
+       start-issue setup [options]
        start-issue update [options]
 
 Arguments:
   <issue-url-or-number>    GitHub issue URL or issue number
                            Examples: 123, https://github.com/owner/repo/issues/123
   init                     Create default start-issue configuration
+  setup                    Run first-run user configuration onboarding
   update                   Update the running start-issue installation
 
 Options:
@@ -51,6 +53,7 @@ Options:
   --user                     With init: write config in ~/.config/start-issue
   --force                    With init: overwrite existing config files
   --dry-run                  Show what would be done without executing
+  --setup                    Run first-run user configuration onboarding
   --update                   Update the running start-issue installation
   --version, -v              Show version
   --help, -h                 Show this help
@@ -109,9 +112,11 @@ Examples:
   start-issue 123 --flat                  # Flat worktree path
   start-issue 123 --dry-run
   start-issue init
+  start-issue setup
   start-issue init --project --agent codex --model gpt-5.2
   start-issue init --project --agent codex
   start-issue init --user --force
+  start-issue --setup
   start-issue update
   start-issue --update
   start-issue --human-gate-help
@@ -228,18 +233,27 @@ Start working on a GitHub issue with git worktree and a configurable agent
 
 Usage: start-issue <issue-url-or-number> [options]
        start-issue init [options]
+       start-issue setup [options]
        start-issue update [options]
 
 Examples:
   start-issue 123
   start-issue https://github.com/owner/repo/issues/123
   start-issue 123 --agent codex
+  start-issue setup
   start-issue init --project
 
 Prompt variables:
   {ISSUE_URL}, {ISSUE_NUMBER}, {ISSUE_TITLE}, {ISSUE_BODY}, {ISSUE_LABELS},
   {REPO}, {BRANCH_NAME}, {WORKTREE_PATH}, {BASE_BRANCH}
 EOF
+}
+
+show_first_run_onboarding_prompt() {
+    echo "Configuration is not initialized yet."
+    echo ""
+    echo "Usage: start-issue <issue-url-or-number> [options]"
+    echo ""
 }
 
 print_agent_model_file_locations() {

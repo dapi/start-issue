@@ -1,4 +1,20 @@
 # shellcheck shell=bash disable=SC2153
+maybe_run_first_run_onboarding() {
+    if [[ -d "$USER_CONFIG_DIR" ]]; then
+        return
+    fi
+
+    show_first_run_onboarding_prompt
+
+    if confirm_yes_default "Run setup now? [Y/n] "; then
+        run_setup_flow
+    else
+        materialize_first_run_marker
+    fi
+
+    echo ""
+}
+
 start_agent_session() {
     if [[ "$AGENT" == "none" ]]; then
         print_manual_next_steps

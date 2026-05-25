@@ -4,14 +4,12 @@ doc_kind: feature
 doc_function: decision_log
 purpose: "Resolved local decisions and conflict handling for FT-014. Stores only decisions grounded in the current feature package and in-scope artifacts."
 derived_from:
-  - https://github.com/dapi/start-issue/issues/26
+  - https://github.com/dapi/start-issue/issues/25
   - feature.md
   - solution.md
-  - ../../../scripts/lib/start_issue/agent.sh
-  - ../../../scripts/lib/start_issue/cli.sh
+  - ../../../scripts/lib/start_issue/init.sh
+  - ../../../scripts/lib/start_issue/config.sh
   - ../../../scripts/lib/start_issue/output.sh
-  - ../../../scripts/lib/start_issue/pipeline.sh
-  - ../../../test/helpers/fake-bin/codex
 status: active
 audience: humans_and_agents
 ---
@@ -22,108 +20,143 @@ audience: humans_and_agents
 
 | Decision ID | Date | Status | Topic | Decision |
 | --- | --- | --- | --- | --- |
-| `DL-01` | 2026-05-24 | accepted | Agent scope | `--human-gate` is Codex-only in FT-014 and must fail clearly for any resolved non-Codex agent. |
-| `DL-02` | 2026-05-24 | accepted | Dedicated help surface | Dedicated human-gate documentation is exposed through `--human-gate-help`, while normal `--help` mentions the mode briefly. |
-| `DL-03` | 2026-05-24 | accepted | Run-state artifacts | Human-gate runs store `events.jsonl`, `last-message.txt`, and `thread-id` under `<worktree>/.start-issue/runs/<timestamp>/` and keep those artifacts for diagnostics and resume fidelity. |
-| `DL-04` | 2026-05-24 | accepted | Final-status parser | The saved last-message artifact is authoritative; only `STATUS: DONE` and `STATUS: HUMAN_GATE` are recognized terminal statuses. |
-| `DL-05` | 2026-05-24 | accepted | Resume failure contract | If `HUMAN_GATE` was reached but interactive resume could not be opened, the command exits `2` after printing the exact resume command and captured thread id. |
+| `DL-01` | 2026-05-24 | accepted | `setup` versus `init` | Keep `init` for backward-compatible manual and project-scoped initialization, and add `setup` as the friendly user-only onboarding entry point for `~/.config/start-issue`. |
+| `DL-02` | 2026-05-24 | accepted | Skip-agent semantics | In setup, "skip" means do not create `~/.config/start-issue/agent`; it does not write `none` or another sentinel value. |
+| `DL-03` | 2026-05-24 | accepted | Prompt baseline for setup | Setup derives the previewed default prompt from the same built-in prompt rules already used by config initialization for the effective onboarding agent state. |
+| `DL-04` | 2026-05-24 | accepted | First-run continuation | On ordinary launches, the first-run onboarding gate resolves before the normal pipeline, but after accept or decline the original command continues instead of exiting. |
+| `DL-05` | 2026-05-24 | accepted | Explicit setup runtime boundary | `setup` is repo-independent and issue-independent because it owns only user-level configuration under `~/.config/start-issue`. |
 
 ## FPF-Closed Questions
 
-### `FPF-01`: Should `--human-gate` be rejected or ignored for non-Codex agents?
+### `FPF-01`: Should `setup` replace `init`, or coexist with it?
 
 #### Why this mattered
 
-Issue #26 explicitly proposes a Codex-oriented workflow and says the option should be rejected or clearly ignored for non-Codex agents unless a generic implementation is intentionally supported later. The document set needed one explicit contract so feature, solution, plan, and future tests would not drift.
+Issue #25 explicitly names two possible directions: keep `setup` separate from `init`, or make `setup` the recommended UX while keeping `init` for technical/manual use. The document set needed one stable contract before feature scope, solution, and implementation plan could align.
 
 #### Available facts
 
-- Issue #26 defines the workflow in terms of `codex exec`, `thread.started`, `codex resume --include-non-interactive`, and Codex-specific final-status handling.
-- Current `scripts/lib/start_issue/agent.sh` already centralizes agent-specific launch and non-interactive behavior and uses `codex exec` only for Codex paths.
-- Current repository facts do not show equivalent resumable session or JSON event contracts for Claude, Kimi, or Pi.
+- Issue #25 says the task is to add a new `setup` command and `--setup` flag for interactive first-run configuration in `~/.config/start-issue`.
+- The same issue notes a preferred direction: keep `init` for backward compatibility and make `setup` the new friendly onboarding entry point.
+- Current code in `scripts/lib/start_issue/init.sh` already owns both project and user scopes, plus `--project`, `--user`, and `--force` semantics.
+- Current docs in `README.md`, `README.ru.md`, and `doc/spec.md` already describe `init` as an existing public command.
 
 #### FPF reasoning summary
 
-- Bounded contexts: generic issue workflow and Codex session-resume behavior are different semantic frames and should not be collapsed.
-- Propose -> analyze -> test: the smallest plausible extension is Codex-only; testing it against repo facts shows only Codex has grounded resumable-session evidence in the issue and current code patterns.
-- Surface precision restoration: the flag name could imply broader support than the evidence allows, so the contract needs an explicit boundary.
+- Bounded contexts: user-first onboarding and manual/project-capable initialization are related but not identical contexts.
+- Evidence discipline: the issue provides a stated preference and current code/docs prove that `init` already owns behavior beyond the issue's requested onboarding scope.
+- Decision rule: prefer the smallest change that satisfies the new UX without breaking a documented public command unnecessarily.
 
 #### Resolution
 
-Reject `--human-gate` for any resolved non-Codex agent in FT-014.
+Add `setup` as a user-only onboarding workflow for `~/.config/start-issue`, and keep `init` as the backward-compatible/manual initializer, including project scope.
 
 #### Conflict handled
 
-This resolves the issue's "rejected or clearly ignored" branch in favor of rejection because the current document set has evidence for one safe bounded context only: Codex. Ignoring the flag would look successful while silently skipping the requested behavior.
+This resolves the potential conflict between "new onboarding command" and the already documented `init` contract. `setup` becomes the preferred UX for user config, while `init` remains the technical/manual initializer rather than being silently redefined.
 
-### `FPF-02`: What dedicated-help surface fits the current CLI without inventing a second subcommand family?
+### `FPF-02`: If the user skips agent selection during setup, what should be written?
 
 #### Why this mattered
 
-Issue #26 requires dedicated help but gives multiple example entrypoints. The feature package needed one concrete user-facing surface.
+Issue #25 requires setup to let the user leave the default agent unspecified and says that in that case the `agent` file must not be created. The feature docs needed a precise meaning so later config resolution, docs, and tests would not diverge.
 
 #### Available facts
 
-- Current `scripts/lib/start_issue/cli.sh` supports two positional command families today: `init` and `update`.
-- Current `scripts/lib/start_issue/output.sh` owns a single normal help surface plus missing-issue help.
-- Current positional parsing treats unknown bare words as either `ISSUE_INPUT` or an error, so a help-only positional token would expand that grammar.
+- Issue #25 explicitly says "без указания / пропустить" must be allowed and that then the `agent` file is not created.
+- Current config resolution in `scripts/lib/start_issue/config.sh` falls back from missing config files to `START_ISSUE_AGENT`, then to the built-in default `claude`.
+- Current supported agent list includes `none`, but `none` means "do not launch an agent", not "unspecified default agent".
 
 #### FPF reasoning summary
 
-- Bounded contexts: "workflow invocation" and "documentation surface" are related but not identical; dedicated help does not need to become a new workflow family.
-- Propose -> analyze -> test: a flag-based help surface is the smallest new claim; when tested against current parser facts, it fits the established flag-help model with less parsing drift than a new positional help token.
-- Surface precision restoration: use a surface that says "this is help for the mode" directly, instead of overloading issue-position parsing.
+- Strict distinction: "no configured default agent" and "configured agent is none" are different states with different runtime meaning.
+- Evidence discipline: the current resolver already gives a clear meaning to absent user config files, so inventing a sentinel would add a second meaning unnecessarily.
+- Decision rule: preserve existing omission semantics when the issue explicitly allows omission.
 
 #### Resolution
 
-Use `--human-gate-help` as the dedicated help entrypoint and mention `--human-gate` briefly in normal `--help`.
+Implement setup skip as absence of `~/.config/start-issue/agent`. Do not write `none` or any other placeholder.
 
 #### Conflict handled
 
-This resolves the ambiguity between `start-issue human-gate --help` and `start-issue --human-gate-help` by choosing the surface that is best aligned with the current CLI grammar and current help ownership.
+This resolves the conflict between the existence of the `none` agent value in current CLI behavior and the issue's explicit "leave unspecified" requirement. The two states stay distinct.
 
-### `FPF-03`: Where should resumable run artifacts live, and should they be kept after the batch run?
+### `FPF-03`: Which prompt should setup preview when the user skips agent selection?
 
 #### Why this mattered
 
-Issue #26 requires a predictable state directory and also requires later interactive resume by exact thread id. The docs needed one artifact contract across solution, plan, and future tests.
+Issue #25 requires setup to generate and show a default prompt after agent selection, but it does not separately define the prompt baseline for the skip-agent case. The feature docs needed one grounded rule to avoid inconsistent docs and tests.
 
 #### Available facts
 
-- Issue #26 proposes `.start-issue/runs/<timestamp>/events.jsonl`, `last-message.txt`, and `thread-id` under the created worktree.
-- Current issue workflow already centers work product inside the prepared worktree, including prompt rendering and optional `init.sh`.
-- Current code has no separate global session registry owned by `start-issue`.
+- Current init logic in `scripts/lib/start_issue/init.sh` derives the default prompt from the selected effective agent: Claude gets the built-in Claude command; other agents get the portable prompt.
+- Current config resolution in `scripts/lib/start_issue/config.sh` falls back to built-in default agent `claude` when no user/project/environment agent is configured.
+- Issue #25 allows leaving the agent unspecified by omitting the `agent` file, not by changing the built-in default contract.
 
 #### FPF reasoning summary
 
-- Bounded contexts: issue work product and its human-gate execution evidence belong to the same local worktree context.
-- Propose -> analyze -> test: co-locating artifacts under the worktree is the simplest hypothesis; it matches the issue proposal and does not require inventing a second storage scope.
-- Trust and evidence discipline: keeping the artifacts after the run preserves the evidence needed to diagnose unknown statuses or failed resume handoffs.
+- Bounded contexts: setup preview should reflect the effective runtime baseline, not invent a third prompt contract.
+- Trust boundary: the strongest in-repo facts are the existing built-in prompt derivation rules and the current built-in default agent.
+- Decision rule: when the issue is silent, reuse the narrowest existing contract that keeps behavior predictable.
 
 #### Resolution
 
-Store `events.jsonl`, `last-message.txt`, and `thread-id` under `<worktree>/.start-issue/runs/<timestamp>/` and keep them by default.
+Setup derives the previewed default prompt from the effective onboarding agent state using the current built-in prompt rules. If the user skips agent selection, the preview uses the built-in default agent behavior, which today is the Claude default prompt.
 
 #### Conflict handled
 
-No cross-document conflict remained after aligning the state contract with the issue's proposed location and the repository's existing worktree-centered workflow.
+This resolves the gap between the issue's prompt-preview requirement and the lack of an explicit skip-agent prompt rule, while staying aligned with current init/config behavior.
 
-## Conflict Resolution
+### `FPF-04`: What happens to the original command after first-run onboarding is accepted or declined?
 
-- Resolved conflict: dedicated help is required, but the current CLI grammar has only `init` and `update` as positional subcommand families.
-  Conflicting sources:
-  issue #26 allows either a positional help surface or a flag help surface;
-  current `cli.sh` and `output.sh` are structured around flag-driven help and issue positional parsing.
-  Resolution:
-  choose `--human-gate-help` and keep human-gate help in the existing help-output ownership model.
-  Why this is consistent:
-  it adds the required documentation surface without redefining the CLI grammar more broadly than the feature needs.
+#### Why this mattered
 
-- Resolved conflict: the flag could look generic, but only Codex-specific resumable evidence is currently grounded.
-  Conflicting sources:
-  the flag name `--human-gate` sounds generic;
-  issue #26 and current code facts only ground Codex-specific batch and resume mechanics.
-  Resolution:
-  make FT-014 explicitly Codex-only and reject other agents.
-  Why this is consistent:
-  it matches the documented evidence boundary and avoids a misleading pseudo-generic contract.
+Issue #25 says ordinary launches should offer setup when the user config directory is missing, and also says that declining setup should create the empty directory so onboarding does not repeat. The documents needed to decide whether the command then exits or continues, because that materially affects orchestration, UX, and testing.
+
+#### Available facts
+
+- Issue #25 frames the behavior as "при обычном запуске" and describes setup as an offer during that launch, not as a separate required restart step.
+- The issue's decline path creates only the directory and explicitly justifies that behavior as preventing repeated onboarding on every launch.
+- Current `start-issue` behavior already distinguishes between ordinary command handling and missing-issue guidance in `scripts/lib/start_issue/pipeline.sh`; there is no existing "must restart after config change" contract.
+- The expected UX example for first run shows compact usage and `Run setup now? [Y/n]`, which reads as an inline decision point inside the current launch.
+
+#### FPF reasoning summary
+
+- Object-of-talk discipline: the issue speaks about what happens during one ordinary launch, so the answer must preserve that launch as the unit of behavior.
+- Evidence discipline: no source says the user must rerun the command after responding to the onboarding prompt.
+- Decision rule: prefer the interpretation with the least extra friction and the fewest hidden user steps, unless contradicted by current behavior or issue text.
+
+#### Resolution
+
+The first-run gate runs inline during the original ordinary launch. After the user accepts or declines onboarding, the command continues in the originally requested non-setup mode.
+
+#### Conflict handled
+
+This resolves the ambiguity between "prompt inline and continue" versus "prompt then exit and require rerun". The inline-continuation rule is more consistent with the issue wording and with the explicit one-time-directory marker.
+
+### `FPF-05`: Should explicit `setup` depend on repository or issue context?
+
+#### Why this mattered
+
+Issue #25 defines `setup` in terms of user-level config files under `~/.config/start-issue`, but current `start-issue` also has many repo-dependent workflows. The feature package needed to close whether explicit setup can run outside a repository before implementation and tests diverged.
+
+#### Available facts
+
+- Issue #25 defines the setup target as `~/.config/start-issue` and never mentions project scope, issue fetching, or git requirements for `setup`.
+- The issue's acceptance criteria say `start-issue setup` and `start-issue --setup` should launch interactive setup; they do not require an issue argument.
+- Current `init` behavior in `doc/spec.md` already distinguishes user scope from project scope and states that `start-issue init --user` can run outside a git repository.
+- Current code in `scripts/lib/start_issue/init.sh` has separate handling for `user` scope without project-root requirements.
+
+#### FPF reasoning summary
+
+- Bounded contexts: explicit setup belongs to the same user-config context as `init --user`, not to the repo/issue execution context.
+- Evidence discipline: every concrete setup fact in the issue points at user-level filesystem state, while repo dependence belongs to a different existing workflow.
+- Decision rule: avoid introducing prerequisites that are not required by the issue and are not needed by the owned state transition.
+
+#### Resolution
+
+Explicit `setup` is repo-independent and issue-independent. It should run against `~/.config/start-issue` without requiring git discovery, repo detection, `gh`, or issue fetching.
+
+#### Conflict handled
+
+This resolves the architectural tension between current repo-dependent startup flows and the new user-only onboarding flow by assigning `setup` to the user-config bounded context.

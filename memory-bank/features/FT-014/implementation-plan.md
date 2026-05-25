@@ -20,7 +20,7 @@ must_not_define:
 
 ## Current Goal
 
-Add a Codex-only batch human-gate mode that finishes unattended on `DONE` and reopens the same saved Codex session on `HUMAN_GATE`, without regressing the ordinary issue-start workflow.
+Add a dedicated user-level `setup` onboarding workflow plus one-time first-run prompting for `~/.config/start-issue`, while preserving the existing `init` and ordinary issue-starting behavior.
 
 ## Grounding / Support References
 
@@ -29,105 +29,106 @@ Add a Codex-only batch human-gate mode that finishes unattended on `DONE` and re
 | `feature.md` | canonical problem / verify owner | `REQ-*`, `SC-*`, `CHK-*`, `EVID-01` | Update `feature.md` first |
 | `solution.md` | canonical solution owner | `SOL-*`, `CTR-*`, `SD-*`, `FM-*`, `RB-*` | Update `solution.md` first |
 | `decision-log.md` | resolved local decisions | `DL-*`, `FPF-*` resolutions | Update `decision-log.md` first |
-| `../../../scripts/lib/start_issue/cli.sh` | current flag parser | `init`/`update` flag patterns, positional parsing constraints | Extend parser without breaking issue input handling |
-| `../../../scripts/lib/start_issue/output.sh` | current help and dry-run output | Normal help surface, dry-run command display | Add human-gate help without fragmenting existing help surfaces |
-| `../../../scripts/lib/start_issue/pipeline.sh` | current orchestration | Agent launch happens after worktree and prompt rendering | Branch late so issue preparation stays shared |
-| `../../../scripts/lib/start_issue/agent.sh` | Codex adapter boundary | Existing interactive Codex launch and non-interactive `codex exec` helper use | Reuse Codex-specific command ownership instead of scattering it |
-| `../../../doc/spec.md`, `../../../README.md`, `../../../README.ru.md` | user-facing contract | Existing launch semantics and help/docs style | Update together once the mode contract is fixed |
-| `../../../test/start_issue.bats`, `../../../test/helpers/fake-bin/codex` | regression net | Existing Codex dry-run and non-interactive fake behavior | Extend fake Codex rather than introducing live Codex dependencies |
+| `../../../scripts/lib/start_issue/init.sh` | current config-init owner | built-in agent/prompt defaults, user/project scope mechanics, force semantics | Reuse prompt/default logic instead of inventing new onboarding rules, without inheriting repo-only scope requirements. |
+| `../../../scripts/lib/start_issue/config.sh` | current config resolution | fallback behavior when files are absent | Preserve omission semantics for skipped agent and declined prompt |
+| `../../../scripts/lib/start_issue/output.sh` | help and compact usage owner | existing short usage and config-surface reporting | Extend without replacing compact missing-issue behavior |
+| `../../../README.md`, `../../../README.ru.md`, `../../../doc/spec.md` | public contract | current `init`, config paths, and missing-issue UX | Update if user-visible onboarding behavior changes |
 
 ## Current State / Reference Points
 
 | Path / module | Current role | Why relevant | Reuse / mirror |
 | --- | --- | --- | --- |
-| `scripts/lib/start_issue/cli.sh` | Parses flags and positional subcommands. | Must accept `--human-gate` and `--human-gate-help` without breaking `ISSUE`, `init`, or `update`. | Mirror the current flag-driven parsing style. |
-| `scripts/lib/start_issue/output.sh` | Owns `--help`, missing-issue help, dry-run rendering, and user-facing summaries. | Must mention the new mode briefly in normal help and own dedicated human-gate help text. | Keep one output owner for user contract text. |
-| `scripts/lib/start_issue/pipeline.sh` | Runs the main issue workflow and launches the selected agent. | Human-gate mode should branch at the launch step, not earlier. | Preserve current order through prompt rendering. |
-| `scripts/lib/start_issue/agent.sh` | Builds launch commands and already uses `codex exec` for non-interactive helper tasks. | Best current home for Codex batch and resume command construction plus status parsing helpers. | Keep Codex-specific behavior centralized. |
-| `test/helpers/fake-bin/codex` | Minimal Codex fake for dry-run, branch naming, and prompt improvement. | Needs richer behavior for JSON events, last-message writing, and resume failure simulation. | Extend deterministically through env vars. |
-| `test/start_issue.bats` | End-to-end coverage of CLI and agent behavior. | Main place to cover `DONE`, `HUMAN_GATE`, missing-state failures, and dedicated help. | Reuse current issue fixture and fake binary harness. |
+| `scripts/lib/start_issue/cli.sh` | Parses subcommands and flags, currently including `init`, `update`, and issue inputs. | Needs setup-mode normalization without breaking existing mode conflicts. | Mirror existing `init` / `update` parsing pattern. |
+| `scripts/lib/start_issue/init.sh` | Owns interactive scope selection and user/project config writes. | Strongest existing source for default agent/prompt logic and user-config write behavior. | Reuse prompt derivation and file-writing helpers where possible. |
+| `scripts/lib/start_issue/config.sh` | Resolves user/project agent, model, and prompt config. | Defines the meaning of omitted files on later runs. | Preserve fallback-to-default behavior when setup skips writes. |
+| `scripts/lib/start_issue/output.sh` | Prints full help, compact missing-issue usage, and config summaries. | Must add compact first-run onboarding messaging and setup documentation. | Extend current compact usage instead of printing full help during onboarding. |
+| `scripts/lib/start_issue/pipeline.sh` | Owns missing-issue mode and normal workflow sequencing. | First-run gate must happen before the normal pipeline while allowing continuation. | Insert onboarding gate without consuming the original command. |
+| `test/start_issue.bats` | Existing integration coverage for config, missing-issue, init, update, and agent/model behavior. | Primary regression net for interactive onboarding and file omission semantics. | Extend current fake-CLI and piped-input test style. |
 
 ## Test Strategy
 
 | Test surface | Canonical refs | Existing coverage | Planned automated coverage | Required local suites / commands | Required CI suites / jobs | Manual-only gap / justification | Manual-only approval ref |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| CLI parsing and validation | `REQ-01`, `REQ-08`, `SC-07`, `SC-08` | Existing coverage for `init`, `update`, help, and Codex dry-run. | Add Bats coverage for `--human-gate`, `--human-gate-help`, and non-Codex rejection. | `mise exec -- bats test/start_issue.bats` | Existing CI `test` job | none | none |
-| Codex batch command generation | `REQ-02`, `REQ-03`, `SC-01` | Existing dry-run covers only interactive Codex launch. | Add assertions for the exact batch command shape and saved-artifact paths. | `mise exec -- bats test/start_issue.bats` | Existing CI `test` job | none | none |
-| Thread-id capture and final-status handling | `REQ-04` - `REQ-07`, `SC-02` - `SC-06` | No current coverage. | Simulate JSON event streams and last-message files for `DONE`, `HUMAN_GATE`, missing status, missing thread id, and resume failure. | `mise exec -- bats test/start_issue.bats` | Existing CI `test` job | none | none |
-| Normal issue-workflow regression | `CON-04`, `REQ-02`, `SC-01` | Existing Bats suite already covers ordinary launches. | Re-run existing suite and add assertions only where the new flags affect shared surfaces. | `mise exec -- bats test/start_issue.bats` | Existing CI `test` job | none | none |
-| Docs/help/spec consistency | `REQ-08`, `REQ-09`, `SC-08` | Existing docs in tree. | Update docs/help/spec and run whitespace check. | `git diff --check` | Existing CI static checks | none | none |
+| Setup command entry parsing | `REQ-01`, `SC-01`, `SC-02` | No current setup coverage. | Add Bats coverage for both `setup` and `--setup`. | `mise exec -- bats test` | Existing CI `test` job | none | none |
+| Outside-git setup execution | `REQ-09`, `SC-09` | `init --user` already provides nearby behavior. | Add Bats coverage that runs explicit setup outside a repository and proves no issue/repo prerequisites are required. | `mise exec -- bats test` | Existing CI `test` job | none | none |
+| User-config onboarding writes and omissions | `REQ-02`, `REQ-03`, `REQ-04`, `SC-01`, `SC-03`, `SC-04` | `init` covers adjacent behavior only. | Add Bats scenarios for agent selection, skip, prompt preview/save, and omitted files. | `mise exec -- bats test` | Existing CI `test` job | none | none |
+| First-run accept/decline continuation | `REQ-05`, `REQ-06`, `REQ-07`, `SC-05`, `SC-06`, `SC-07`, `SC-10` | Missing-issue mode currently has no onboarding gate. | Add Bats coverage for compact usage, accept path, decline path, one-time directory marker, and continued normal execution. | `mise exec -- bats test` | Existing CI `test` job | none | none |
+| `init` compatibility | `REQ-08`, `SC-08` | Existing `init` coverage already exists. | Re-run suite and add assertions only if setup parsing or shared helpers create regressions. | `mise exec -- bats test` | Existing CI `test` job | none | none |
+| Docs/help/spec consistency | `REQ-10`, `SC-05`, `SC-08`, `SC-10` | Existing docs in tree. | Update docs and run whitespace check. | `bash -n scripts/start-issue scripts/lib/start_issue/*.sh`, `git diff --check` | Existing CI static checks | none | none |
 
 ## Open Questions / Ambiguities
 
-None currently open. Blocking ambiguities from issue #26 were resolved in [decision-log.md](decision-log.md) as `DL-01` through `DL-05`.
+None currently open. Blocking ambiguities from issue #25 were resolved in [decision-log.md](decision-log.md).
 
 ## Environment Contract
 
 | Area | Contract | Used by | Failure symptom |
 | --- | --- | --- | --- |
-| setup | Worktree may contain unrelated user changes and must not be reset. | all steps | Auto-edits overwrite unrelated work. |
-| test | `bash`, `mise`, and `bats` are available per repo tooling. | verification steps | Local verification cannot complete and must be reported. |
-| access / network / secrets | Tests must stay fake-Codex based and not depend on a real Codex account or live session state. | human-gate tests | CI becomes flaky or requires real credentials. |
+| setup | Worktree may already contain unrelated user changes and must not be reset. | all steps | Auto-edits overwrite unrelated work. |
+| test | `bash`, `mise`, and `bats` are available per repo tooling; `shellcheck` may be available locally. | verification steps | Local verification cannot complete and must be reported. |
+| access / network / secrets | Setup/onboarding tests should rely on fake CLIs and local HOME fixtures rather than external services. | onboarding and regression tests | Tests become flaky or depend on live GitHub state. |
 
 ## Preconditions
 
 | Precondition ID | Canonical ref | Required state | Used by steps | Blocks start |
 | --- | --- | --- | --- | --- |
-| `PRE-01` | `DL-01`, `CON-04` | Human-gate mode is fixed as Codex-only and ordinary issue flow remains the regression baseline. | `STEP-02` - `STEP-06` | yes |
-| `PRE-02` | `DL-02`, `REQ-08` | Dedicated help shape is fixed as a flag surface rather than an additional positional subcommand. | `STEP-02`, `STEP-05`, `STEP-06` | yes |
-| `PRE-03` | `DL-03`, `DL-05`, `CON-01`, `CON-02` | Run-state artifacts and explicit-thread resume contract are fixed. | `STEP-03` - `STEP-06` | yes |
+| `PRE-01` | `DL-01` - `DL-04` | The `setup`/`init` boundary, prompt baseline, and first-run continuation rule are fixed. | `STEP-02` - `STEP-06` | yes |
+| `PRE-02` | `CON-05`, `SD-04` | Directory existence is the accepted one-time onboarding marker. | `STEP-03` - `STEP-06` | yes |
+| `PRE-03` | `REQ-07`, `SD-05` | Ordinary command execution must resume after onboarding resolves. | `STEP-03` - `STEP-06` | yes |
+| `PRE-04` | `REQ-09`, `SD-06` | Explicit setup must remain runnable without repo discovery or issue-fetch dependencies. | `STEP-02` - `STEP-06` | yes |
 
 ## Workstreams
 
 | Workstream | Implements | Result | Owner | Dependencies |
 | --- | --- | --- | --- | --- |
-| `WS-01` | `REQ-01`, `REQ-08` | CLI/help surfaces gain human-gate flags, Codex-only validation, and dedicated help. | agent | `PRE-01`, `PRE-02` |
-| `WS-02` | `REQ-02` - `REQ-07` | Main pipeline and Codex adapter gain batch execution, state capture, final-status parsing, and resume handoff. | agent | `WS-01`, `PRE-03` |
-| `WS-03` | `REQ-09` | Tests, docs, and spec describe and verify the same mode contract. | agent | `WS-01`, `WS-02` |
+| `WS-1` | `REQ-01`, `REQ-02`, `REQ-08`, `REQ-09` | CLI parsing and onboarding helpers add explicit setup mode without replacing init or requiring repo context. | agent | `PRE-01`, `PRE-04` |
+| `WS-2` | `REQ-03`, `REQ-04`, `REQ-05`, `REQ-06`, `REQ-07` | User onboarding flow and first-run gate handle accept/decline and resume the original command. | agent | `WS-1`, `PRE-02`, `PRE-03` |
+| `WS-3` | `REQ-10` | Docs and tests describe the same onboarding contract. | agent | `WS-1`, `WS-2` |
 
 ## Approval Gates
 
-None. The feature changes terminal behavior, but it does not require destructive repo actions. Resume-handling failures must surface as explicit command failures rather than silent fallbacks.
+None. The plan does not require destructive repo actions.
 
 ## Work Order
 
 | Step ID | Actor | Implements | Goal | Touchpoints | Artifact | Verifies | Evidence IDs | Check command / procedure | Blocked by | Needs approval | Escalate if |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `STEP-01` | agent | `REQ-08` | Establish the FT-014 feature package and working contract. | `memory-bank/features/FT-014/*` | Feature docs | `CHK-03` | `EVID-01`, `EVID-14` | Review document boundaries and issue alignment. | none | none | Feature package drifts from issue #26 intent. |
-| `STEP-02` | agent | `REQ-01`, `REQ-08` | Add human-gate flags, dedicated help, and Codex-only validation. | `cli.sh`, `output.sh`, `pipeline.sh` | Code changes | `CHK-01`, `CHK-02`, `CHK-03` | `EVID-01` | Syntax check, Bats help/validation tests, and doc diff check. | `PRE-01`, `PRE-02` | none | Help surface and real CLI behavior diverge. |
-| `STEP-03` | agent | `REQ-02` - `REQ-07` | Implement the Codex batch execution path, run-state artifacts, status parsing, and explicit-thread resume handoff. | `pipeline.sh`, `agent.sh`, run-state helper module if needed | Code changes | `CHK-01`, `CHK-02` | `EVID-01` | Bats coverage for `DONE`, `HUMAN_GATE`, missing status, missing thread id, and resume failure. | `STEP-02`, `PRE-03` | none | Codex batch output cannot provide a stable `thread_id` or last-message contract without guessing. |
-| `STEP-04` | agent | `REQ-09` | Extend fake Codex and test scenarios for deterministic batch and resume behavior. | `test/start_issue.bats`, `test/helpers/fake-bin/codex` | Tests | `CHK-02` | `EVID-01` | `mise exec -- bats test/start_issue.bats` | `STEP-03` | none | Tests require live Codex sessions or nondeterministic timing. |
-| `STEP-05` | agent | `REQ-08`, `REQ-09` | Update README, Russian README, and spec with the new mode contract. | `README.md`, `README.ru.md`, `doc/spec.md` | Docs | `CHK-03` | `EVID-01` | `git diff --check` plus doc review. | `STEP-02`, `STEP-03` | none | Docs and actual exit/status behavior disagree. |
-| `STEP-06` | agent | `EC-01` - `EC-05` | Run verification and record completion state. | full change surface | Verification output | `CHK-01`, `CHK-02`, `CHK-03` | `EVID-01` | `bash -n scripts/start-issue scripts/lib/start_issue/*.sh`, `git diff --check`, `mise exec -- bats test/start_issue.bats` | `STEP-02` - `STEP-05` | none | Required tools are unavailable or regressions remain unresolved. |
+| `STEP-01` | agent | `REQ-10` | Establish the FT-014 feature package and working contract. | `memory-bank/features/FT-014/*` | Feature docs | `CHK-03` | `EVID-01`, `EVID-14` | Review document boundaries and issue alignment. | none | none | Feature package drifts from issue #25 intent. |
+| `STEP-02` | agent | `REQ-01`, `REQ-02`, `REQ-08`, `REQ-09` | Add setup parsing and user-only onboarding entry flow while preserving `init` and repo-independent setup behavior. | `scripts/start-issue`, `cli.sh`, shared onboarding helpers | Code changes | `CHK-01`, `CHK-02` | `EVID-01` | Syntax check plus regression suite. | `PRE-01`, `PRE-04` | none | `setup`, `init`, and `update` mode parsing become ambiguous or setup still requires repo state. |
+| `STEP-03` | agent | `REQ-03`, `REQ-04` | Implement onboarding agent selection, prompt preview, and selective file writes under `~/.config/start-issue`. | onboarding helpers, `init.sh` or new module, `output.sh` | Code changes | `CHK-01`, `CHK-02` | `EVID-01` | Focused Bats scenarios for save/skip behavior. | `STEP-02` | none | Prompt derivation cannot stay aligned with current init defaults. |
+| `STEP-04` | agent | `REQ-05`, `REQ-06`, `REQ-07` | Add the one-time first-run gate and continue the original non-setup command after accept/decline. | `pipeline.sh`, `output.sh`, config helpers | Code changes | `CHK-01`, `CHK-02` | `EVID-01` | Bats scenarios for first-run accept/decline and continued execution. | `STEP-02`, `PRE-02`, `PRE-03` | none | First-run gating cannot resume the original command safely. |
+| `STEP-05` | agent | `REQ-10` | Update help text, README, Russian README, and spec for setup/onboarding, outside-git setup, and `init` compatibility. | `README.md`, `README.ru.md`, `doc/spec.md`, `output.sh` | Docs | `CHK-03` | `EVID-01` | `git diff --check` plus doc review. | `STEP-02` - `STEP-04` | none | Docs and implementation disagree about setup/write semantics, repo independence, or first-run continuation. |
+| `STEP-06` | agent | `EC-01` - `EC-06` | Run verification and record completion state. | full change surface | Verification output | `CHK-01`, `CHK-02`, `CHK-03` | `EVID-01` | `bash -n scripts/start-issue scripts/lib/start_issue/*.sh`, `git diff --check`, `mise exec -- bats test` | `STEP-02` - `STEP-05` | none | Required tools are unavailable or regressions remain unresolved. |
 
 ## Parallelizable Work
 
-- `PAR-01` Feature docs can be reviewed and refined before code changes.
-- `PAR-02` Fake Codex extensions can be prepared in parallel with batch-helper implementation once the artifact contract is fixed.
-- `PAR-03` Public docs should wait until the dedicated-help and exit-code contract are settled in code.
+- `PAR-01` Feature docs can be prepared before code changes because they define the onboarding contract.
+- `PAR-02` Setup helper work can start before first-run gate wiring, but the continuation rule must stay fixed.
+- `PAR-03` Public docs should wait until setup/write semantics and first-run continuation are fixed in code.
 
 ## Checkpoints
 
 | Checkpoint ID | Refs | Condition | Evidence IDs |
 | --- | --- | --- | --- |
-| `CP-01` | `STEP-02`, `STEP-03` | Human-gate mode branches late from the normal pipeline and resumes only by explicit thread id. | `EVID-01` |
-| `CP-02` | `STEP-04`, `STEP-05`, `STEP-06` | Tests, help, README, and spec all reflect the same status and exit-code contract. | `EVID-01`, `EVID-14` |
+| `CP-01` | `STEP-02`, `STEP-03` | Setup mode is explicit, user-only, repo-independent, and preserves skip/save omission semantics. | `EVID-01` |
+| `CP-02` | `STEP-04`, `STEP-06` | First-run gating is one-time, compact, and resumes the requested command after accept or decline. | `EVID-01`, `EVID-14` |
 
 ## Execution Risks
 
 | Risk ID | Risk | Impact | Mitigation | Trigger |
 | --- | --- | --- | --- | --- |
-| `ER-01` | CLI parsing for dedicated help or human-gate mode collides with existing issue positional parsing. | Help or issue start may break. | Keep dedicated help flag-based and extend the current parser conservatively. | `start-issue 123 --human-gate` or `start-issue --human-gate-help` is misparsed as an issue argument. |
-| `ER-02` | The implementation captures stdout text but not a stable `thread_id`. | `HUMAN_GATE` cannot reopen the exact session. | Treat JSON event capture and saved thread-id as mandatory artifacts. | Resume logic reaches `--last` or has no id to use. |
-| `ER-03` | Status parsing becomes too permissive. | Arbitrary agent summaries are misclassified as terminal statuses. | Parse only the documented `STATUS:` lines from the saved artifact. | A message without the exact contract still exits success. |
-| `ER-04` | Dedicated help describes a prompt contract that tests do not enforce. | Prompt authors rely on stale or inaccurate documentation. | Keep help, spec, and fake-Codex tests aligned to one contract. | README/help says one exit/status behavior while tests prove another. |
+| `ER-01` | Setup reuses `init` too loosely and accidentally writes project config, force-style behavior, or repo-only prerequisites. | Violates issue scope and changes existing semantics. | Keep user-only onboarding as a separate contract even if helpers are shared. | Setup writes into `.start-issue`, mentions project scope, or fails outside a repo. |
+| `ER-02` | First-run decline does not create `~/.config/start-issue`. | Onboarding repeats forever. | Treat the directory itself as the completion marker and cover decline behavior with tests. | The second ordinary run still prompts setup. |
+| `ER-03` | Skip agent is implemented as `none` instead of missing file. | Later runs change default-agent behavior. | Preserve omitted-file semantics from current config resolution. | Resolved agent becomes `none` after a skipped setup. |
+| `ER-04` | First-run gating exits after setup/decline instead of continuing the original command. | Ordinary launches become two-step and contradict the issue. | Make continuation an explicit orchestration contract and test both accept and decline paths. | After first-run prompt, issue fetch/worktree steps never occur. |
+| `ER-05` | Docs describe setup as repo-independent but implementation still runs git checks first. | User-facing contract and behavior diverge immediately. | Test setup outside a repository and keep repo checks out of the explicit setup path. | `start-issue setup` fails before creating `~/.config/start-issue` outside a repo. |
 
 ## Stop Conditions / Fallback
 
 | Stop ID | Related refs | Trigger | Immediate action | Safe fallback state |
 | --- | --- | --- | --- | --- |
-| `STOP-01` | `CON-01`, `CON-02`, `FM-02`, `FM-03` | A resumable Codex batch run cannot reliably expose or preserve `thread_id` from the available artifacts. | Stop auto-fixing and raise a human gate with the observed artifact gap, options, and risk. | Keep the existing interactive Codex launch as the only supported path. |
-| `STOP-02` | `CON-04`, `FM-01` | Human-gate mode changes ordinary issue-start behavior even when the flag is absent. | Stop expanding the feature and repair the regression first. | Existing issue workflow remains the only supported launch path until isolated branching is restored. |
+| `STOP-01` | `REQ-07`, `FM-03` | The first-run gate cannot safely continue the original command without breaking existing mode handling. | Stop auto-fixing and raise a human gate with facts, options, and risk. | Keep explicit `setup` available while deferring automatic first-run continuation. |
+| `STOP-02` | `REQ-08`, `FM-04` | Preserving `init` semantics and adding `setup` creates an unresolved user-facing conflict. | Stop and re-open the onboarding boundary decision from `DL-01`. | Keep `init` as the only documented initializer until the conflict is resolved. |
 
 ## Plan-local Evidence
 
@@ -138,13 +139,9 @@ None. The feature changes terminal behavior, but it does not require destructive
 ## Execution Status
 
 - `STEP-01` completed on 2026-05-24 by creating the FT-014 feature package and decision log.
-- `STEP-02` completed on 2026-05-24 by adding `--human-gate` / `--human-gate-help`, Codex-only validation, and dedicated help surfaces.
-- `STEP-03` completed on 2026-05-24 by adding the Codex batch execution path, run-state artifacts, final-status parsing, and explicit-thread resume handling.
-- `STEP-04` completed on 2026-05-24 by extending fake Codex and Bats coverage for batch, resume, missing-status, and missing-thread-id scenarios.
-- `STEP-05` completed on 2026-05-24 by updating `README.md`, `README.ru.md`, and `doc/spec.md` with the shipped human-gate contract.
-- `STEP-06` completed locally on 2026-05-24 with passing `bash -n scripts/start-issue scripts/lib/start_issue/*.sh test/helpers/fake-bin/*`, `shellcheck install.sh scripts/start-issue scripts/lib/start_issue/*.sh test/helpers/fake-bin/*`, `git diff --check`, and `bats test/start_issue.bats`.
+- `STEP-02` - `STEP-06` not started in this document-only review pass.
 
 ## Ready For Acceptance
 
-- The feature package is ready to guide implementation work for issue #26 once the review-improve cycle closes without `critical` or `important` document issues.
+- The feature package is ready to guide implementation work for issue #25 once the review-improve cycle closes without `critical` or `important` document issues.
 - Final acceptance remains owned by `feature.md`.

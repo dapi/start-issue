@@ -54,11 +54,12 @@ Agent-specific behavior должен быть централизован за е
 |----------|--------|---------|
 | Issue | URL или номер | `https://github.com/owner/repo/issues/123` или `123` |
 | Config init | Литерал `init` | `start-issue init` |
+| Config setup | Литерал `setup` | `start-issue setup` |
 | Update | Литерал `update` | `start-issue update` |
 
 Если Issue не передан, команда печатает справку и текущую конфигурацию:
-выбранный agent с источником, prompt source, prompt location и короткий prompt
-preview. Этот путь не обращается к GitHub и завершается с ненулевым кодом.
+выбранные agent/model, источники config, prompt source и prompt location.
+Этот путь не обращается к GitHub и завершается с ненулевым кодом.
 
 ### Опциональные параметры
 
@@ -85,6 +86,7 @@ preview. Этот путь не обращается к GitHub и заверша
 | `--user` | Для `init`: записать пользовательскую конфигурацию в `~/.config/start-issue` | интерактивный выбор |
 | `--force` | Для `init`: перезаписать существующие `agent`, `prompt.md` и при необходимости сбросить `model` к unset | false |
 | `--dry-run` | Показать действия, не выполняя worktree/init/agent launch | false |
+| `--setup` | Включить user-level onboarding для `~/.config/start-issue` | false |
 | `--update` | Включить режим self-update для запущенного executable | false |
 
 ## Приоритет конфигурации
@@ -151,6 +153,33 @@ git rev-parse --show-toplevel
 По умолчанию записывается agent `claude` и стандартный Claude prompt. `--agent` меняет записываемый agent; `--model` записывает sibling `model` config; `--prompt` или `--prompt-file` меняют записываемый prompt. Если `--model` не передан, built-in behavior остается unset и новый `model` файл не создается. Если выбран не `claude` и prompt явно не задан, записывается portable prompt. Если существующий `agent` сохраняется без `--force`, default prompt выбирается по сохраненному agent, а не по built-in default или CLI override.
 
 Существующие файлы не перезаписываются. `--force` перезаписывает `agent` и `prompt.md`; существующий `model` файл либо заменяется новым значением, либо удаляется для возврата к built-in unset.
+
+## User Setup Onboarding
+
+`start-issue setup` и `start-issue --setup` запускают один и тот же user-level onboarding workflow.
+
+Контракт режима:
+
+1. Режим работает только с `~/.config/start-issue` и не пишет project config в `.start-issue`.
+2. Режим не требует issue, git repository, `gh` или `jq`.
+3. Если директория `~/.config/start-issue` отсутствует, она создается в начале setup.
+4. Команда спрашивает default agent: `claude`, `codex`, `kimi`, `pi` или `skip`.
+5. `skip` означает, что файл `~/.config/start-issue/agent` должен отсутствовать.
+6. Default prompt выводится пользователю целиком и выбирается по built-in prompt contract для эффективного onboarding agent state.
+7. `prompt.md` сохраняется только после явного подтверждения пользователя.
+8. Если пользователь отказывается сохранять prompt, `~/.config/start-issue/prompt.md` отсутствует.
+
+## First-run Onboarding Gate
+
+При обычном non-setup запуске, если `~/.config/start-issue` еще не существует:
+
+1. Команда печатает компактное first-run сообщение:
+   - `Configuration is not initialized yet.`
+   - `Usage: start-issue <issue-url-or-number> [options]`
+2. Команда спрашивает `Run setup now? [Y/n]`.
+3. Если пользователь соглашается, запускается тот же setup workflow, что и в explicit `setup`.
+4. Если пользователь отказывается, команда создает пустую директорию `~/.config/start-issue`, но не создает `agent` или `prompt.md`.
+5. После accept или decline команда продолжает исходный non-setup workflow вместо раннего выхода.
 
 ## Self-update
 
@@ -319,6 +348,19 @@ Templating правила:
 7. Записать `agent` и `prompt.md`; существующие файлы оставить без изменений, если не передан `--force`. В `--dry-run` только напечатать planned writes.
 8. Завершить работу без получения issue, создания worktree и запуска agent.
 
+### Фаза 0A: Config setup
+
+Если первый positional argument равен `setup` или включен `--setup`:
+
+1. Не требовать git repository, `gh`, `jq` или issue input.
+2. Создать `~/.config/start-issue`, если директория отсутствует.
+3. Спросить default agent: `claude`, `codex`, `kimi`, `pi` или `skip`.
+4. Если выбран `skip`, не создавать `~/.config/start-issue/agent`.
+5. Выбрать built-in default prompt для эффективного onboarding agent state и вывести его пользователю.
+6. Спросить, нужно ли сохранить prompt в `~/.config/start-issue/prompt.md`.
+7. Если ответ положительный, записать `prompt.md`; иначе оставить `prompt.md` отсутствующим.
+8. Завершить работу без issue fetch, worktree lifecycle и agent launch.
+
 ### Фаза 1: Валидация и парсинг
 
 1. Распарсить CLI arguments.
@@ -332,6 +374,7 @@ Templating правила:
 9. Проверить наличие CLI выбранного agent, если agent не `none` и режим не `--dry-run`.
 10. Выбрать prompt template.
 11. Если включен `--improve-prompt`, сгенерировать proposal улучшенного prompt template и завершить workflow до worktree/agent launch.
+12. Если это ordinary non-setup launch и `~/.config/start-issue` отсутствует, выполнить first-run onboarding gate перед оставшимся workflow.
 
 Если включен `--human-gate`:
 
@@ -543,6 +586,8 @@ start-issue 123 --agent codex --improve-prompt --prompt-output-file .start-issue
 start-issue 123 --agent pi --prompt "Implement {ISSUE_URL} in {WORKTREE_PATH}"
 start-issue 123 --no-agent
 start-issue 123 --no-claude
+start-issue setup
+start-issue --setup
 start-issue init
 start-issue init --project --agent codex --model gpt-5.2
 start-issue init --project --agent codex
@@ -562,7 +607,7 @@ start-issue --human-gate-help
 - `gh` CLI с авторизованной GitHub session
 - `jq`
 
-Для `start-issue init --user` обязателен только `bash`. Для `start-issue init --project` нужны `bash` и `git`.
+Для `start-issue setup` обязателен только `bash`. Для `start-issue init --user` обязателен только `bash`. Для `start-issue init --project` нужны `bash` и `git`.
 
 Опциональные:
 
@@ -582,6 +627,11 @@ start-issue --human-gate-help
 - [x] Model выбирается через CLI, `.start-issue/model`, `~/.config/start-issue/model`, `START_ISSUE_MODEL`, затем built-in unset.
 - [x] Prompt выбирается через CLI, `.start-issue/prompt.md`, `~/.config/start-issue/prompt.md`, env.
 - [x] Запуск без Issue печатает выбранные agent/model и prompt details с расположением config файлов.
+- [x] `start-issue setup` и `start-issue --setup` запускают один и тот же user-level onboarding flow.
+- [x] `start-issue setup` работает вне git repository.
+- [x] Если `~/.config/start-issue` отсутствует, обычный запуск предлагает пройти setup.
+- [x] При отказе от first-run setup создается пустая `~/.config/start-issue`, но `agent` и `prompt.md` не создаются.
+- [x] После first-run accept/decline исходный ordinary workflow продолжается.
 - [x] `start-issue init` создает project или user config с agent и prompt по умолчанию и пишет `model`, если она явно задана.
 - [x] `start-issue init --force` перезаписывает существующие config-файлы.
 - [x] `STATUS: DONE` завершает workflow без открытия Codex TUI.
