@@ -55,6 +55,14 @@ parse_args() {
                 IMPROVE_PROMPT=true
                 shift
                 ;;
+            --human-gate)
+                HUMAN_GATE_MODE=true
+                shift
+                ;;
+            --human-gate-help)
+                HUMAN_GATE_HELP=true
+                shift
+                ;;
             --prompt-output-file)
                 require_value "$1" "${2:-}"
                 PROMPT_IMPROVEMENT_OUTPUT_FILE="$2"

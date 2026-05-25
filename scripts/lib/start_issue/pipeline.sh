@@ -21,6 +21,11 @@ start_agent_session() {
         return
     fi
 
+    if [[ "$HUMAN_GATE_MODE" == "true" ]]; then
+        run_codex_human_gate_session
+        return $?
+    fi
+
     log_info "🚀 Starting $AGENT agent session..."
 
     if [[ "$DRY_RUN" == "true" ]]; then
@@ -64,6 +69,7 @@ run_start_issue_pipeline() {
     detect_base_branch
     resolve_agent
     resolve_model
+    validate_human_gate_mode
     check_selected_agent_dependency
     resolve_prompt_template
     validate_prompt_improvement_mode
