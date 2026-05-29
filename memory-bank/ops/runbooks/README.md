@@ -2,34 +2,27 @@
 title: Runbooks Index
 doc_kind: ops
 doc_function: index
-purpose: Точка входа в operational runbooks. Читать, чтобы завести пошаговую инструкцию для типовой ops-задачи или инцидента.
+purpose: "Operational runbook entrypoint for start-issue."
 derived_from:
   - ../../dna/governance.md
+  - ../release.md
+  - ../development.md
 status: active
 audience: humans_and_agents
 ---
 
 # Runbooks Index
 
-В этом каталоге живут runbooks для повторяемых operational задач.
+No separate runbooks are currently instantiated. Use these owner documents for
+the recurring operational workflows:
 
-Runbook должен отвечать на вопросы:
+- [Development Environment](../development.md) for local setup and checks.
+- [Configuration Guide](../config.md) for config files, env vars, setup, and
+  init behavior.
+- [Release And Deployment](../release.md) for release preparation, publishing,
+  and rollback.
+- [Stages And Non-Local Environments](../stages.md) for GitHub and external CLI
+  operational boundaries.
 
-- что является триггером;
-- что проверить сначала;
-- какие команды выполнять;
-- какой результат ожидать;
-- как безопасно откатиться;
-- кому и когда эскалировать проблему.
-
-## Suggested Structure
-
-1. Summary
-2. Trigger / symptoms
-3. Safety notes
-4. Diagnosis
-5. Resolution
-6. Rollback
-7. Escalation
-
-Если у проекта пока нет runbooks, каталог может содержать только этот индекс.
+Create a dedicated runbook here only when a repeated operational task needs a
+step-by-step procedure beyond those documents.

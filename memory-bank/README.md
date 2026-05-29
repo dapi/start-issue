@@ -28,9 +28,9 @@ The current local adoption includes the upstream template structure needed for
 governed feature work: `dna/`, `flows/`, `features/`, `prompts/`, `product/`,
 `domain/`, `engineering/`, `ops/`, `prd/`, `use-cases/`, `adr/`, and `epics/`.
 
-The project-specific sections are currently template-derived starting points.
-Before treating them as authoritative for product, domain, engineering, or ops
-decisions, adapt their contents to `start-issue`.
+The product, domain, engineering, and ops sections have been adapted to
+`start-issue` and should be treated as the current project baseline. Template
+flows and templates remain upstream-derived process references.
 
 ## Annotated Index
 
@@ -41,9 +41,9 @@ decisions, adapt their contents to `start-issue`.
 - [prompts/README.md](prompts/README.md)
   Reusable prompt documents for issue review, feature-pack review, implementation, and PR finish.
 - [product/README.md](product/README.md)
-  Product context, vision, customers, metrics, marketing, and roadmap templates.
+  Product context, vision, customers, metrics, marketing, and roadmap.
 - [domain/README.md](domain/README.md)
-  Domain glossary, model, rules, states, events, and context map templates.
+  Domain glossary, model, rules, states, events, and context map.
 - [engineering/README.md](engineering/README.md)
   Architecture, testing, coding, git workflow, frontend, and autonomy guidance.
 - [ops/README.md](ops/README.md)

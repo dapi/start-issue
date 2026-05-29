@@ -2,92 +2,79 @@
 title: Configuration Guide
 doc_kind: ops
 doc_function: canonical
-purpose: Шаблон документа ownership-модели конфигурации. Читать при описании env contract, naming conventions и config sources проекта.
+purpose: "Configuration sources, precedence, files, environment variables, and ownership for start-issue."
 derived_from:
   - ../dna/governance.md
+  - ../domain/rules.md
+  - ../../README.md
+  - ../../doc/spec.md
 status: active
 audience: humans_and_agents
 ---
 
 # Configuration Guide
 
-Этот документ не обязан перечислять все переменные окружения подряд. Его задача: объяснить, где живет canonical schema конфигурации и как downstream-проект документирует важные настройки.
-
 ## Configuration Architecture
 
-Опиши реальную модель конфигурации проекта.
+`start-issue` uses simple CLI flags, plaintext config files, and environment
+variables. The canonical precedence is:
 
-Примеры:
+1. CLI flags
+2. project config under `.start-issue/`
+3. user config under `~/.config/start-issue/`
+4. environment variables
+5. built-in defaults
 
-- typed config class;
-- `.env` + runtime env vars;
-- YAML/JSON/TOML файлы с environment overlays;
-- secret manager;
-- Helm values / Terraform variables / deployment manifests.
+Config resolution is owned by `scripts/lib/start_issue/config.sh`. User-facing
+documentation must stay aligned in README and `doc/spec.md`.
 
-### File Layout
+## File Layout
+
+Project config:
 
 ```text
-config/
-├── application.yml
-├── environments/
-├── secrets/
-└── ...
+.start-issue/
+├── agent
+├── model
+└── prompt.md
 ```
 
-### Ownership Rules
+User config:
 
-Зафиксируй:
-
-1. какой файл или модуль владеет schema конфигурации;
-2. где задаются defaults;
-3. где лежат environment-specific overrides;
-4. как документируются секреты без раскрытия значений.
-
-```ruby
-# Пример API доступа к конфигурации:
-Config.database_url
-Settings.feature_flags.checkout_v2
-ENV.fetch("APP_PORT")
+```text
+~/.config/start-issue/
+├── agent
+├── model
+└── prompt.md
 ```
 
-## Naming Convention For Env Vars
+`agent` and `model` are plain strings. `prompt.md` is a prompt template.
 
-| YAML structure | Env variable |
-| --- | --- |
-| `database.url` | `APP_DATABASE__URL` |
-| `feature_checkout_v2` | `APP_FEATURE_CHECKOUT_V2` |
-| `smtp.password` | `APP_SMTP__PASSWORD` |
-| `storage.bucket` | `APP_STORAGE__BUCKET` |
-
-Rules:
-
-- выбери один canonical префикс или явно задокументируй, что префикса нет;
-- если используется вложенность, зафиксируй separator;
-- перечисли правила для списков, boolean и secrets;
-- если проект запрещает interpolation внутри config-файлов, напиши это явно.
-
-## Documenting Important Variables
-
-Если проекту нужен справочник ключевых переменных, не перечисляй все подряд. Сфокусируйся на значимых runtime contracts.
+## Environment Variables
 
 | Variable | Description | Default | Owner |
 | --- | --- | --- | --- |
-| `APP_DATABASE__URL` | Основное подключение к БД | none | platform |
-| `APP_REDIS__URL` | Кэш или очередь | `redis://localhost:6379/0` | platform |
-| `APP_PUBLIC_BASE_URL` | Базовый URL для генерации ссылок | `http://localhost:3000` | product/platform |
-| `APP_FEATURE_X_ENABLED` | Feature flag | `false` | owning team |
+| `START_ISSUE_AGENT` | Default agent when CLI and config files do not set one | built-in `claude` | `config.sh` |
+| `START_ISSUE_MODEL` | Default model when CLI and config files do not set one | unset | `config.sh` |
+| `START_ISSUE_PROMPT` | Inline prompt template | none | `config.sh` |
+| `START_ISSUE_PROMPT_FILE` | Prompt template file | none | `config.sh` |
+| `START_ISSUE_WORKTREE_DIR` | Parent directory for created worktrees | `~/worktrees` | `config.sh` / `worktree.sh` |
+| `START_ISSUE_DUMP_PROMPT` | Print full rendered prompt in dry-run when set to `1` | unset | `output.sh` |
+
+`START_ISSUE_PROMPT` and `START_ISSUE_PROMPT_FILE` are mutually exclusive when
+no CLI prompt override is provided.
+
+## Setup And Init
+
+- `start-issue setup` and `start-issue --setup` write only user config.
+- First-run onboarding creates `~/.config/start-issue` as the marker that setup
+  was offered.
+- `start-issue init --project` writes project config and requires a git repo.
+- `start-issue init --user` writes user config and can run outside a git repo.
+- `--force` overwrites existing `agent` and `prompt.md`; omitted `--model` under
+  `--force` removes an existing `model` file to return to built-in unset.
 
 ## Secrets
 
-- Никогда не вставляй реальные значения секретов в репозиторий.
-- Документируй только способ их хранения, выдачи и rotation policy.
-- Если часть конфигурации приходит из secret manager, это должно быть написано явно.
-
-## Adoption Checklist
-
-- [ ] описан schema-owner конфигурации
-- [ ] задокументирована naming convention
-- [ ] перечислены ключевые runtime/env contracts
-- [ ] описан secret handling
-- [ ] удалены ссылки на несуществующие downstream-справочники
+No secrets are stored by `start-issue` config files. GitHub authentication and
+agent authentication remain owned by their external CLIs.

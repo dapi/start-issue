@@ -2,17 +2,29 @@
 title: Operations Index
 doc_kind: ops
 doc_function: index
-purpose: Навигация по операционной документации шаблона. Читать при адаптации dev/prod workflow, релизов, конфигурации и runbooks под проект.
+purpose: "Navigation for start-issue development, configuration, release, non-local state, and runbook guidance."
 derived_from:
   - ../dna/governance.md
+  - development.md
+  - release.md
+  - config.md
 status: active
 audience: humans_and_agents
 ---
 
 # Operations Index
 
-- [Development Environment](development.md) — локальная разработка, запуск приложения, тестов и вспомогательных сервисов.
-- [Stages And Non-Local Environments](stages.md) — доступ к runtime-окружениям, логи, smoke-checks и права доступа.
-- [Release And Deployment](release.md) — релизный процесс, checklist и release test plan.
-- [Configuration](config.md) — ownership-модель конфигурации, naming conventions и env contract.
-- [Runbooks](runbooks/README.md) — шаблон для operational runbooks и инцидентных инструкций.
+`start-issue` has no hosted service. Operations are local development, GitHub
+issues/releases/CI, user config files, installed executables, and external CLI
+dependencies.
+
+- [Development Environment](development.md) - local tools, setup, daily commands,
+  dry-run workflow, services, and safety notes.
+- [Stages And Non-Local Environments](stages.md) - GitHub/non-local boundaries,
+  credentials, version checks, and diagnostics.
+- [Release And Deployment](release.md) - versioning, changelog, release prep,
+  GitHub Release assets, verification, and rollback.
+- [Configuration](config.md) - config files, environment variables, precedence,
+  setup, init, and secret boundaries.
+- [Runbooks](runbooks/README.md) - entrypoint for future repeated operational
+  procedures.

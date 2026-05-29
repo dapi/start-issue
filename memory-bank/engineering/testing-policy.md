@@ -6,7 +6,8 @@ purpose: "Testing policy for start-issue: required local checks, Bats coverage, 
 derived_from:
   - ../dna/governance.md
   - ../flows/feature-flow.md
-  - ../../Makefile
+  - ../../README.md
+  - ../../doc/spec.md
 status: active
 canonical_for:
   - repository_testing_policy
