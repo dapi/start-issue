@@ -342,7 +342,9 @@ make release-minor
 make release-major
 ```
 
-Each command requires a clean worktree, bumps `VERSION`, runs `make test` and `make build`, creates a local commit like `Release v1.12.0`, and creates the matching annotated git tag.
+Before preparing a release, add user-facing changes under `## [Unreleased]` in `CHANGELOG.md`.
+
+Each command requires a clean worktree, bumps `VERSION`, moves the `CHANGELOG.md` unreleased entries under the new version and date, runs `make test` and `make build`, creates a local commit like `Release v1.12.0`, and creates the matching annotated git tag.
 
 Publish the prepared release with:
 

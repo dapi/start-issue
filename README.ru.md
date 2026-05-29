@@ -342,7 +342,9 @@ make release-minor
 make release-major
 ```
 
-Каждая команда требует чистое рабочее дерево, поднимает `VERSION`, запускает `make test` и `make build`, создает локальный commit вида `Release v1.12.0` и создает matching annotated git tag.
+Перед подготовкой релиза добавьте user-facing изменения в `CHANGELOG.md` под `## [Unreleased]`.
+
+Каждая команда требует чистое рабочее дерево, поднимает `VERSION`, переносит unreleased-записи из `CHANGELOG.md` под новую версию и дату, запускает `make test` и `make build`, создает локальный commit вида `Release v1.12.0` и создает matching annotated git tag.
 
 Опубликовать подготовленный релиз:
 
