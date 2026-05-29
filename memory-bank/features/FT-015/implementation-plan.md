@@ -49,17 +49,17 @@ Add a Codex-only batch human-gate mode that finishes unattended on `DONE` and re
 
 ## Test Strategy
 
-| Test surface | Canonical refs | Existing coverage | Planned automated coverage | Required local suites / commands | Required CI suites / jobs | Manual-only gap / justification | Manual-only approval ref |
+| Test surface | Canonical refs | Existing coverage | Planned / implemented automated coverage | Required local suites / commands | Required CI suites / jobs | Manual-only gap / justification | Manual-only approval ref |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| CLI parsing and validation | `REQ-01`, `REQ-08`, `SC-07`, `SC-08` | Existing coverage for `init`, `update`, help, and Codex dry-run. | Add Bats coverage for `--human-gate`, `--human-gate-help`, and non-Codex rejection. | `mise exec -- bats test/start_issue.bats` | Existing CI `test` job | none | none |
-| Codex batch command generation | `REQ-02`, `REQ-03`, `SC-01` | Existing dry-run covers only interactive Codex launch. | Add assertions for the exact batch command shape and saved-artifact paths. | `mise exec -- bats test/start_issue.bats` | Existing CI `test` job | none | none |
-| Thread-id capture and final-status handling | `REQ-04` - `REQ-07`, `SC-02` - `SC-06` | No current coverage. | Simulate JSON event streams and last-message files for `DONE`, `HUMAN_GATE`, missing status, missing thread id, and resume failure. | `mise exec -- bats test/start_issue.bats` | Existing CI `test` job | none | none |
-| Normal issue-workflow regression | `CON-04`, `REQ-02`, `SC-01` | Existing Bats suite already covers ordinary launches. | Re-run existing suite and add assertions only where the new flags affect shared surfaces. | `mise exec -- bats test/start_issue.bats` | Existing CI `test` job | none | none |
-| Docs/help/spec consistency | `REQ-08`, `REQ-09`, `SC-08` | Existing docs in tree. | Update docs/help/spec and run whitespace check. | `git diff --check` | Existing CI static checks | none | none |
+| CLI parsing and validation | `REQ-01`, `REQ-08`, `SC-07`, `SC-08` | Existing coverage for `init`, `update`, help, and Codex dry-run. | Bats coverage exists for `--human-gate`, `--human-gate-help`, and non-Codex rejection. | `mise exec -- bats test/start_issue.bats` | Existing CI `test` job | none | none |
+| Codex batch command generation | `REQ-02`, `REQ-03`, `SC-01` | Existing dry-run covered only interactive Codex launch before FT-015. | Bats assertions cover the batch command shape and saved-artifact paths. | `mise exec -- bats test/start_issue.bats` | Existing CI `test` job | none | none |
+| Thread-id capture and final-status handling | `REQ-04` - `REQ-07`, `SC-02` - `SC-06` | No pre-FT-015 coverage. | Fake Codex and Bats simulate JSON event streams and last-message files for `DONE`, `HUMAN_GATE`, missing status, missing thread id, and resume failure. | `mise exec -- bats test/start_issue.bats` | Existing CI `test` job | none | none |
+| Normal issue-workflow regression | `CON-04`, `REQ-02`, `SC-01` | Existing Bats suite already covers ordinary launches. | Existing suite is re-run; new assertions stay limited to shared surfaces affected by the new flags. | `mise exec -- bats test/start_issue.bats` | Existing CI `test` job | none | none |
+| Docs/help/spec consistency | `REQ-08`, `REQ-09`, `SC-08` | Existing docs in tree. | README, Russian README, spec, and help text describe the same shipped contract; whitespace is checked with `git diff --check`. | `git diff --check` | Existing CI static checks | none | none |
 
 ## Open Questions / Ambiguities
 
-None currently open. Blocking ambiguities from issue #26 were resolved in [decision-log.md](decision-log.md) as `DL-01` through `DL-05`.
+None currently open. Blocking ambiguities from issue #26 and the local completion-state wording were resolved in [decision-log.md](decision-log.md) as `DL-01` through `DL-06`.
 
 ## Environment Contract
 
@@ -146,5 +146,7 @@ None. The feature changes terminal behavior, but it does not require destructive
 
 ## Ready For Acceptance
 
-- The feature package is ready to guide implementation work for issue #26 once the review-improve cycle closes without `critical` or `important` document issues.
+- Local implementation, documentation, and local verification steps are recorded as complete for issue #26.
+- `delivery_status` remains `in_progress` until final acceptance / CI evidence is recorded, per `DL-06`.
+- The feature package is ready for acceptance review once the review-improve cycle closes without `critical` or `important` document issues.
 - Final acceptance remains owned by `feature.md`.

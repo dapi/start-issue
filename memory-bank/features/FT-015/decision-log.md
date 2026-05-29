@@ -27,6 +27,7 @@ audience: humans_and_agents
 | `DL-03` | 2026-05-24 | accepted | Run-state artifacts | Human-gate runs store `events.jsonl`, `last-message.txt`, and `thread-id` under `<worktree>/.start-issue/runs/<timestamp>/` and keep those artifacts for diagnostics and resume fidelity. |
 | `DL-04` | 2026-05-24 | accepted | Final-status parser | The saved last-message artifact is authoritative; only `STATUS: DONE` and `STATUS: HUMAN_GATE` are recognized terminal statuses. |
 | `DL-05` | 2026-05-24 | accepted | Resume failure contract | If `HUMAN_GATE` was reached but interactive resume could not be opened, the command exits `2` after printing the exact resume command and captured thread id. |
+| `DL-06` | 2026-05-29 | accepted | Completion-state wording | Keep `delivery_status: in_progress` until final acceptance / CI evidence is recorded, while the implementation plan may state that local implementation and local verification steps are complete. |
 
 ## FPF-Closed Questions
 
@@ -107,6 +108,33 @@ Store `events.jsonl`, `last-message.txt`, and `thread-id` under `<worktree>/.sta
 #### Conflict handled
 
 No cross-document conflict remained after aligning the state contract with the issue's proposed location and the repository's existing worktree-centered workflow.
+
+### `FPF-04`: How should the documents describe completion after local implementation but before final acceptance evidence?
+
+#### Why this mattered
+
+The feature package had a status conflict: [feature.md](feature.md) still used `delivery_status: in_progress`, while [implementation-plan.md](implementation-plan.md) said `STEP-02` through `STEP-06` were completed locally but also said the package was only ready to guide implementation work. The document set needed one state model so verify/evidence and delivery status would not contradict each other.
+
+#### Available facts
+
+- Issue #26 is still open in GitHub as of 2026-05-29.
+- [feature.md](feature.md) owns final acceptance and has `delivery_status: in_progress`.
+- [implementation-plan.md](implementation-plan.md) records local completion for code, tests, docs, and local verification on 2026-05-24.
+- [feature.md](feature.md) defines `EVID-01` as local and CI command output, but the current feature package only records local verification in the implementation plan.
+
+#### FPF reasoning summary
+
+- Bounded contexts: implementation execution, local verification, final acceptance, and external issue closure are separate states and should not be collapsed into one "done" label.
+- Evidence discipline: the documents can assert local completion because the implementation plan records it, but they should not assert final acceptance or issue closure without CI / acceptance evidence.
+- Surface precision restoration: "ready to guide implementation work" is stale once implementation steps are recorded as complete; the accurate state is "locally implemented and ready for acceptance review."
+
+#### Resolution
+
+Keep `delivery_status: in_progress` until final acceptance / CI evidence is recorded, but update [implementation-plan.md](implementation-plan.md) to say local implementation and local verification are complete and the feature is ready for acceptance review.
+
+#### Conflict handled
+
+This resolves the conflict between `delivery_status: in_progress`, completed local steps, and stale "ready to guide implementation" wording by separating local completion from final acceptance.
 
 ## Conflict Resolution
 
