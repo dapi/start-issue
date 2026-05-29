@@ -28,6 +28,7 @@ uninstall:
 test:
 	bash -n scripts/start-issue
 	shellcheck install.sh scripts/start-issue scripts/build-start-issue scripts/bump-version scripts/prepare-release scripts/lib/start_issue/*.sh
+	python3 scripts/check_memory_bank_index.py --max-depth 4
 	git diff --check
 	bats test
 

@@ -11,7 +11,6 @@ derived_from:
   - ../../../scripts/lib/start_issue/cli.sh
   - ../../../scripts/lib/start_issue/output.sh
   - ../../../scripts/lib/start_issue/pipeline.sh
-  - ../../../test/helpers/fake-bin/codex
 status: active
 audience: humans_and_agents
 ---
