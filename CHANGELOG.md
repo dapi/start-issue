@@ -18,6 +18,10 @@ This project follows Semantic Versioning.
 
 - Updated release preparation to require `CHANGELOG.md` entries and move `Unreleased` notes under the new release version and date.
 
+### Fixed
+
+- Fixed branch slug generation for non-Latin titles: leading bracketed workflow tags (e.g. `[brief]`) are now stripped, and Cyrillic titles are transliterated to a meaningful Latin slug instead of collapsing to the tag or `work`. The AI branch-name prompt now also transliterates non-English titles and ignores bracketed tags.
+
 ## [1.13.1] - 2026-05-24
 
 ### Changed
