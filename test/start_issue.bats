@@ -1134,3 +1134,75 @@ EOF
   assert_output_contains "Base: develop"
   assert_output_contains "Would run: git worktree add -b feature/issue-1-add-login-button $HOME/worktrees/feature/issue-1-add-login-button develop"
 }
+
+@test "sanitize_branch_slug strips leading bracketed tag before slug" {
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "[brief] add login button"'
+
+  assert_success
+  [[ "$output" == add-login-button* ]]
+  [[ "$output" != brief* ]]
+}
+
+@test "sanitize_branch_slug strips multiple leading bracketed tags" {
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "[brief][bug] add login button"'
+
+  assert_success
+  [[ "$output" == add-login-button* ]]
+  [[ "$output" != brief* ]]
+}
+
+@test "sanitize_branch_slug transliterates Cyrillic to meaningful Latin slug" {
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "Кнопка Отменить выгрузки"'
+
+  assert_success
+  [[ "$output" != "work" ]]
+  [[ "$output" == *knopka* ]]
+  [[ "$output" == *otmenit* ]]
+}
+
+@test "fast branch naming with cyrillic title and leading bracketed tag yields meaningful slug" {
+  cat > "$TEST_TMPDIR/issue-cyrillic.json" <<'EOF'
+{
+  "number": 2980,
+  "title": "[brief] - Кнопка «Отменить» на странице выгрузки в операторской",
+  "body": "Some body text.",
+  "html_url": "https://github.com/owner/repo/issues/2980",
+  "labels": [
+    {
+      "name": "enhancement"
+    }
+  ]
+}
+EOF
+  export START_ISSUE_FAKE_ISSUE_JSON="$TEST_TMPDIR/issue-cyrillic.json"
+
+  run_start_issue 2980 --agent none --dry-run --no-init
+
+  assert_success
+  [[ "$output" != *"/issue-2980-brief"* ]]
+  [[ "$output" != *"/issue-2980-work"* ]]
+  assert_output_contains "knopka"
+}
+
+@test "fast branch naming with purely Cyrillic title yields transliterated slug not 'work'" {
+  cat > "$TEST_TMPDIR/issue-pure-cyrillic.json" <<'EOF'
+{
+  "number": 42,
+  "title": "Добавить кнопку входа",
+  "body": "Добавить кнопку входа в заголовок.",
+  "html_url": "https://github.com/owner/repo/issues/42",
+  "labels": [
+    {
+      "name": "enhancement"
+    }
+  ]
+}
+EOF
+  export START_ISSUE_FAKE_ISSUE_JSON="$TEST_TMPDIR/issue-pure-cyrillic.json"
+
+  run_start_issue 42 --agent none --dry-run --no-init
+
+  assert_success
+  [[ "$output" != *"/issue-42-work"* ]]
+  assert_output_contains "dobavit"
+}
