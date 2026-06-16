@@ -349,6 +349,8 @@ generate_ai_branch_name() {
     local prompt="Git branch name for issue #$ISSUE_NUMBER: \"$ISSUE_TITLE\" (labels: $ISSUE_LABELS).
 Format: {type}/issue-$ISSUE_NUMBER-{kebab-case-name}
 Types: bug/fix -> fix, enhancement -> feature, hotfix -> hotfix, docs -> docs, refactor -> refactor, test -> test, chore -> chore, default -> feature.
+If the title contains non-English text (e.g. Cyrillic), transliterate it to English for the kebab-case name.
+Strip any leading bracketed tags (e.g. [brief], [bug]) from the title — they are workflow markers, not part of the task meaning.
 Reply with ONLY the branch name."
     local output=""
 

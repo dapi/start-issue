@@ -30,6 +30,7 @@ setup() {
   unset START_ISSUE_FAKE_BRANCH_NAME
   unset START_ISSUE_FAKE_AGENT_FAIL
   unset START_ISSUE_FAKE_EXPECT_MODEL
+  unset START_ISSUE_FAKE_EXPECT_PROMPT
   unset START_ISSUE_FAKE_FORBID_MODEL
   unset START_ISSUE_FAKE_LATEST_RELEASE_JSON
   unset START_ISSUE_REPOSITORY
@@ -984,6 +985,26 @@ install_fake_zellij_tab_status() {
   assert_success
   assert_output_contains "Generated branch name doesn't match expected format"
   assert_output_contains "Using fallback: feature/issue-1-add-login-button"
+}
+
+@test "AI branch naming prompt instructs model to transliterate non-English titles" {
+  export START_ISSUE_FAKE_BRANCH_NAME=feature/issue-1-ai-generated-name
+  export START_ISSUE_FAKE_EXPECT_PROMPT="transliterate"
+
+  run_start_issue 1 --agent claude --ai --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Branch: feature/issue-1-ai-generated-name"
+}
+
+@test "AI branch naming prompt instructs model to ignore leading bracketed tags" {
+  export START_ISSUE_FAKE_BRANCH_NAME=feature/issue-1-ai-generated-name
+  export START_ISSUE_FAKE_EXPECT_PROMPT="bracketed"
+
+  run_start_issue 1 --agent claude --ai --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Branch: feature/issue-1-ai-generated-name"
 }
 
 @test "AI branch naming falls back when branch ends with a trailing dash" {
