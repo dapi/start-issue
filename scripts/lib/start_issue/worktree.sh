@@ -22,7 +22,7 @@ s/Д/D/g; s/д/d/g;
 s/Е/E/g; s/е/e/g;
 s/З/Z/g; s/з/z/g;
 s/И/I/g; s/и/i/g;
-s/Й/J/g; s/й/j/g;
+s/Й/Y/g; s/й/y/g;
 s/К/K/g; s/к/k/g;
 s/Л/L/g; s/л/l/g;
 s/М/M/g; s/м/m/g;

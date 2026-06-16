@@ -1155,9 +1155,9 @@ EOF
   run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "Кнопка Отменить выгрузки"'
 
   assert_success
-  [[ "$output" != "work" ]]
-  [[ "$output" == *knopka* ]]
-  [[ "$output" == *otmenit* ]]
+  # Exact match also guards against stray-dash artifacts from soft/hard sign (ь/ъ) handling.
+  [[ "$output" == "knopka-otmenit-vygruzki" ]]
+  [[ "$output" != *--* ]]
 }
 
 @test "fast branch naming with cyrillic title and leading bracketed tag yields meaningful slug" {
