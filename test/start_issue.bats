@@ -989,6 +989,7 @@ install_fake_zellij_tab_status() {
 
 @test "AI branch naming prompt instructs model to transliterate non-English titles" {
   export START_ISSUE_FAKE_BRANCH_NAME=feature/issue-1-ai-generated-name
+  # Substring must match a word in the generate_ai_branch_name prompt; keep in sync if reworded.
   export START_ISSUE_FAKE_EXPECT_PROMPT="transliterate"
 
   run_start_issue 1 --agent claude --ai --dry-run --no-init
@@ -999,6 +1000,7 @@ install_fake_zellij_tab_status() {
 
 @test "AI branch naming prompt instructs model to ignore leading bracketed tags" {
   export START_ISSUE_FAKE_BRANCH_NAME=feature/issue-1-ai-generated-name
+  # Substring must match a word in the generate_ai_branch_name prompt; keep in sync if reworded.
   export START_ISSUE_FAKE_EXPECT_PROMPT="bracketed"
 
   run_start_issue 1 --agent claude --ai --dry-run --no-init
