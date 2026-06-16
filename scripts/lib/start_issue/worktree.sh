@@ -3,7 +3,7 @@ sanitize_branch_slug() {
     local input="$1"
     local slug
 
-    # Strip leading bracketed workflow tags ([brief], [brief][bug], ...), then
+    # Strip leading bracketed process/stage tags ([brief], [brief][investigation], ...), then
     # transliterate Cyrillic -> Latin (BGN/PCGN-style: Х->Kh, Ц->Ts, Щ->Shch, Й->Y;
     # soft/hard signs ъ/ь are dropped, not substituted). Two invariants:
     #   - order matters: multi-letter digraphs must precede the single-letter rules;

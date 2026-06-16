@@ -1167,7 +1167,7 @@ EOF
 }
 
 @test "sanitize_branch_slug strips multiple leading bracketed tags" {
-  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "[brief][bug] add login button"'
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "[brief][investigation] add login button"'
 
   assert_success
   [[ "$output" == add-login-button* ]]
