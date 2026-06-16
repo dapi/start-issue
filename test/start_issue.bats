@@ -1178,9 +1178,45 @@ EOF
   run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "Кнопка Отменить выгрузки"'
 
   assert_success
-  # Exact match also guards against stray-dash artifacts from soft/hard sign (ь/ъ) handling.
+  # Exact match pins the transliteration table; soft/hard signs (ь/ъ) must drop, not transliterate.
   [[ "$output" == "knopka-otmenit-vygruzki" ]]
-  [[ "$output" != *--* ]]
+}
+
+@test "sanitize_branch_slug falls back to 'work' when only a bracketed tag remains" {
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "[brief]"'
+
+  assert_success
+  [[ "$output" == "work" ]]
+}
+
+@test "sanitize_branch_slug falls back to 'work' when title is only soft/hard signs" {
+  # ь/ъ are deleted (not transliterated), so the slug collapses to empty -> work.
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "ьъ"'
+
+  assert_success
+  [[ "$output" == "work" ]]
+}
+
+@test "sanitize_branch_slug transliterates a mixed Latin/Cyrillic title" {
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "Fix Кнопка login"'
+
+  assert_success
+  [[ "$output" == "fix-knopka-login" ]]
+}
+
+@test "sanitize_branch_slug orders multi-letter digraphs before single-letter rules" {
+  # Защита exercises щ->shch and several digraphs; a wrong rule order would corrupt it.
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "Защита поиска"'
+
+  assert_success
+  [[ "$output" == "zashchita-poiska" ]]
+}
+
+@test "sanitize_branch_slug lowercases transliterated uppercase Cyrillic" {
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "КНОПКА ОТМЕНИТЬ"'
+
+  assert_success
+  [[ "$output" == "knopka-otmenit" ]]
 }
 
 @test "fast branch naming with cyrillic title and leading bracketed tag yields meaningful slug" {
@@ -1228,4 +1264,30 @@ EOF
   assert_success
   [[ "$output" != *"/issue-42-work"* ]]
   assert_output_contains "dobavit"
+}
+
+@test "fast branch naming reproduces the real issue #3109 title with a meaningful slug" {
+  # Regression for the real alfagen/mercury#3109 title that the old code turned into
+  # 'feature/issue-3109-brief-0-20-usd' (leaked [brief] tag, dropped the Cyrillic head word).
+  cat > "$TEST_TMPDIR/issue-3109.json" <<'EOF'
+{
+  "number": 3109,
+  "title": "[brief] - Вознаграждение 0,20 USD в рублёвом эквиваленте при нулевой/отрицательной комиссии",
+  "body": "Some body text.",
+  "html_url": "https://github.com/owner/repo/issues/3109",
+  "labels": [
+    {
+      "name": "enhancement"
+    }
+  ]
+}
+EOF
+  export START_ISSUE_FAKE_ISSUE_JSON="$TEST_TMPDIR/issue-3109.json"
+
+  run_start_issue 3109 --agent none --dry-run --no-init
+
+  assert_success
+  [[ "$output" != *"/issue-3109-brief"* ]]
+  [[ "$output" != *"/issue-3109-work"* ]]
+  assert_output_contains "voznagrazhdenie"
 }

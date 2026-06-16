@@ -3,6 +3,13 @@ sanitize_branch_slug() {
     local input="$1"
     local slug
 
+    # Strip leading bracketed workflow tags ([brief], [brief][bug], ...), then
+    # transliterate Cyrillic -> Latin (BGN/PCGN-style: Х->Kh, Ц->Ts, Щ->Shch, Й->Y;
+    # soft/hard signs ъ/ь are dropped, not substituted). Two invariants:
+    #   - order matters: multi-letter digraphs must precede the single-letter rules;
+    #   - LC_ALL must be a UTF-8 locale or sed won't match the multibyte Cyrillic.
+    # The tail lowercases, collapses non-alnum runs to single dashes, caps at 40
+    # chars, and trims leading/trailing dashes; an empty result falls back to "work".
     slug=$(printf "%s" "$input" | LC_ALL=en_US.UTF-8 sed 's/^\(\[[^]]*\][[:space:]-]*\)*//' | \
         LC_ALL=en_US.UTF-8 sed '
 s/Щ/Shch/g; s/щ/shch/g;
