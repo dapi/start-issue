@@ -274,6 +274,10 @@ print_prompt_file_locations() {
     echo "${indent}  User: $HOME/.config/start-issue/prompt.md"
 }
 
+print_terminal_status() {
+    echo "   $1"
+}
+
 print_session_header() {
     local term_width
     local min_width=60

@@ -40,6 +40,7 @@ start_agent_session() {
         cd "$LAUNCH_CWD" || exit
     fi
 
+    print_terminal_status "Handing off to $AGENT in $WORKTREE_PATH"
     exec "${LAUNCH_CMD[@]}"
 }
 

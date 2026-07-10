@@ -210,6 +210,7 @@ prompt_branch_conflict_resolution() {
     echo "  3) Delete branch/worktree and recreate"
     echo "  0) Exit"
     echo ""
+    print_terminal_status "Waiting for input: branch already exists"
     read -r -n 1 -p "Choice: " CONFLICT_CHOICE
     echo ""
 }

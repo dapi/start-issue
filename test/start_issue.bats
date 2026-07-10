@@ -350,6 +350,7 @@ install_fake_zellij_tab_status() {
   assert_output_contains "Fetching issue #1 from owner/repo"
   assert_output_contains "Agent: codex"
   assert_output_contains "Agent source: $HOME/.config/start-issue/agent"
+  assert_output_contains "Handing off to codex in $HOME/worktrees/feature/issue-1-add-login-button"
   assert_output_contains "fake codex invoked"
   [[ "$(cat "$HOME/.config/start-issue/agent")" == "codex" ]]
   [[ "$(cat "$HOME/.config/start-issue/prompt.md")" == *"Implement GitHub issue {ISSUE_URL} in this worktree."* ]]
@@ -1077,6 +1078,7 @@ EOF
 
   assert_success
   assert_output_contains "Existing worktree: $expected_worktree"
+  assert_output_contains "Waiting for input: branch already exists"
   assert_output_contains "Using existing worktree: $expected_worktree"
   assert_output_contains "✅ Worktree ready at: $expected_worktree"
   [[ "$output" != *"worktree-v2"* ]]
