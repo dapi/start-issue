@@ -350,6 +350,7 @@ install_fake_zellij_tab_status() {
   assert_output_contains "Fetching issue #1 from owner/repo"
   assert_output_contains "Agent: codex"
   assert_output_contains "Agent source: $HOME/.config/start-issue/agent"
+  assert_output_contains "Handing off to codex in $HOME/worktrees/feature/issue-1-add-login-button"
   assert_output_contains "fake codex invoked"
   [[ "$(cat "$HOME/.config/start-issue/agent")" == "codex" ]]
   [[ "$(cat "$HOME/.config/start-issue/prompt.md")" == *"Implement GitHub issue {ISSUE_URL} in this worktree."* ]]
@@ -1077,6 +1078,7 @@ EOF
 
   assert_success
   assert_output_contains "Existing worktree: $expected_worktree"
+  assert_output_contains "Waiting for input: branch already exists"
   assert_output_contains "Using existing worktree: $expected_worktree"
   assert_output_contains "✅ Worktree ready at: $expected_worktree"
   [[ "$output" != *"worktree-v2"* ]]
@@ -1088,6 +1090,7 @@ EOF
   run bash -c 'printf "1\n" | "$REPO_ROOT/scripts/start-issue" 1 --agent none --no-init'
 
   assert_failure
+  assert_output_contains "Waiting for input: worktree path already exists"
   assert_output_contains "path exists but is not a git worktree for this repository"
   [[ "$output" != *"Worktree ready"* ]]
 }
@@ -1099,6 +1102,7 @@ EOF
 
   assert_failure
   assert_output_contains "Registered branch: chore/other-branch"
+  assert_output_contains "Waiting for input: worktree path already exists"
   assert_output_contains "Cannot reuse worktree path '$HOME/worktrees/feature/issue-1-add-login-button': it belongs to branch 'chore/other-branch', not 'feature/issue-1-add-login-button'."
   [[ "$output" != *"Worktree ready"* ]]
 }
