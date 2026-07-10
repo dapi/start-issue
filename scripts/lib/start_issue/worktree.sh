@@ -274,6 +274,7 @@ prompt_path_conflict_resolution() {
     echo "  2) Delete and recreate"
     echo "  0) Exit"
     echo ""
+    print_terminal_status "Waiting for input: worktree path already exists"
     read -r -n 1 -p "Choice: " CONFLICT_CHOICE
     echo ""
 }

@@ -1090,6 +1090,7 @@ EOF
   run bash -c 'printf "1\n" | "$REPO_ROOT/scripts/start-issue" 1 --agent none --no-init'
 
   assert_failure
+  assert_output_contains "Waiting for input: worktree path already exists"
   assert_output_contains "path exists but is not a git worktree for this repository"
   [[ "$output" != *"Worktree ready"* ]]
 }
@@ -1101,6 +1102,7 @@ EOF
 
   assert_failure
   assert_output_contains "Registered branch: chore/other-branch"
+  assert_output_contains "Waiting for input: worktree path already exists"
   assert_output_contains "Cannot reuse worktree path '$HOME/worktrees/feature/issue-1-add-login-button': it belongs to branch 'chore/other-branch', not 'feature/issue-1-add-login-button'."
   [[ "$output" != *"Worktree ready"* ]]
 }
