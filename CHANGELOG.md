@@ -6,6 +6,8 @@ This project follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [1.13.2] - 2026-07-19
+
 ### Added
 
 - Added `setup` and `--setup` onboarding for user-level configuration in `~/.config/start-issue`.
