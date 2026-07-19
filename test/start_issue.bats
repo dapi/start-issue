@@ -30,6 +30,7 @@ setup() {
   unset START_ISSUE_FAKE_BRANCH_NAME
   unset START_ISSUE_FAKE_AGENT_FAIL
   unset START_ISSUE_FAKE_EXPECT_MODEL
+  unset START_ISSUE_FAKE_EXPECT_PROMPT
   unset START_ISSUE_FAKE_FORBID_MODEL
   unset START_ISSUE_FAKE_LATEST_RELEASE_JSON
   unset START_ISSUE_REPOSITORY
@@ -987,6 +988,28 @@ install_fake_zellij_tab_status() {
   assert_output_contains "Using fallback: feature/issue-1-add-login-button"
 }
 
+@test "AI branch naming prompt instructs model to transliterate non-English titles" {
+  export START_ISSUE_FAKE_BRANCH_NAME=feature/issue-1-ai-generated-name
+  # Substring must match a word in the generate_ai_branch_name prompt; keep in sync if reworded.
+  export START_ISSUE_FAKE_EXPECT_PROMPT="transliterate"
+
+  run_start_issue 1 --agent claude --ai --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Branch: feature/issue-1-ai-generated-name"
+}
+
+@test "AI branch naming prompt instructs model to ignore leading bracketed tags" {
+  export START_ISSUE_FAKE_BRANCH_NAME=feature/issue-1-ai-generated-name
+  # Substring must match a word in the generate_ai_branch_name prompt; keep in sync if reworded.
+  export START_ISSUE_FAKE_EXPECT_PROMPT="bracketed"
+
+  run_start_issue 1 --agent claude --ai --dry-run --no-init
+
+  assert_success
+  assert_output_contains "Branch: feature/issue-1-ai-generated-name"
+}
+
 @test "AI branch naming falls back when branch ends with a trailing dash" {
   export START_ISSUE_FAKE_BRANCH_NAME="feature/issue-1-ai-generated-"
 
@@ -1137,4 +1160,138 @@ EOF
   assert_output_contains "Could not detect default branch, using current: develop"
   assert_output_contains "Base: develop"
   assert_output_contains "Would run: git worktree add -b feature/issue-1-add-login-button $HOME/worktrees/feature/issue-1-add-login-button develop"
+}
+
+@test "sanitize_branch_slug strips leading bracketed tag before slug" {
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "[brief] add login button"'
+
+  assert_success
+  [[ "$output" == add-login-button* ]]
+  [[ "$output" != brief* ]]
+}
+
+@test "sanitize_branch_slug strips multiple leading bracketed tags" {
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "[brief][investigation] add login button"'
+
+  assert_success
+  [[ "$output" == add-login-button* ]]
+  [[ "$output" != brief* ]]
+}
+
+@test "sanitize_branch_slug transliterates Cyrillic to meaningful Latin slug" {
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "Кнопка Отменить выгрузки"'
+
+  assert_success
+  # Exact match pins the transliteration table; soft/hard signs (ь/ъ) must drop, not transliterate.
+  [[ "$output" == "knopka-otmenit-vygruzki" ]]
+}
+
+@test "sanitize_branch_slug falls back to 'work' when only a bracketed tag remains" {
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "[brief]"'
+
+  assert_success
+  [[ "$output" == "work" ]]
+}
+
+@test "sanitize_branch_slug falls back to 'work' when title is only soft/hard signs" {
+  # ь/ъ are deleted (not transliterated), so the slug collapses to empty -> work.
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "ьъ"'
+
+  assert_success
+  [[ "$output" == "work" ]]
+}
+
+@test "sanitize_branch_slug transliterates a mixed Latin/Cyrillic title" {
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "Fix Кнопка login"'
+
+  assert_success
+  [[ "$output" == "fix-knopka-login" ]]
+}
+
+@test "sanitize_branch_slug orders multi-letter digraphs before single-letter rules" {
+  # Защита exercises щ->shch and several digraphs; a wrong rule order would corrupt it.
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "Защита поиска"'
+
+  assert_success
+  [[ "$output" == "zashchita-poiska" ]]
+}
+
+@test "sanitize_branch_slug lowercases transliterated uppercase Cyrillic" {
+  run bash -lc 'set -euo pipefail; source "'"$REPO_ROOT"'/scripts/lib/start_issue/worktree.sh"; sanitize_branch_slug "КНОПКА ОТМЕНИТЬ"'
+
+  assert_success
+  [[ "$output" == "knopka-otmenit" ]]
+}
+
+@test "fast branch naming with cyrillic title and leading bracketed tag yields meaningful slug" {
+  cat > "$TEST_TMPDIR/issue-cyrillic.json" <<'EOF'
+{
+  "number": 2980,
+  "title": "[brief] - Кнопка «Отменить» на странице выгрузки в операторской",
+  "body": "Some body text.",
+  "html_url": "https://github.com/owner/repo/issues/2980",
+  "labels": [
+    {
+      "name": "enhancement"
+    }
+  ]
+}
+EOF
+  export START_ISSUE_FAKE_ISSUE_JSON="$TEST_TMPDIR/issue-cyrillic.json"
+
+  run_start_issue 2980 --agent none --dry-run --no-init
+
+  assert_success
+  [[ "$output" != *"/issue-2980-brief"* ]]
+  [[ "$output" != *"/issue-2980-work"* ]]
+  assert_output_contains "knopka"
+}
+
+@test "fast branch naming with purely Cyrillic title yields transliterated slug not 'work'" {
+  cat > "$TEST_TMPDIR/issue-pure-cyrillic.json" <<'EOF'
+{
+  "number": 42,
+  "title": "Добавить кнопку входа",
+  "body": "Добавить кнопку входа в заголовок.",
+  "html_url": "https://github.com/owner/repo/issues/42",
+  "labels": [
+    {
+      "name": "enhancement"
+    }
+  ]
+}
+EOF
+  export START_ISSUE_FAKE_ISSUE_JSON="$TEST_TMPDIR/issue-pure-cyrillic.json"
+
+  run_start_issue 42 --agent none --dry-run --no-init
+
+  assert_success
+  [[ "$output" != *"/issue-42-work"* ]]
+  assert_output_contains "dobavit"
+}
+
+@test "fast branch naming reproduces the real issue #3109 title with a meaningful slug" {
+  # Regression for the real alfagen/mercury#3109 title that the old code turned into
+  # 'feature/issue-3109-brief-0-20-usd' (leaked [brief] tag, dropped the Cyrillic head word).
+  cat > "$TEST_TMPDIR/issue-3109.json" <<'EOF'
+{
+  "number": 3109,
+  "title": "[brief] - Вознаграждение 0,20 USD в рублёвом эквиваленте при нулевой/отрицательной комиссии",
+  "body": "Some body text.",
+  "html_url": "https://github.com/owner/repo/issues/3109",
+  "labels": [
+    {
+      "name": "enhancement"
+    }
+  ]
+}
+EOF
+  export START_ISSUE_FAKE_ISSUE_JSON="$TEST_TMPDIR/issue-3109.json"
+
+  run_start_issue 3109 --agent none --dry-run --no-init
+
+  assert_success
+  [[ "$output" != *"/issue-3109-brief"* ]]
+  [[ "$output" != *"/issue-3109-work"* ]]
+  assert_output_contains "voznagrazhdenie"
 }

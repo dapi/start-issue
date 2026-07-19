@@ -3,7 +3,50 @@ sanitize_branch_slug() {
     local input="$1"
     local slug
 
-    slug=$(printf "%s" "$input" | tr '[:upper:]' '[:lower:]' | \
+    # Strip leading bracketed process/stage tags ([brief], [brief][investigation], ...), then
+    # transliterate Cyrillic -> Latin (BGN/PCGN-style: Х->Kh, Ц->Ts, Щ->Shch, Й->Y;
+    # soft/hard signs ъ/ь are dropped, not substituted). Two invariants:
+    #   - order matters: multi-letter digraphs must precede the single-letter rules;
+    #   - LC_ALL must be a UTF-8 locale or sed won't match the multibyte Cyrillic.
+    # The tail lowercases, collapses non-alnum runs to single dashes, caps at 40
+    # chars, and trims leading/trailing dashes; an empty result falls back to "work".
+    slug=$(printf "%s" "$input" | LC_ALL=en_US.UTF-8 sed 's/^\(\[[^]]*\][[:space:]-]*\)*//' | \
+        LC_ALL=en_US.UTF-8 sed '
+s/Щ/Shch/g; s/щ/shch/g;
+s/Ж/Zh/g;   s/ж/zh/g;
+s/Х/Kh/g;   s/х/kh/g;
+s/Ц/Ts/g;   s/ц/ts/g;
+s/Ч/Ch/g;   s/ч/ch/g;
+s/Ш/Sh/g;   s/ш/sh/g;
+s/Ю/Yu/g;   s/ю/yu/g;
+s/Я/Ya/g;   s/я/ya/g;
+s/Ё/Yo/g;   s/ё/yo/g;
+s/А/A/g; s/а/a/g;
+s/Б/B/g; s/б/b/g;
+s/В/V/g; s/в/v/g;
+s/Г/G/g; s/г/g/g;
+s/Д/D/g; s/д/d/g;
+s/Е/E/g; s/е/e/g;
+s/З/Z/g; s/з/z/g;
+s/И/I/g; s/и/i/g;
+s/Й/Y/g; s/й/y/g;
+s/К/K/g; s/к/k/g;
+s/Л/L/g; s/л/l/g;
+s/М/M/g; s/м/m/g;
+s/Н/N/g; s/н/n/g;
+s/О/O/g; s/о/o/g;
+s/П/P/g; s/п/p/g;
+s/Р/R/g; s/р/r/g;
+s/С/S/g; s/с/s/g;
+s/Т/T/g; s/т/t/g;
+s/У/U/g; s/у/u/g;
+s/Ф/F/g; s/ф/f/g;
+s/Ы/Y/g; s/ы/y/g;
+s/Э/E/g; s/э/e/g;
+s/Ъ//g;  s/ъ//g;
+s/Ь//g;  s/ь//g;
+' | \
+        tr '[:upper:]' '[:lower:]' | \
         sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | cut -c1-40 | sed 's/^-*//' | sed 's/-*$//')
 
     if [[ -z "$slug" ]]; then

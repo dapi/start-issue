@@ -6,6 +6,17 @@ if [[ -n "${START_ISSUE_FAKE_EXPECT_MODEL:-}" && "$*" != *"--model ${START_ISSUE
   exit 1
 fi
 
+# Assert the branch-name prompt contains EXPECT_PROMPT. Only the --print path is
+# checked; the prompt-improvement path ("Improve the following ...") also uses
+# --print but carries a different prompt, so it is excluded.
+if [[ -n "${START_ISSUE_FAKE_EXPECT_PROMPT:-}" \
+   && "$*" == *"--print"* \
+   && "$*" != *"Improve the following"* \
+   && "$*" != *"${START_ISSUE_FAKE_EXPECT_PROMPT}"* ]]; then
+  printf "%s\n" "expected prompt to contain: ${START_ISSUE_FAKE_EXPECT_PROMPT}" >&2
+  exit 1
+fi
+
 if [[ "${START_ISSUE_FAKE_FORBID_MODEL:-}" == "1" && "$*" == *"--model "* ]]; then
   printf "%s\n" "unexpected model flag" >&2
   exit 1
