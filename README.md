@@ -19,7 +19,7 @@ It fetches issue metadata with `gh`, creates a git worktree with a branch name b
 Install from source with Go:
 
 ```bash
-go install github.com/dapi/start-issue/cmd/start-issue@latest
+go install github.com/dapi/start-issue/v2/cmd/start-issue@latest
 ```
 
 Published releases contain platform-specific Go binaries and a `checksums.txt`

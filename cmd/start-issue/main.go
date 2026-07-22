@@ -164,7 +164,7 @@ func run(o options) error {
 		return errors.New("Not in a git repository")
 	}
 	root = strings.TrimSpace(root)
-	if err := maybeRunFirstRunOnboarding(); err != nil {
+	if err := maybeRunFirstRunOnboarding(o.dryRun); err != nil {
 		return err
 	}
 	agent, agentSource, err := resolveAgent(root, o.agent)
@@ -249,6 +249,9 @@ func run(o options) error {
 	fmt.Printf("   Branch: %s (fast)\n📁 Creating worktree...\n   Path: %s\n   Base: %s\n", branch, worktree, o.base)
 	if o.dryRun {
 		fmt.Printf("   [DRY-RUN] Would run: git worktree add -b %s %s %s\n", branch, worktree, o.base)
+		if o.humanGate {
+			return humanGate(model, worktree, rendered, true)
+		}
 		printLaunch(agent, model, worktree, rendered)
 		return nil
 	}
@@ -288,7 +291,7 @@ func runInit(worktree string) {
 	}
 }
 func fileExists(path string) bool { _, err := os.Stat(path); return err == nil }
-func maybeRunFirstRunOnboarding() error {
+func maybeRunFirstRunOnboarding(dryRun bool) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
@@ -302,10 +305,14 @@ func maybeRunFirstRunOnboarding() error {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("No start-issue user configuration found. Run setup now? [Y/n] ")
 	answer, _ := reader.ReadString('\n')
+	if dryRun {
+		fmt.Printf("[DRY-RUN] Would create first-run configuration marker: %s\n", dir)
+		return nil
+	}
 	if strings.TrimSpace(strings.ToLower(answer)) == "n" {
 		return os.MkdirAll(dir, 0755)
 	}
-	return setupMode(home)
+	return setupMode(home, false)
 }
 
 func runMode(o options) error {
@@ -322,7 +329,7 @@ func runMode(o options) error {
 		return installMode()
 	}
 	if o.mode == "setup" {
-		return setupMode(home)
+		return setupMode(home, o.dryRun)
 	}
 	dir := filepath.Join(home, ".config", "start-issue")
 	if o.mode == "init" && o.project {
@@ -342,9 +349,9 @@ func runMode(o options) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	agent := o.agent
-	if agent == "" {
-		agent = "claude"
+	agent, _, err := resolveAgent(root, o.agent)
+	if err != nil {
+		return err
 	}
 	if err := writeConfig(filepath.Join(dir, "agent"), agent+"\n", o.force); err != nil {
 		return err
@@ -379,8 +386,12 @@ func runMode(o options) error {
 	return nil
 }
 
-func setupMode(home string) error {
+func setupMode(home string, dryRun bool) error {
 	dir := filepath.Join(home, ".config", "start-issue")
+	if dryRun {
+		fmt.Printf("[DRY-RUN] Would create configuration in: %s\n", dir)
+		return nil
+	}
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
@@ -403,6 +414,9 @@ func setupMode(home string) error {
 	answer, _ := reader.ReadString('\n')
 	if strings.TrimSpace(strings.ToLower(answer)) != "n" {
 		agent := agents[choice]
+		if agent == "" {
+			agent = "claude"
+		}
 		prompt := defaultPortablePrompt()
 		if agent == "claude" {
 			prompt = "/task-router:route-task {ISSUE_URL}"
@@ -482,6 +496,11 @@ func updateMode(o options) error {
 	}
 	if compareVersions(version, release.TagName) >= 0 {
 		fmt.Printf("start-issue is already up to date (%s).\n", version)
+		return nil
+	}
+	if o.dryRun {
+		target, _ := os.Executable()
+		fmt.Printf("[DRY-RUN] Would download %s, verify checksums.txt, and replace: %s\n", releaseAssetName(runtime.GOOS, runtime.GOARCH), target)
 		return nil
 	}
 	assetName := releaseAssetName(runtime.GOOS, runtime.GOARCH)
@@ -841,6 +860,10 @@ func improvePrompt(root, agent, model, prompt, source string, o options, in issu
 	if outputPath == "" {
 		if o.promptFile != "" {
 			outputPath = strings.TrimSuffix(o.promptFile, filepath.Ext(o.promptFile)) + ".improved.md"
+		} else if fileSource := strings.TrimPrefix(source, "START_ISSUE_PROMPT_FILE: "); fileExists(fileSource) {
+			outputPath = strings.TrimSuffix(fileSource, filepath.Ext(fileSource)) + ".improved.md"
+		} else if fileExists(source) {
+			outputPath = strings.TrimSuffix(source, filepath.Ext(source)) + ".improved.md"
 		} else {
 			outputPath = filepath.Join(root, ".start-issue", "prompt.improved.md")
 		}
@@ -994,6 +1017,9 @@ func helperArgs(agent, model, root, prompt string) []string {
 	}
 	switch agent {
 	case "claude":
+		if model == "" {
+			model = "haiku"
+		}
 		args := withModel([]string{"claude", "--print"})
 		return append(args, "--no-session-persistence", "--disable-slash-commands", prompt)
 	case "codex":
