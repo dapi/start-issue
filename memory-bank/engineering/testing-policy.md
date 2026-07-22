@@ -2,7 +2,7 @@
 title: Testing Policy
 doc_kind: engineering
 doc_function: canonical
-purpose: "Testing policy for start-issue: required local checks, Bats coverage, release checks, memory-bank audit, and manual-only exceptions."
+purpose: "Testing policy for start-issue: required Go checks, release checks, memory-bank audit, and manual-only exceptions."
 derived_from:
   - ../dna/governance.md
   - ../flows/feature-flow.md
@@ -33,24 +33,24 @@ make test
 
 `make test` runs:
 
-1. `bash -n scripts/start-issue`
-2. `shellcheck install.sh scripts/start-issue scripts/build-start-issue scripts/bump-version scripts/prepare-release scripts/lib/start_issue/*.sh test/e2e/*.sh`
-3. `python3 scripts/check_memory_bank_index.py --max-depth 4`
-4. `git diff --check`
-5. `bats test`
+1. `gofmt` cleanliness for `cmd/`
+2. `go vet ./...`
+3. `go test ./...`
+4. `python3 scripts/check_memory_bank_index.py --max-depth 4`
+5. `git diff --check`
 
 ## Test Stack
 
-- Shell syntax: `bash -n`
-- Static analysis: `shellcheck`
-- Behavior/regression tests: Bats under `test/`
+- Formatting: `gofmt`
+- Static analysis: `go vet`
+- Behavior/regression tests: Go tests under `cmd/` and future Go packages
 - Opt-in real-agent E2E smoke tests: scripts under `test/e2e/`, run manually and never in CI
 - Memory-bank navigation: `scripts/check_memory_bank_index.py`
 - Whitespace/conflict-marker check: `git diff --check`
 
 ## Core Rules
 
-- Any deterministic behavior change needs automated Bats coverage.
+- Any deterministic behavior change needs automated Go test coverage.
 - Any public CLI contract change must update help/output assertions and docs.
 - Any config precedence change must test the winning source and displayed source.
 - Any worktree lifecycle change must test safe reuse/reject/delete behavior.
@@ -65,7 +65,7 @@ make test
 - Legacy `feature.md` packages own their existing `SC-*`, `CHK-*`, and `EVID-*`
   until migrated.
 - `implementation-plan.md` owns concrete test commands and sequencing.
-- Bats tests own executable regression behavior.
+- Go tests own executable regression behavior.
 
 ## Sufficient Coverage
 
@@ -101,8 +101,7 @@ feature plan or final handoff.
 After tests pass, review for shell complexity:
 
 - avoid scattered agent-specific branching;
-- prefer small functions with explicit inputs over implicit global mutation where
-  practical within the existing Bash style;
+- prefer small functions with explicit inputs over implicit global mutation;
 - avoid abstraction unless it removes real duplication or clarifies a boundary;
 - keep user-facing output stable and direct.
 

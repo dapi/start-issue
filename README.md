@@ -16,38 +16,15 @@ It fetches issue metadata with `gh`, creates a git worktree with a branch name b
 
 ## Install
 
-Install the latest published release:
+Install from source with Go:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dapi/start-issue/master/install.sh | bash
+go install github.com/dapi/start-issue/cmd/start-issue@latest
 ```
 
-The installer downloads the latest GitHub Release asset into `~/.local/bin/start-issue` by default.
-
-For developer diagnostics on a machine where the install appears to hang:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/dapi/start-issue/master/install.sh | bash -s -- --debug
-```
-
-This enables shell tracing plus verbose `curl` or `wget` output so you can see which step is blocking.
-
-Manual install:
-
-```bash
-mkdir -p ~/.local/bin
-curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o ~/.local/bin/start-issue
-chmod +x ~/.local/bin/start-issue
-```
-
-Verify the download if you want:
-
-```bash
-tmpdir="$(mktemp -d)"
-curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o "$tmpdir/start-issue"
-curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue.sha256 -o "$tmpdir/start-issue.sha256"
-(cd "$tmpdir" && shasum -a 256 -c start-issue.sha256)
-```
+Published releases contain platform-specific Go binaries and a `checksums.txt`
+manifest. Download the asset matching your OS and architecture from the release
+page and verify it against that manifest before adding it to `PATH`.
 
 Build and install from source:
 
@@ -55,7 +32,7 @@ Build and install from source:
 make install
 ```
 
-This builds a self-contained `start-issue` script from the modular sources and installs it to `~/.local/bin/start-issue`.
+This builds and installs the Go binary to `~/.local/bin/start-issue`.
 
 Make sure `~/.local/bin` is in your `PATH`.
 
@@ -123,16 +100,10 @@ flowchart TD
 
 ## Internal Architecture
 
-The CLI entrypoint remains `scripts/start-issue`, but the implementation is now split into focused shell modules under `scripts/lib/start_issue/`.
-`make build` and `make install` bundle those modules back into a single-file script for distribution and local installation.
-
-- `cli.sh` parses arguments and normalizes flags into workflow state.
-- `config.sh` resolves agent, model, and prompt configuration.
-- `github.sh` resolves repository context and fetches issue metadata.
-- `worktree.sh` plans branch/worktree behavior and runs worktree-side effects.
-- `agent.sh` owns agent adapter operations: validation, launch command construction, AI branch naming, and prompt improvement.
-- `release.sh` owns release download, checksum, and version-normalization helpers shared by install and update paths.
-- `update.sh` owns the self-update workflow and latest-release resolution.
+The Go entrypoint is `cmd/start-issue`. It owns argument parsing, configuration
+resolution, repository and worktree orchestration, and the adapter commands for
+supported agents. `git`, `gh`, and agent CLIs remain explicit external process
+boundaries.
 - `output.sh` renders help, status, dry-run output, and session framing.
 - `init.sh` owns `start-issue init` plus the user-config onboarding helpers behind `setup`.
 - `pipeline.sh` makes the orchestration pipeline explicit.
@@ -354,32 +325,34 @@ Optional dependency for Zellij support:
 
 ## Requirements
 
-- `bash`
+- Go 1.21+
 - `git`
 - `gh` CLI with authenticated GitHub session
 - `jq`
 - selected agent CLI unless `--agent none` or `--dry-run` is used
 
-The `curl | bash` installer and self-update workflow need `bash` plus either `curl` or `wget`.
-
 ## Releases
 
-GitHub Releases are published automatically when a SemVer tag like `v1.12.0` is pushed. The release workflow reruns the test suite, verifies that the tag matches `VERSION` in `scripts/start-issue`, builds the bundled `start-issue` script, and uploads:
+GitHub Releases are published automatically when a SemVer tag like `v1.12.0` is pushed. The release workflow reruns the Go test suite and publishes platform-specific binaries with a checksum manifest:
 
-- `start-issue`
-- `start-issue.sha256`
+- `start-issue-linux-amd64`
+- `start-issue-linux-arm64`
+- `start-issue-darwin-amd64`
+- `start-issue-darwin-arm64`
+- `start-issue-windows-amd64.exe`
+- `checksums.txt`
 
 To prepare a release locally:
 
 ```bash
-make release-patch
-make release-minor
-make release-major
+make test
+git tag v2.0.0
+git push origin v2.0.0
 ```
 
 Before preparing a release, add user-facing changes under `## [Unreleased]` in `CHANGELOG.md`.
 
-Each command requires a clean worktree, bumps `VERSION`, moves the `CHANGELOG.md` unreleased entries under the new version and date, runs `make test` and `make build`, creates a local commit like `Release v1.12.0`, and creates the matching annotated git tag.
+Create releases from a clean worktree after `make test` and `make build` pass. The tag is the source of the published binary version.
 
 Publish the prepared release with:
 

@@ -67,7 +67,7 @@ tracker, or the developer's review and merge process.
 | Metric ID | Metric | Baseline | Target | Measurement method |
 | --- | --- | --- | --- | --- |
 | `MET-01` | Time from issue reference to prepared worktree | Manual setup | One command for common cases | Manual workflow review and regression tests |
-| `MET-02` | Predictability of config and launch behavior | Historically implicit defaults | Effective agent, model, prompt source, and launch command are visible | CLI output, `--dry-run`, Bats coverage |
+| `MET-02` | Predictability of config and launch behavior | Historically implicit defaults | Effective agent, model, prompt source, and launch command are visible | CLI output, `--dry-run`, Go test coverage |
 | `MET-03` | Release/install reliability | Manual install/update risk | Checksummed release asset and self-update path | Release workflow and installer/update tests |
 
 ## Product Constraints

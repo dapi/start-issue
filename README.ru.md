@@ -19,7 +19,7 @@
 Установить последний опубликованный релиз:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dapi/start-issue/master/install.sh | bash
+go install github.com/dapi/start-issue/cmd/start-issue@latest
 ```
 
 Скрипт установки скачивает asset из последнего GitHub Release в `~/.local/bin/start-issue` по умолчанию.
@@ -196,7 +196,7 @@ flowchart TD
 
 ## Внутренняя архитектура
 
-CLI entrypoint остается `scripts/start-issue`, но реализация теперь разбита на специализированные shell-модули в `scripts/lib/start_issue/`.
+CLI entrypoint — `cmd/start-issue`; runtime, build и тесты реализованы на Go.
 `make build` и `make install` собирают эти модули обратно в single-file script для дистрибуции и локальной установки.
 
 - `cli.sh` парсит аргументы и нормализует флаги в состояние workflow.

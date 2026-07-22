@@ -30,7 +30,10 @@ audience: humans_and_agents
 - Вместо `XXX` используй идентификатор, принятый в проекте: issue id, ticket id или другой стабильный ключ
 - Один package = одна delivery-единица
 
-## Feature packages
+## Instantiated Packages
 
 - [FT-016: Real Codex human-gate E2E suite](FT-016/README.md)
   Opt-in local smoke suite that validates the real Codex human-gate path.
+
+- [FT-017: Go parity-first migration](FT-017/README.md)
+  Issue #34 package for migrating the CLI to Go with executable parity before cutover. The Bash runtime remains the baseline until the package's parity evidence permits cutover.

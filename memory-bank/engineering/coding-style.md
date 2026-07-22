@@ -14,28 +14,23 @@ audience: humans_and_agents
 
 ## General Rules
 
-- Follow the surrounding shell style before introducing a new pattern.
+- Follow idiomatic Go style and run `gofmt` before committing.
 - Keep changes scoped to the requested behavior and touched module boundary.
 - Add comments only for non-obvious why/boundary conditions.
 - Prefer explicit user-facing errors over surprising implicit fallback.
 - Keep docs, help, spec, and tests aligned for public behavior changes.
 
-## Bash Rules
+## Go Rules
 
-- Use `set -euo pipefail` semantics where already established by the script.
-- Quote variable expansions unless the local pattern deliberately relies on word
-  splitting.
-- Keep adapter-specific command syntax in `agent.sh`.
-- Keep config precedence and prompt rendering in `config.sh`.
-- Keep top-level ordering in `pipeline.sh`.
-- Do not grow `scripts/start-issue` with feature logic; source modules should
-  remain the implementation home.
+- Keep adapter-specific command syntax in dedicated Go helpers.
+- Keep config precedence and prompt rendering separate from worktree side effects.
+- Return wrapped errors at external process and filesystem boundaries.
 
 ## Tooling Contract
 
-- Formatter: none configured; preserve existing formatting.
-- Linter: `shellcheck` through `make test`.
-- Test runner: Bats through `make test`.
+- Formatter: `gofmt`.
+- Linter: `go vet` through `make test`.
+- Test runner: Go tests through `make test`.
 - Documentation audit: `scripts/check_memory_bank_index.py --max-depth 4`.
 
 ## Documentation Style
