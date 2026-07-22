@@ -48,7 +48,8 @@ func main() {
 	}
 	if o.issue == "" {
 		usage()
-		return
+		fmt.Fprintln(os.Stderr, "Error: <issue-url-or-number> is required.")
+		os.Exit(1)
 	}
 	if err := run(o); err != nil {
 		die(err)
@@ -151,6 +152,9 @@ func parse(args []string) (options, error) {
 	if (o.project || o.user || o.force) && o.mode != "init" {
 		return o, errors.New("--project, --user, and --force are only valid with init.")
 	}
+	if o.mode != "" && o.issue != "" {
+		return o, fmt.Errorf("Use either %s or <issue-url-or-number>, not both.", o.mode)
+	}
 	return o, nil
 }
 
@@ -252,6 +256,9 @@ func run(o options) error {
 		if worktreeBranch(worktree) != "refs/heads/"+branch {
 			return fmt.Errorf("Cannot reuse worktree path '%s': it does not belong to branch '%s'.", worktree, branch)
 		}
+		if !confirm("Worktree already exists. Continue in " + worktree + "? [y/N] ") {
+			return errors.New("Cancelled.")
+		}
 		if !o.noInit {
 			runInit(worktree)
 		}
@@ -324,7 +331,9 @@ func runMode(o options) error {
 		}
 		dir = filepath.Join(root, ".start-issue")
 	} else if o.mode == "init" && !o.user && root != "" {
-		dir = filepath.Join(root, ".start-issue")
+		if confirm("Initialize project configuration? [y/N] ") {
+			dir = filepath.Join(root, ".start-issue")
+		}
 	}
 	if o.dryRun {
 		fmt.Printf("[DRY-RUN] Would create configuration in: %s\n", dir)
@@ -345,6 +354,9 @@ func runMode(o options) error {
 			return err
 		}
 	}
+	if o.force && o.model == "" {
+		_ = os.Remove(filepath.Join(dir, "model"))
+	}
 	prompt := o.prompt
 	if o.promptFile != "" {
 		b, err := os.ReadFile(o.promptFile)
@@ -357,7 +369,7 @@ func runMode(o options) error {
 		if agent == "claude" {
 			prompt = "/task-router:route-task {ISSUE_URL}"
 		} else {
-			prompt = "Implement GitHub issue {ISSUE_URL} in this worktree."
+			prompt = defaultPortablePrompt()
 		}
 	}
 	if err := writeConfig(filepath.Join(dir, "prompt.md"), prompt+"\n", o.force); err != nil {
@@ -379,23 +391,27 @@ func setupMode(home string) error {
 	choice = strings.TrimSpace(choice)
 	agents := map[string]string{"": "claude", "1": "claude", "2": "codex", "3": "kimi", "4": "pi"}
 	if agent, ok := agents[choice]; ok {
-		if err := writeConfig(filepath.Join(dir, "agent"), agent+"\n", false); err != nil {
+		if err := writeConfig(filepath.Join(dir, "agent"), agent+"\n", true); err != nil {
 			return err
 		}
-	} else if choice != "5" {
+	} else if choice == "5" {
+		_ = os.Remove(filepath.Join(dir, "agent"))
+	} else {
 		return errors.New("invalid setup choice")
 	}
 	fmt.Print("Save a default prompt? [Y/n] ")
 	answer, _ := reader.ReadString('\n')
 	if strings.TrimSpace(strings.ToLower(answer)) != "n" {
 		agent := agents[choice]
-		prompt := "Implement GitHub issue {ISSUE_URL} in this worktree."
+		prompt := defaultPortablePrompt()
 		if agent == "claude" {
 			prompt = "/task-router:route-task {ISSUE_URL}"
 		}
-		if err := writeConfig(filepath.Join(dir, "prompt.md"), prompt+"\n", false); err != nil {
+		if err := writeConfig(filepath.Join(dir, "prompt.md"), prompt+"\n", true); err != nil {
 			return err
 		}
+	} else {
+		_ = os.Remove(filepath.Join(dir, "prompt.md"))
 	}
 	fmt.Printf("Wrote start-issue configuration: %s\n", dir)
 	return nil
@@ -653,7 +669,20 @@ func resolvePrompt(root, agent string, o options) (string, string, error) {
 		}
 		return "/task-router:route-task {ISSUE_URL}", "built-in Claude command", nil
 	}
-	return "Implement GitHub issue {ISSUE_URL} in this worktree.", "built-in portable prompt", nil
+	return defaultPortablePrompt(), "built-in portable prompt", nil
+}
+func defaultPortablePrompt() string {
+	return `Implement GitHub issue {ISSUE_URL} in this worktree.
+
+Context:
+- Repo: {REPO}
+- Issue: #{ISSUE_NUMBER}
+- Title: {ISSUE_TITLE}
+- Branch: {BRANCH_NAME}
+- Worktree: {WORKTREE_PATH}
+
+Start by reading the issue with gh if needed. Follow repository instructions. Keep changes scoped. Run relevant tests or checks. Summarize changed files and verification before finishing.
+If you open a PR for this work, target the base branch {BASE_BRANCH}.`
 }
 func parseIssue(v, repo string) (string, string, error) {
 	re := regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/issues/([0-9]+)`)
@@ -913,6 +942,9 @@ func printLaunch(a, m, w, p string) {
 		fmt.Printf("   Agent: none\n   Model: %s\n   [DRY-RUN] Would prepare worktree without launching an agent\n", show(m))
 		return
 	}
+	if len(p) > 4000 && os.Getenv("START_ISSUE_DUMP_PROMPT") != "1" {
+		p = "<rendered prompt omitted; set START_ISSUE_DUMP_PROMPT=1 to show it>"
+	}
 	fmt.Printf("   Agent: %s\n   Model: %s\n   [DRY-RUN] Would run: %s\n", a, show(m), strings.Join(launchArgs(a, m, w, p), " "))
 }
 func launch(a, m, w, p string) error {
@@ -1018,8 +1050,28 @@ func show(v string) string {
 	return v
 }
 func die(e error) { fmt.Fprintln(os.Stderr, "Error:", e); os.Exit(1) }
+func confirm(message string) bool {
+	fmt.Print(message)
+	answer, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	return strings.TrimSpace(strings.ToLower(answer)) == "y" || strings.TrimSpace(strings.ToLower(answer)) == "yes"
+}
 func usage() {
-	fmt.Printf("start-issue v%s\n\nUsage: start-issue <issue-url-or-number> [options]\n", version)
+	fmt.Printf(`start-issue v%s
+
+Usage: start-issue <issue-url-or-number> [options]
+       start-issue init [--project|--user] [--force] [options]
+       start-issue setup | update | install
+
+Options:
+  --repo, -r <owner/repo>  --base, -b <branch>  --worktree-dir, -w <dir>
+  --agent <claude|codex|kimi|pi|none>  --model <model>
+  --prompt-file <path>  --prompt <text>  --improve-prompt  --prompt-output-file <path>
+  --no-agent  --no-init  --flat  --ai  --human-gate  --dry-run
+  --project  --user  --force  --version, -v  --help, -h
+
+Environment: START_ISSUE_AGENT, START_ISSUE_MODEL, START_ISSUE_PROMPT,
+START_ISSUE_PROMPT_FILE, START_ISSUE_WORKTREE_DIR, START_ISSUE_DUMP_PROMPT
+`, version)
 }
 
 func humanGateHelp() {
