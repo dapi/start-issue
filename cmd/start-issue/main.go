@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var version = "2.0.0"
@@ -159,6 +160,9 @@ func run(o options) error {
 		return errors.New("Not in a git repository")
 	}
 	root = strings.TrimSpace(root)
+	if err := maybeRunFirstRunOnboarding(); err != nil {
+		return err
+	}
 	agent, agentSource, err := resolveAgent(root, o.agent)
 	if err != nil {
 		return err
@@ -210,6 +214,13 @@ func run(o options) error {
 	for _, l := range in.Labels {
 		labels = append(labels, l.Name)
 	}
+	if _, err := exec.LookPath("zellij-tab-status"); err == nil {
+		if o.dryRun {
+			fmt.Printf("   [DRY-RUN] Would run: zellij-tab-status --set-name #%s\n", number)
+		} else {
+			_ = command("zellij-tab-status", "--set-name", "#"+number)
+		}
+	}
 	if o.improvePrompt {
 		return improvePrompt(root, agent, model, prompt, promptSource, o, in, repo, number, strings.Join(labels, ", "))
 	}
@@ -241,6 +252,9 @@ func run(o options) error {
 		if worktreeBranch(worktree) != "refs/heads/"+branch {
 			return fmt.Errorf("Cannot reuse worktree path '%s': it does not belong to branch '%s'.", worktree, branch)
 		}
+		if !o.noInit {
+			runInit(worktree)
+		}
 		return launchSelected(o, agent, model, worktree, rendered)
 	}
 	if branchWorktree(branch) != "" {
@@ -249,18 +263,42 @@ func run(o options) error {
 	if err := os.MkdirAll(filepath.Dir(worktree), 0755); err != nil {
 		return err
 	}
+	_ = command("git", "fetch", "origin", o.base, "--quiet")
 	if err := command("git", "worktree", "add", "-b", branch, worktree, "origin/"+o.base); err != nil {
 		if err = command("git", "worktree", "add", "-b", branch, worktree, o.base); err != nil {
 			return errors.New("Failed to create worktree")
 		}
 	}
 	if !o.noInit {
-		init := filepath.Join(worktree, "init.sh")
-		if _, err := os.Stat(init); err == nil {
-			_ = commandAt(worktree, "bash", "./init.sh")
-		}
+		runInit(worktree)
 	}
 	return launchSelected(o, agent, model, worktree, rendered)
+}
+
+func runInit(worktree string) {
+	if init := filepath.Join(worktree, "init.sh"); fileExists(init) {
+		_ = commandAt(worktree, "bash", "./init.sh")
+	}
+}
+func fileExists(path string) bool { _, err := os.Stat(path); return err == nil }
+func maybeRunFirstRunOnboarding() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	dir := filepath.Join(home, ".config", "start-issue")
+	if _, err := os.Stat(dir); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("No start-issue user configuration found. Run setup now? [Y/n] ")
+	answer, _ := reader.ReadString('\n')
+	if strings.TrimSpace(strings.ToLower(answer)) == "n" {
+		return os.MkdirAll(dir, 0755)
+	}
+	return setupMode(home)
 }
 
 func runMode(o options) error {
@@ -681,12 +719,7 @@ func aiBranchName(agent, model, root, number, title, labels string) (string, err
 		return "", errors.New("no agent")
 	}
 	prompt := fmt.Sprintf("Git branch name for issue #%s: %q (labels: %s). Reply with ONLY {type}/issue-%s-{kebab-case-name}.", number, title, labels, number)
-	args := launchArgs(agent, model, root, prompt)
-	if agent == "claude" {
-		args = append([]string{"claude", "--print"}, args[1:]...)
-	} else if agent == "codex" {
-		args = append([]string{"codex", "exec", "--sandbox", "read-only", "--skip-git-repo-check"}, args[1:]...)
-	}
+	args := helperArgs(agent, model, root, prompt)
 	result, err := output(args[0], args[1:]...)
 	if err != nil {
 		return "", err
@@ -791,12 +824,7 @@ func improvePrompt(root, agent, model, prompt, source string, o options, in issu
 		return fmt.Errorf("Prompt improvement output already exists: %s", outputPath)
 	}
 	request := fmt.Sprintf("Improve the following start-issue prompt template. Return ONLY the complete improved prompt template.\n\nRepository: %s\nIssue #%s: %s\nLabels: %s\nBody:\n%s\n\nPrompt:\n%s", repo, number, in.Title, labels, in.Body, prompt)
-	args := launchArgs(agent, model, root, request)
-	if agent == "claude" {
-		args = append([]string{"claude", "--print"}, args[1:]...)
-	} else if agent == "codex" {
-		args = append([]string{"codex", "exec", "--sandbox", "read-only", "--skip-git-repo-check"}, args[1:]...)
-	}
+	args := helperArgs(agent, model, root, request)
 	result, err := output(args[0], args[1:]...)
 	if err != nil {
 		return fmt.Errorf("Could not generate improved prompt with %s", agent)
@@ -813,7 +841,7 @@ func improvePrompt(root, agent, model, prompt, source string, o options, in issu
 func humanGate(model, worktree, prompt string, dryRun bool) error {
 	runID := os.Getenv("START_ISSUE_RUN_ID")
 	if runID == "" {
-		runID = "latest"
+		runID = time.Now().Format("20060102-150405")
 	}
 	dir := filepath.Join(worktree, ".start-issue", "runs", runID)
 	events, last := filepath.Join(dir, "events.jsonl"), filepath.Join(dir, "last-message.txt")
@@ -922,6 +950,40 @@ func launchArgs(a, m, w, p string) []string {
 			x = append(x, "--model", m)
 		}
 		return append(x, p)
+	}
+}
+
+func helperArgs(agent, model, root, prompt string) []string {
+	withModel := func(args []string) []string {
+		if model != "" {
+			return append(args, "--model", model)
+		}
+		return args
+	}
+	switch agent {
+	case "claude":
+		args := withModel([]string{"claude", "--print"})
+		return append(args, "--no-session-persistence", "--disable-slash-commands", prompt)
+	case "codex":
+		args := []string{"codex", "exec"}
+		if model != "" {
+			args = append(args, "--model", model)
+		}
+		return append(args, "--cd", root, "--sandbox", "read-only", "--skip-git-repo-check", prompt)
+	case "kimi":
+		args := []string{"kimi"}
+		if model != "" {
+			args = append(args, "--model", model)
+		}
+		return append(args, "--work-dir", root, "--quiet", "-p", prompt)
+	case "pi":
+		args := []string{"pi"}
+		if model != "" {
+			args = append(args, "--model", model)
+		}
+		return append(args, "--print", "--no-tools", "--no-session", prompt)
+	default:
+		return nil
 	}
 }
 func command(name string, args ...string) error {

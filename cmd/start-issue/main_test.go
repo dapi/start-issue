@@ -96,3 +96,14 @@ func TestLaunchArgsNoneIsEmpty(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestHelperArgsAreNonInteractive(t *testing.T) {
+	pi := helperArgs("pi", "", "/repo", "prompt")
+	if got := fmt.Sprint(pi); got != "[pi --print --no-tools --no-session prompt]" {
+		t.Fatalf("pi helper args: %s", got)
+	}
+	kimi := helperArgs("kimi", "model", "/repo", "prompt")
+	if got := fmt.Sprint(kimi); got != "[kimi --model model --work-dir /repo --quiet -p prompt]" {
+		t.Fatalf("kimi helper args: %s", got)
+	}
+}
