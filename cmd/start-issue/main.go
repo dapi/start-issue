@@ -230,7 +230,7 @@ func run(o options) error {
 	}
 	branch := branchName(number, in.Title, strings.Join(labels, ", "))
 	if o.ai {
-		if generated, err := aiBranchName(agent, model, root, number, in.Title, strings.Join(labels, ", ")); err == nil && regexp.MustCompile(`^(feature|fix|hotfix|refactor|docs|test|chore)/issue-[0-9]+-[a-z0-9][a-z0-9-]*$`).MatchString(generated) {
+		if generated, err := aiBranchName(agent, model, root, number, in.Title, strings.Join(labels, ", ")); err == nil && regexp.MustCompile(`^(feature|fix|hotfix|refactor|docs|test|chore)/issue-[0-9]+-[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$`).MatchString(generated) {
 			branch = generated
 			fmt.Printf("   Branch: %s (ai:%s)\n", branch, agent)
 		} else {
@@ -247,17 +247,13 @@ func run(o options) error {
 	fmt.Printf("Agent: %s\nAgent source: %s\nModel: %s\nModel source: %s\nWorktree directory: %s\nPrompt source: %s\n\n", agent, agentSource, show(model), modelSource, o.worktreeDir, promptSource)
 	fmt.Printf("🔍 Fetching issue #%s from %s...\n   Title: %s\n", number, repo, in.Title)
 	fmt.Printf("   Branch: %s (fast)\n📁 Creating worktree...\n   Path: %s\n   Base: %s\n", branch, worktree, o.base)
-	if o.dryRun {
-		fmt.Printf("   [DRY-RUN] Would run: git worktree add -b %s %s %s\n", branch, worktree, o.base)
-		if o.humanGate {
-			return humanGate(model, worktree, rendered, true)
-		}
-		printLaunch(agent, model, worktree, rendered)
-		return nil
-	}
 	if _, err := os.Stat(worktree); err == nil {
 		if worktreeBranch(worktree) != "refs/heads/"+branch {
 			return fmt.Errorf("Cannot reuse worktree path '%s': it does not belong to branch '%s'.", worktree, branch)
+		}
+		if o.dryRun {
+			fmt.Printf("   [DRY-RUN] Would reuse worktree: %s\n", worktree)
+			return launchSelected(options{dryRun: true, humanGate: o.humanGate}, agent, model, worktree, rendered)
 		}
 		if !confirm("Worktree already exists. Continue in " + worktree + "? [y/N] ") {
 			return errors.New("Cancelled.")
@@ -269,16 +265,36 @@ func run(o options) error {
 	}
 	if branchWorktree(branch) != "" {
 		existing := branchWorktree(branch)
+		if o.dryRun {
+			fmt.Printf("   [DRY-RUN] Would reuse branch worktree: %s\n", existing)
+			return launchSelected(options{dryRun: true, humanGate: o.humanGate}, agent, model, existing, render(prompt, map[string]string{"WORKTREE_PATH": existing}))
+		}
 		if !confirm("Branch already exists in " + existing + ". Continue there? [y/N] ") {
 			return errors.New("Cancelled.")
 		}
 		if !o.noInit {
 			runInit(existing)
 		}
-		return launchSelected(o, agent, model, existing, rendered)
+		return launchSelected(o, agent, model, existing, render(prompt, map[string]string{"WORKTREE_PATH": existing}))
 	}
 	if _, err := output("git", "show-ref", "--verify", "--quiet", "refs/heads/"+branch); err == nil {
-		return fmt.Errorf("Branch '%s' exists but is not attached to a worktree. Choose a new branch name or remove it before continuing.", branch)
+		if o.dryRun {
+			fmt.Printf("   [DRY-RUN] Branch exists detached; would prompt for resolution.\n")
+			return nil
+		}
+		if confirm("Branch exists detached. Create suffixed branch? [y/N] ") {
+			branch += "-2"
+		} else {
+			return errors.New("Cancelled.")
+		}
+	}
+	if o.dryRun {
+		fmt.Printf("   [DRY-RUN] Would run: git worktree add -b %s %s %s\n", branch, worktree, o.base)
+		if o.humanGate {
+			return humanGate(model, worktree, rendered, true)
+		}
+		printLaunch(agent, model, worktree, rendered)
+		return nil
 	}
 	if err := os.MkdirAll(filepath.Dir(worktree), 0755); err != nil {
 		return err
@@ -841,6 +857,7 @@ func branchWorktree(branch string) string {
 	return ""
 }
 func worktreeBranch(path string) string {
+	path = canonicalPath(path)
 	value, err := output("git", "worktree", "list", "--porcelain")
 	if err != nil {
 		return ""
@@ -850,11 +867,21 @@ func worktreeBranch(path string) string {
 		if strings.HasPrefix(line, "worktree ") {
 			current = strings.TrimPrefix(line, "worktree ")
 		}
-		if current == path && strings.HasPrefix(line, "branch ") {
+		if canonicalPath(current) == path && strings.HasPrefix(line, "branch ") {
 			return strings.TrimPrefix(line, "branch ")
 		}
 	}
 	return ""
+}
+func canonicalPath(path string) string {
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return path
+	}
+	if resolved, err := filepath.EvalSymlinks(absolute); err == nil {
+		return resolved
+	}
+	return absolute
 }
 func launchSelected(o options, agent, model, worktree, prompt string) error {
 	if o.humanGate {
