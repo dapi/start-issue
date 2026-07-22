@@ -26,6 +26,10 @@ Published releases contain platform-specific Go binaries and a `checksums.txt`
 manifest. Download the asset matching your OS and architecture from the release
 page and verify it against that manifest before adding it to `PATH`.
 
+After bootstrapping the Go command, `start-issue install` performs the same
+platform selection and SHA-256 verification before installing the latest POSIX
+release binary into `~/.local/bin`.
+
 Build and install from source:
 
 ```bash

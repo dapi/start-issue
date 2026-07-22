@@ -3,6 +3,8 @@ package main
 import (
 	"crypto/sha256"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -64,5 +66,33 @@ func TestValidChecksum(t *testing.T) {
 func TestCompareVersions(t *testing.T) {
 	if compareVersions("v1.2.0", "1.2.0") != 0 || compareVersions("1.2.1", "1.2.0") <= 0 || compareVersions("1.1.9", "v1.2.0") >= 0 {
 		t.Fatal("unexpected version ordering")
+	}
+}
+
+func TestParseInitOptions(t *testing.T) {
+	o, err := parse([]string{"init", "--project", "--force", "--prompt-file", "prompt.md"})
+	if err != nil || o.mode != "init" || !o.project || !o.force || o.promptFile != "prompt.md" {
+		t.Fatalf("unexpected options: %#v, %v", o, err)
+	}
+}
+
+func TestResolvePromptPrefersProjectConfig(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, ".start-issue")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "prompt.md"), []byte("project {ISSUE_URL}"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	got, source, err := resolvePrompt(root, "codex", options{})
+	if err != nil || got != "project {ISSUE_URL}" || source != filepath.Join(dir, "prompt.md") {
+		t.Fatalf("got %q %q %v", got, source, err)
+	}
+}
+
+func TestLaunchArgsNoneIsEmpty(t *testing.T) {
+	if got := launchArgs("none", "", "", ""); len(got) != 0 {
+		t.Fatalf("got %q", got)
 	}
 }

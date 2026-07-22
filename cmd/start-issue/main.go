@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -19,10 +20,11 @@ import (
 var version = "2.0.0"
 
 type options struct {
-	repo, base, worktreeDir, agent, model, promptFile, prompt, command string
-	issue                                                              string
-	dryRun, noInit, flat, ai, improvePrompt, humanGate                 bool
-	mode                                                               string
+	repo, base, worktreeDir, agent, model, promptFile, prompt, command       string
+	promptOutput                                                             string
+	issue                                                                    string
+	dryRun, noInit, flat, ai, improvePrompt, humanGate, project, user, force bool
+	mode                                                                     string
 }
 
 type issue struct {
@@ -105,14 +107,24 @@ func parse(args []string) (options, error) {
 			o.ai = true
 		case "--improve-prompt":
 			o.improvePrompt = true
+		case "--prompt-output-file":
+			o.promptOutput, err = value()
 		case "--human-gate":
 			o.humanGate = true
+		case "--project":
+			o.project = true
+		case "--user":
+			o.user = true
+		case "--force":
+			o.force = true
 		case "init":
 			o.mode = "init"
 		case "setup", "--setup":
 			o.mode = "setup"
 		case "update", "--update":
 			o.mode = "update"
+		case "install", "--install":
+			o.mode = "install"
 		case "--human-gate-help":
 			humanGateHelp()
 			os.Exit(0)
@@ -132,6 +144,12 @@ func parse(args []string) (options, error) {
 	if o.prompt != "" && o.promptFile != "" {
 		return o, errors.New("Use either --prompt-file or --prompt, not both.")
 	}
+	if o.project && o.user {
+		return o, errors.New("Use either --project or --user, not both.")
+	}
+	if (o.project || o.user || o.force) && o.mode != "init" {
+		return o, errors.New("--project, --user, and --force are only valid with init.")
+	}
 	return o, nil
 }
 
@@ -147,6 +165,11 @@ func run(o options) error {
 	}
 	if o.humanGate && agent != "codex" {
 		return fmt.Errorf("--human-gate requires agent 'codex'. Current agent: %s.", agent)
+	}
+	if agent != "none" && !o.dryRun {
+		if err := need(agent); err != nil {
+			return fmt.Errorf("%s CLI not found. Install it or use --agent none.", agent)
+		}
 	}
 	model, modelSource, err := resolveModel(root, o.model)
 	if err != nil {
@@ -187,7 +210,18 @@ func run(o options) error {
 	for _, l := range in.Labels {
 		labels = append(labels, l.Name)
 	}
+	if o.improvePrompt {
+		return improvePrompt(root, agent, model, prompt, promptSource, o, in, repo, number, strings.Join(labels, ", "))
+	}
 	branch := branchName(number, in.Title, strings.Join(labels, ", "))
+	if o.ai {
+		if generated, err := aiBranchName(agent, model, root, number, in.Title, strings.Join(labels, ", ")); err == nil && regexp.MustCompile(`^(feature|fix|hotfix|refactor|docs|test|chore)/issue-[0-9]+-[a-z0-9][a-z0-9-]*$`).MatchString(generated) {
+			branch = generated
+			fmt.Printf("   Branch: %s (ai:%s)\n", branch, agent)
+		} else {
+			fmt.Printf("   Could not generate branch name with %s; using fast fallback\n", agent)
+		}
+	}
 	name := branch
 	if o.flat {
 		name = strings.ReplaceAll(name, "/", "-")
@@ -204,7 +238,13 @@ func run(o options) error {
 		return nil
 	}
 	if _, err := os.Stat(worktree); err == nil {
-		return fmt.Errorf("Worktree path already exists: %s", worktree)
+		if worktreeBranch(worktree) != "refs/heads/"+branch {
+			return fmt.Errorf("Cannot reuse worktree path '%s': it does not belong to branch '%s'.", worktree, branch)
+		}
+		return launchSelected(o, agent, model, worktree, rendered)
+	}
+	if branchWorktree(branch) != "" {
+		return fmt.Errorf("Branch '%s' already exists in worktree %s.", branch, branchWorktree(branch))
 	}
 	if err := os.MkdirAll(filepath.Dir(worktree), 0755); err != nil {
 		return err
@@ -220,7 +260,7 @@ func run(o options) error {
 			_ = commandAt(worktree, "bash", "./init.sh")
 		}
 	}
-	return launch(agent, model, worktree, rendered)
+	return launchSelected(o, agent, model, worktree, rendered)
 }
 
 func runMode(o options) error {
@@ -233,8 +273,19 @@ func runMode(o options) error {
 	if o.mode == "update" {
 		return updateMode(o)
 	}
+	if o.mode == "install" {
+		return installMode()
+	}
+	if o.mode == "setup" {
+		return setupMode(home)
+	}
 	dir := filepath.Join(home, ".config", "start-issue")
-	if o.mode == "init" && root != "" {
+	if o.mode == "init" && o.project {
+		if root == "" {
+			return errors.New("--project requires a git repository")
+		}
+		dir = filepath.Join(root, ".start-issue")
+	} else if o.mode == "init" && !o.user && root != "" {
 		dir = filepath.Join(root, ".start-issue")
 	}
 	if o.dryRun {
@@ -248,15 +299,22 @@ func runMode(o options) error {
 	if agent == "" {
 		agent = "claude"
 	}
-	if err := os.WriteFile(filepath.Join(dir, "agent"), []byte(agent+"\n"), 0644); err != nil {
+	if err := writeConfig(filepath.Join(dir, "agent"), agent+"\n", o.force); err != nil {
 		return err
 	}
 	if o.model != "" {
-		if err := os.WriteFile(filepath.Join(dir, "model"), []byte(o.model+"\n"), 0644); err != nil {
+		if err := writeConfig(filepath.Join(dir, "model"), o.model+"\n", o.force); err != nil {
 			return err
 		}
 	}
 	prompt := o.prompt
+	if o.promptFile != "" {
+		b, err := os.ReadFile(o.promptFile)
+		if err != nil {
+			return err
+		}
+		prompt = string(b)
+	}
 	if prompt == "" {
 		if agent == "claude" {
 			prompt = "/task-router:route-task {ISSUE_URL}"
@@ -264,11 +322,95 @@ func runMode(o options) error {
 			prompt = "Implement GitHub issue {ISSUE_URL} in this worktree."
 		}
 	}
-	if err := os.WriteFile(filepath.Join(dir, "prompt.md"), []byte(prompt+"\n"), 0644); err != nil {
+	if err := writeConfig(filepath.Join(dir, "prompt.md"), prompt+"\n", o.force); err != nil {
 		return err
 	}
 	fmt.Printf("Wrote start-issue configuration: %s\n", dir)
 	return nil
+}
+
+func setupMode(home string) error {
+	dir := filepath.Join(home, ".config", "start-issue")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Println("Select default agent: 1) claude  2) codex  3) kimi  4) pi  5) skip")
+	fmt.Print("Choice [1]: ")
+	choice, _ := reader.ReadString('\n')
+	choice = strings.TrimSpace(choice)
+	agents := map[string]string{"": "claude", "1": "claude", "2": "codex", "3": "kimi", "4": "pi"}
+	if agent, ok := agents[choice]; ok {
+		if err := writeConfig(filepath.Join(dir, "agent"), agent+"\n", false); err != nil {
+			return err
+		}
+	} else if choice != "5" {
+		return errors.New("invalid setup choice")
+	}
+	fmt.Print("Save a default prompt? [Y/n] ")
+	answer, _ := reader.ReadString('\n')
+	if strings.TrimSpace(strings.ToLower(answer)) != "n" {
+		agent := agents[choice]
+		prompt := "Implement GitHub issue {ISSUE_URL} in this worktree."
+		if agent == "claude" {
+			prompt = "/task-router:route-task {ISSUE_URL}"
+		}
+		if err := writeConfig(filepath.Join(dir, "prompt.md"), prompt+"\n", false); err != nil {
+			return err
+		}
+	}
+	fmt.Printf("Wrote start-issue configuration: %s\n", dir)
+	return nil
+}
+
+func installMode() error {
+	if runtime.GOOS == "windows" {
+		return errors.New("Windows installation is manual: download start-issue-windows-amd64.exe from the latest release")
+	}
+	data, err := output("gh", "api", "repos/dapi/start-issue/releases/latest")
+	if err != nil {
+		return errors.New("Could not fetch the latest start-issue release")
+	}
+	var release githubRelease
+	if err := json.Unmarshal([]byte(data), &release); err != nil {
+		return err
+	}
+	name := releaseAssetName(runtime.GOOS, runtime.GOARCH)
+	assetURL, checksumURL := release.assetURLs(name)
+	if assetURL == "" || checksumURL == "" {
+		return fmt.Errorf("latest release does not contain %s and checksums.txt", name)
+	}
+	binary, err := download(assetURL)
+	if err != nil {
+		return err
+	}
+	checksums, err := download(checksumURL)
+	if err != nil {
+		return err
+	}
+	if !validChecksum(binary, name, string(checksums)) {
+		return fmt.Errorf("checksum verification failed for %s", name)
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	target := filepath.Join(home, ".local", "bin", "start-issue")
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(target, binary, 0755); err != nil {
+		return err
+	}
+	fmt.Printf("Installed start-issue v%s at: %s\n", strings.TrimPrefix(release.TagName, "v"), target)
+	return nil
+}
+
+func writeConfig(path, content string, force bool) error {
+	if _, err := os.Stat(path); err == nil && !force {
+		return nil
+	}
+	return os.WriteFile(path, []byte(content), 0644)
 }
 
 func updateMode(o options) error {
@@ -449,6 +591,24 @@ func resolvePrompt(root, agent string, o options) (string, string, error) {
 		b, e := os.ReadFile(o.promptFile)
 		return string(b), "CLI --prompt-file: " + o.promptFile, e
 	}
+	if os.Getenv("START_ISSUE_PROMPT_FILE") != "" && os.Getenv("START_ISSUE_PROMPT") != "" {
+		return "", "", errors.New("Use either START_ISSUE_PROMPT_FILE or START_ISSUE_PROMPT, not both.")
+	}
+	if path := os.Getenv("START_ISSUE_PROMPT_FILE"); path != "" {
+		b, e := os.ReadFile(path)
+		return string(b), "START_ISSUE_PROMPT_FILE: " + path, e
+	}
+	if value := os.Getenv("START_ISSUE_PROMPT"); value != "" {
+		return value, "START_ISSUE_PROMPT", nil
+	}
+	home, _ := os.UserHomeDir()
+	for _, path := range []string{filepath.Join(root, ".start-issue", "prompt.md"), filepath.Join(home, ".config", "start-issue", "prompt.md")} {
+		if b, e := os.ReadFile(path); e == nil {
+			return string(b), path, nil
+		} else if !os.IsNotExist(e) {
+			return "", "", e
+		}
+	}
 	if agent == "claude" {
 		if o.command != "" {
 			return o.command + " {ISSUE_URL}", "built-in Claude command", nil
@@ -516,6 +676,27 @@ func containsAny(s string, terms ...string) bool {
 	}
 	return false
 }
+func aiBranchName(agent, model, root, number, title, labels string) (string, error) {
+	if agent == "none" {
+		return "", errors.New("no agent")
+	}
+	prompt := fmt.Sprintf("Git branch name for issue #%s: %q (labels: %s). Reply with ONLY {type}/issue-%s-{kebab-case-name}.", number, title, labels, number)
+	args := launchArgs(agent, model, root, prompt)
+	if agent == "claude" {
+		args = append([]string{"claude", "--print"}, args[1:]...)
+	} else if agent == "codex" {
+		args = append([]string{"codex", "exec", "--sandbox", "read-only", "--skip-git-repo-check"}, args[1:]...)
+	}
+	result, err := output(args[0], args[1:]...)
+	if err != nil {
+		return "", err
+	}
+	lines := strings.Fields(strings.Trim(strings.TrimSpace(result), "`\""))
+	if len(lines) == 0 {
+		return "", errors.New("empty branch")
+	}
+	return lines[len(lines)-1], nil
+}
 
 func slugify(title string) string {
 	title = regexp.MustCompile(`^(\[[^]]*\][\s-]*)+`).ReplaceAllString(title, "")
@@ -552,7 +733,158 @@ func render(s string, m map[string]string) string {
 	}
 	return s
 }
+func branchWorktree(branch string) string {
+	value, err := output("git", "worktree", "list", "--porcelain")
+	if err != nil {
+		return ""
+	}
+	current := ""
+	for _, line := range strings.Split(value, "\n") {
+		if strings.HasPrefix(line, "worktree ") {
+			current = strings.TrimPrefix(line, "worktree ")
+		}
+		if line == "branch refs/heads/"+branch {
+			return current
+		}
+	}
+	return ""
+}
+func worktreeBranch(path string) string {
+	value, err := output("git", "worktree", "list", "--porcelain")
+	if err != nil {
+		return ""
+	}
+	current := ""
+	for _, line := range strings.Split(value, "\n") {
+		if strings.HasPrefix(line, "worktree ") {
+			current = strings.TrimPrefix(line, "worktree ")
+		}
+		if current == path && strings.HasPrefix(line, "branch ") {
+			return strings.TrimPrefix(line, "branch ")
+		}
+	}
+	return ""
+}
+func launchSelected(o options, agent, model, worktree, prompt string) error {
+	if o.humanGate {
+		return humanGate(model, worktree, prompt, o.dryRun)
+	}
+	return launch(agent, model, worktree, prompt)
+}
+func improvePrompt(root, agent, model, prompt, source string, o options, in issue, repo, number, labels string) error {
+	if agent == "none" {
+		return errors.New("--improve-prompt requires an agent. Use --agent claude, codex, kimi, or pi.")
+	}
+	outputPath := o.promptOutput
+	if outputPath == "" {
+		if o.promptFile != "" {
+			outputPath = strings.TrimSuffix(o.promptFile, filepath.Ext(o.promptFile)) + ".improved.md"
+		} else {
+			outputPath = filepath.Join(root, ".start-issue", "prompt.improved.md")
+		}
+	}
+	if o.dryRun {
+		fmt.Printf("📝 Improving prompt template...\n   Prompt source: %s\n   Proposal path: %s\n   [DRY-RUN] Would ask %s to generate an improved prompt proposal.\n", source, outputPath, agent)
+		return nil
+	}
+	if _, err := os.Stat(outputPath); err == nil {
+		return fmt.Errorf("Prompt improvement output already exists: %s", outputPath)
+	}
+	request := fmt.Sprintf("Improve the following start-issue prompt template. Return ONLY the complete improved prompt template.\n\nRepository: %s\nIssue #%s: %s\nLabels: %s\nBody:\n%s\n\nPrompt:\n%s", repo, number, in.Title, labels, in.Body, prompt)
+	args := launchArgs(agent, model, root, request)
+	if agent == "claude" {
+		args = append([]string{"claude", "--print"}, args[1:]...)
+	} else if agent == "codex" {
+		args = append([]string{"codex", "exec", "--sandbox", "read-only", "--skip-git-repo-check"}, args[1:]...)
+	}
+	result, err := output(args[0], args[1:]...)
+	if err != nil {
+		return fmt.Errorf("Could not generate improved prompt with %s", agent)
+	}
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(outputPath, []byte(strings.TrimSpace(result)+"\n"), 0644); err != nil {
+		return err
+	}
+	fmt.Printf("📝 Prompt improvement written: %s\n", outputPath)
+	return nil
+}
+func humanGate(model, worktree, prompt string, dryRun bool) error {
+	runID := os.Getenv("START_ISSUE_RUN_ID")
+	if runID == "" {
+		runID = "latest"
+	}
+	dir := filepath.Join(worktree, ".start-issue", "runs", runID)
+	events, last := filepath.Join(dir, "events.jsonl"), filepath.Join(dir, "last-message.txt")
+	args := []string{"exec", "--cd", worktree, "--ask-for-approval", "never", "--sandbox", "workspace-write", "--json", "--output-last-message", last, "-"}
+	if model != "" {
+		args = append([]string{"exec", "--model", model}, args[1:]...)
+	}
+	if dryRun {
+		fmt.Printf("   [DRY-RUN] Would run: codex %s\n", strings.Join(args, " "))
+		return nil
+	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	file, err := os.Create(events)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	cmd := exec.Command("codex", args...)
+	cmd.Dir = worktree
+	cmd.Stdin = strings.NewReader(prompt)
+	cmd.Stdout = file
+	cmd.Stderr = os.Stderr
+	_ = cmd.Run()
+	body, err := os.ReadFile(last)
+	if err != nil {
+		return fmt.Errorf("No recognized final status found. Inspect: %s", last)
+	}
+	status := ""
+	for _, line := range strings.Split(string(body), "\n") {
+		if strings.HasPrefix(line, "STATUS:") {
+			status = strings.TrimSpace(strings.TrimPrefix(line, "STATUS:"))
+			break
+		}
+	}
+	if status == "DONE" {
+		fmt.Println("✅ Codex finished with STATUS: DONE")
+		return nil
+	}
+	if status == "HUMAN_GATE" {
+		eventsBody, err := os.ReadFile(events)
+		if err != nil {
+			return err
+		}
+		threadID := ""
+		for _, line := range strings.Split(string(eventsBody), "\n") {
+			var event struct {
+				Type     string `json:"type"`
+				ThreadID string `json:"thread_id"`
+			}
+			if json.Unmarshal([]byte(line), &event) == nil && event.Type == "thread.started" {
+				threadID = event.ThreadID
+				break
+			}
+		}
+		if threadID == "" {
+			return fmt.Errorf("Codex human-gate run did not capture thread_id. Inspect: %s", events)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "thread-id"), []byte(threadID+"\n"), 0644); err != nil {
+			return err
+		}
+		return command("codex", "resume", "--include-non-interactive", threadID)
+	}
+	return fmt.Errorf("No recognized final status found. Inspect: %s", last)
+}
 func printLaunch(a, m, w, p string) {
+	if a == "none" {
+		fmt.Printf("   Agent: none\n   Model: %s\n   [DRY-RUN] Would prepare worktree without launching an agent\n", show(m))
+		return
+	}
 	fmt.Printf("   Agent: %s\n   Model: %s\n   [DRY-RUN] Would run: %s\n", a, show(m), strings.Join(launchArgs(a, m, w, p), " "))
 }
 func launch(a, m, w, p string) error {
@@ -564,6 +896,8 @@ func launch(a, m, w, p string) error {
 }
 func launchArgs(a, m, w, p string) []string {
 	switch a {
+	case "none":
+		return nil
 	case "claude":
 		x := []string{"claude"}
 		if m != "" {
