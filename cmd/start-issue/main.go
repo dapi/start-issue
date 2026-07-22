@@ -268,7 +268,17 @@ func run(o options) error {
 		return launchSelected(o, agent, model, worktree, rendered)
 	}
 	if branchWorktree(branch) != "" {
-		return fmt.Errorf("Branch '%s' already exists in worktree %s.", branch, branchWorktree(branch))
+		existing := branchWorktree(branch)
+		if !confirm("Branch already exists in " + existing + ". Continue there? [y/N] ") {
+			return errors.New("Cancelled.")
+		}
+		if !o.noInit {
+			runInit(existing)
+		}
+		return launchSelected(o, agent, model, existing, rendered)
+	}
+	if _, err := output("git", "show-ref", "--verify", "--quiet", "refs/heads/"+branch); err == nil {
+		return fmt.Errorf("Branch '%s' exists but is not attached to a worktree. Choose a new branch name or remove it before continuing.", branch)
 	}
 	if err := os.MkdirAll(filepath.Dir(worktree), 0755); err != nil {
 		return err
