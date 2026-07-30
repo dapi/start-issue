@@ -121,7 +121,8 @@ START_ISSUE_E2E=1 make e2e-human-gate
 Скрипт использует приватный репозиторий `dapi/start-issue-e2e-fixture` и его
 control issue, требует авторизованный `gh`, не допускает fake Codex и создаёт
 отдельный временный clone и worktree parent. После успеха они удаляются; чтобы
-сохранить их, задайте `START_ISSUE_E2E_KEEP=1`. Для проверки interactive resume:
+сохранить их, задайте `START_ISSUE_E2E_KEEP=1`. Скрипт также отклоняет любые
+изменения fixture worktree, кроме своего `.start-issue` state. Для проверки interactive resume:
 
 ```bash
 START_ISSUE_E2E=1 \

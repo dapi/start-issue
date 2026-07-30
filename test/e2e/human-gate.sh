@@ -114,6 +114,9 @@ if [[ "$scenario" == "human-gate" ]]; then
         fail "resume command was not reported; inspect $log_path"
 fi
 
+unexpected_changes="$(git -C "$worktree_path" status --porcelain | awk '$0 !~ /^\?\? \.start-issue\// { print }')"
+[[ -z "$unexpected_changes" ]] || fail "fixture worktree has unexpected changes: $unexpected_changes"
+
 printf 'PASS: real Codex human-gate %s scenario. State: %s\n' "$scenario" "$state_dir"
 if [[ "${START_ISSUE_E2E_KEEP:-}" == "1" ]]; then
     printf 'The temporary fixture is preserved at: %s\n' "$fixture_root"

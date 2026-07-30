@@ -281,7 +281,8 @@ START_ISSUE_E2E=1 make e2e-human-gate
 The script uses the private `dapi/start-issue-e2e-fixture` repository and its
 control issue, requires authenticated `gh`, rejects the fake Codex binary, and
 creates an isolated temporary clone and worktree parent. It deletes those after
-success; set `START_ISSUE_E2E_KEEP=1` to retain them. To test interactive resume, run:
+success; set `START_ISSUE_E2E_KEEP=1` to retain them. It also rejects any
+fixture worktree change other than its `.start-issue` state. To test interactive resume, run:
 
 ```bash
 START_ISSUE_E2E=1 \
