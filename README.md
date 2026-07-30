@@ -299,8 +299,9 @@ Exit the resumed Codex session to let the script verify the artifacts.
 | `human-gate` | `START_ISSUE_E2E=1 test/e2e/human-gate.sh --scenario human-gate` | The same artifact and clean-worktree checks, plus the reported explicit `codex resume --include-non-interactive <thread_id>` handoff. The operator exits the resumed interactive session before the script can finish. |
 
 Both scenarios verify authenticated `gh`, a real rather than fake Codex binary,
-and a current `codex exec` interface without the obsolete
-`--ask-for-approval` flag. They do not prove application behavior beyond this
+and the required `codex exec` help interface (`--output-last-message`, without
+the obsolete `--ask-for-approval` flag). The selected Codex executable is
+printed in the test output. They do not prove application behavior beyond this
 human-gate protocol and are intentionally excluded from CI.
 
 Configuration precedence:

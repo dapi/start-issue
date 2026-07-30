@@ -51,7 +51,12 @@ codex_path="$(command -v codex || true)"
 [[ "$codex_path" != "$repo_root/test/helpers/fake-bin/codex" ]] || fail "PATH resolves codex to the test fake"
 gh auth status >/dev/null || fail "gh is not authenticated"
 
-if codex exec --help 2>&1 | grep -q -- '--ask-for-approval'; then
+codex_exec_help="$(codex exec --help 2>&1)" || fail "codex exec --help failed"
+printf '%s' "$codex_exec_help" | grep -Fq 'Run Codex non-interactively' || \
+    fail "resolved codex does not expose the real Codex exec interface"
+printf '%s' "$codex_exec_help" | grep -Fq -- '--output-last-message' || \
+    fail "resolved codex does not support --output-last-message"
+if printf '%s' "$codex_exec_help" | grep -q -- '--ask-for-approval'; then
     fail "installed codex exec still advertises --ask-for-approval; use a current Codex CLI"
 fi
 
@@ -73,6 +78,7 @@ EOF
 )
 
 printf 'E2E human-gate scenario: %s\n' "$scenario"
+printf 'Codex executable: %s\n' "$codex_path"
 printf 'Fixture repository: %s (issue #%s)\n' "$fixture_repo" "$fixture_issue"
 printf 'Worktree parent: %s\n' "$worktree_parent"
 printf 'Log: %s\n' "$log_path"
