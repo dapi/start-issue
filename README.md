@@ -291,6 +291,18 @@ test/e2e/human-gate.sh --scenario human-gate
 
 Exit the resumed Codex session to let the script verify the artifacts.
 
+#### Scenarios and checks
+
+| Scenario | Command | What it verifies |
+| --- | --- | --- |
+| `done` | `START_ISSUE_E2E=1 make e2e-human-gate` | A real Codex batch run emits `thread.started`, saves `thread-id`, `events.jsonl`, and `last-message.txt`, ends with `STATUS: DONE`, and leaves no fixture change other than `.start-issue` state. |
+| `human-gate` | `START_ISSUE_E2E=1 test/e2e/human-gate.sh --scenario human-gate` | The same artifact and clean-worktree checks, plus the reported explicit `codex resume --include-non-interactive <thread_id>` handoff. The operator exits the resumed interactive session before the script can finish. |
+
+Both scenarios verify authenticated `gh`, a real rather than fake Codex binary,
+and a current `codex exec` interface without the obsolete
+`--ask-for-approval` flag. They do not prove application behavior beyond this
+human-gate protocol and are intentionally excluded from CI.
+
 Configuration precedence:
 
 1. Agent: CLI `--agent` / `--no-agent`, then project config, user config, `START_ISSUE_AGENT`, then built-in default `claude`

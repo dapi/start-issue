@@ -131,6 +131,18 @@ test/e2e/human-gate.sh --scenario human-gate
 
 Выйдите из возобновлённой Codex-сессии, после чего скрипт проверит артефакты.
 
+#### Сценарии и проверки
+
+| Сценарий | Команда | Что проверяется |
+| --- | --- | --- |
+| `done` | `START_ISSUE_E2E=1 make e2e-human-gate` | Реальный Codex batch run выдаёт `thread.started`, сохраняет `thread-id`, `events.jsonl` и `last-message.txt`, заканчивается `STATUS: DONE` и не меняет fixture worktree за пределами `.start-issue` state. |
+| `human-gate` | `START_ISSUE_E2E=1 test/e2e/human-gate.sh --scenario human-gate` | Те же проверки артефактов и чистоты worktree, а также явный handoff `codex resume --include-non-interactive <thread_id>`. Перед завершением скрипта оператор выходит из возобновлённой interactive session. |
+
+Оба сценария проверяют авторизованный `gh`, реальный, а не fake Codex binary, и
+актуальный интерфейс `codex exec` без устаревшего флага
+`--ask-for-approval`. Они не доказывают поведение приложения за пределами
+human-gate protocol и намеренно не входят в CI.
+
 ## Использование
 
 ```bash

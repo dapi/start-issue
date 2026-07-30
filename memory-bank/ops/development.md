@@ -46,6 +46,11 @@ current repository:
 START_ISSUE_E2E=1 make e2e-human-gate
 ```
 
+When a live E2E must be visible in cmux, follow the canonical cmux-tab
+procedure in [`../../AGENTS.md`](../../AGENTS.md): find the `start-issue`
+workspace using `cmux tree --all`, create a terminal surface in its active pane,
+and run the command with `START_ISSUE_E2E_KEEP=1`.
+
 ## Daily Commands
 
 ```bash
