@@ -97,7 +97,6 @@ build_human_gate_command() {
             codex exec
             --model "$MODEL"
             --cd "$WORKTREE_PATH"
-            --ask-for-approval never
             --sandbox workspace-write
             --json
             --output-last-message "$HUMAN_GATE_LAST_MESSAGE_PATH"
@@ -107,7 +106,6 @@ build_human_gate_command() {
         HUMAN_GATE_CMD=(
             codex exec
             --cd "$WORKTREE_PATH"
-            --ask-for-approval never
             --sandbox workspace-write
             --json
             --output-last-message "$HUMAN_GATE_LAST_MESSAGE_PATH"

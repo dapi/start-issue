@@ -6,6 +6,10 @@ This project follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- Removed the obsolete `codex exec --ask-for-approval` argument from the Codex human-gate workflow, restoring compatibility with current Codex CLI versions.
+
 ## [1.13.2] - 2026-07-19
 
 ### Added

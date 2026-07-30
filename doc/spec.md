@@ -217,7 +217,6 @@ git rev-parse --show-toplevel
 codex exec \
   [--model "$MODEL"] \
   --cd "$WORKTREE_PATH" \
-  --ask-for-approval never \
   --sandbox workspace-write \
   --json \
   --output-last-message "$STATE_DIR/last-message.txt" \

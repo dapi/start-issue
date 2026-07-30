@@ -742,7 +742,7 @@ install_fake_zellij_tab_status() {
 
   assert_success
   assert_output_contains "Starting codex human-gate batch session"
-  assert_output_contains "--ask-for-approval never"
+  [[ "$output" != *"--ask-for-approval"* ]]
   assert_output_contains "--sandbox workspace-write"
   assert_output_contains "--json"
   assert_output_contains "--output-last-message"
@@ -753,6 +753,7 @@ install_fake_zellij_tab_status() {
 
 @test "human-gate exits successfully on DONE without resuming Codex" {
   export START_ISSUE_RUN_ID="20260524-020304"
+  export START_ISSUE_FAKE_CODEX_REJECT_ASK_FOR_APPROVAL=1
 
   run_start_issue 1 --agent codex --human-gate --no-init
 

@@ -15,6 +15,11 @@ if [[ "${START_ISSUE_FAKE_AGENT_FAIL:-}" == "1" ]]; then
   exit 1
 fi
 
+if [[ "${START_ISSUE_FAKE_CODEX_REJECT_ASK_FOR_APPROVAL:-}" == "1" && "$*" == *"--ask-for-approval"* ]]; then
+  printf '%s\n' "unexpected obsolete --ask-for-approval flag" >&2
+  exit 1
+fi
+
 if [[ "${1:-}" == "resume" ]]; then
   shift
 
@@ -43,7 +48,7 @@ if [[ "${1:-}" == "exec" ]]; then
         output_last_message="${2:-}"
         shift 2
         ;;
-      --model|--cd|--sandbox|--ask-for-approval)
+      --model|--cd|--sandbox)
         shift 2
         ;;
       --skip-git-repo-check|-)
