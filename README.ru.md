@@ -109,6 +109,27 @@ State files:
 <worktree>/.start-issue/runs/<timestamp>/thread-id
 ```
 
+### Локальный E2E smoke test с реальным Codex
+
+Обычный Bats-набор использует fake Codex CLI. Для проверки с реальным локальным
+Codex из checkout `start-issue` выполните opt-in команду:
+
+```bash
+START_ISSUE_E2E=1 make e2e-human-gate
+```
+
+Скрипт использует приватный репозиторий `dapi/start-issue-e2e-fixture` и его
+control issue, требует авторизованный `gh`, не допускает fake Codex и создаёт
+отдельный временный clone и worktree parent. После успеха они удаляются; чтобы
+сохранить их, задайте `START_ISSUE_E2E_KEEP=1`. Для проверки interactive resume:
+
+```bash
+START_ISSUE_E2E=1 \
+test/e2e/human-gate.sh --scenario human-gate
+```
+
+Выйдите из возобновлённой Codex-сессии, после чего скрипт проверит артефакты.
+
 ## Использование
 
 ```bash

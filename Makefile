@@ -1,4 +1,4 @@
-.PHONY: build install uninstall test print-version bump-patch bump-minor bump-major release-patch release-minor release-major
+.PHONY: build install uninstall test e2e-human-gate print-version bump-patch bump-minor bump-major release-patch release-minor release-major
 
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
@@ -27,10 +27,13 @@ uninstall:
 
 test:
 	bash -n scripts/start-issue
-	shellcheck install.sh scripts/start-issue scripts/build-start-issue scripts/bump-version scripts/prepare-release scripts/lib/start_issue/*.sh
+	shellcheck install.sh scripts/start-issue scripts/build-start-issue scripts/bump-version scripts/prepare-release scripts/lib/start_issue/*.sh test/e2e/*.sh
 	python3 scripts/check_memory_bank_index.py --max-depth 4
 	git diff --check
 	bats test
+
+e2e-human-gate:
+	@bash test/e2e/human-gate.sh
 
 print-version:
 	@awk -F'"' '/^VERSION="/ { print $$2; exit }' scripts/start-issue

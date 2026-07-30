@@ -29,3 +29,8 @@ audience: humans_and_agents
 - Базовый формат: `FT-XXX/`
 - Вместо `XXX` используй идентификатор, принятый в проекте: issue id, ticket id или другой стабильный ключ
 - Один package = одна delivery-единица
+
+## Feature packages
+
+- [FT-016: Real Codex human-gate E2E suite](FT-016/README.md)
+  Opt-in local smoke suite that validates the real Codex human-gate path.

@@ -279,6 +279,20 @@ install_fake_zellij_tab_status() {
   assert_output_contains ".start-issue/runs/<timestamp>/events.jsonl"
 }
 
+@test "real Codex human-gate E2E runner requires explicit authorization" {
+  run bash "$REPO_ROOT/test/e2e/human-gate.sh"
+
+  assert_failure
+  assert_output_contains "set START_ISSUE_E2E=1"
+}
+
+@test "real Codex human-gate E2E runner documents its scenarios" {
+  run bash "$REPO_ROOT/test/e2e/human-gate.sh" --help
+
+  assert_success
+  assert_output_contains "--scenario done|human-gate"
+}
+
 @test "prompt improvement without issue prints explicit error" {
   run_start_issue --improve-prompt
 

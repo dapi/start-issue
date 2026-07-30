@@ -39,6 +39,13 @@ Install locally from source:
 make install
 ```
 
+Run the opt-in real-Codex human-gate E2E smoke test with a usable issue in the
+current repository:
+
+```bash
+START_ISSUE_E2E=1 make e2e-human-gate
+```
+
 ## Daily Commands
 
 ```bash
