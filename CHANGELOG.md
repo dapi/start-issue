@@ -6,6 +6,10 @@ This project follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Added an opt-in local E2E smoke suite for the real Codex human-gate workflow.
+
 ## [1.13.3] - 2026-07-30
 
 ### Fixed

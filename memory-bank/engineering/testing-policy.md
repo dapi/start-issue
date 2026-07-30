@@ -34,7 +34,7 @@ make test
 `make test` runs:
 
 1. `bash -n scripts/start-issue`
-2. `shellcheck install.sh scripts/start-issue scripts/build-start-issue scripts/bump-version scripts/prepare-release scripts/lib/start_issue/*.sh`
+2. `shellcheck install.sh scripts/start-issue scripts/build-start-issue scripts/bump-version scripts/prepare-release scripts/lib/start_issue/*.sh test/e2e/*.sh`
 3. `python3 scripts/check_memory_bank_index.py --max-depth 4`
 4. `git diff --check`
 5. `bats test`
@@ -44,6 +44,7 @@ make test
 - Shell syntax: `bash -n`
 - Static analysis: `shellcheck`
 - Behavior/regression tests: Bats under `test/`
+- Opt-in real-agent E2E smoke tests: scripts under `test/e2e/`, run manually and never in CI
 - Memory-bank navigation: `scripts/check_memory_bank_index.py`
 - Whitespace/conflict-marker check: `git diff --check`
 
@@ -87,6 +88,10 @@ Manual-only verification is acceptable only for:
 - live GitHub/network behavior beyond mocked/fake helper coverage;
 - visual/manual review of long help text or docs when no stable assertion is
   useful.
+
+Real-agent E2E scripts must require an explicit opt-in environment variable,
+avoid fake agent binaries, preserve diagnostic artifacts, and stay outside
+`make test` and CI.
 
 For each manual-only gap, record the reason and the manual procedure in the
 feature plan or final handoff.

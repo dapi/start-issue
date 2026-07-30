@@ -109,6 +109,41 @@ State files:
 <worktree>/.start-issue/runs/<timestamp>/thread-id
 ```
 
+### Локальный E2E smoke test с реальным Codex
+
+Обычный Bats-набор использует fake Codex CLI. Для проверки с реальным локальным
+Codex из checkout `start-issue` выполните opt-in команду:
+
+```bash
+START_ISSUE_E2E=1 make e2e-human-gate
+```
+
+Скрипт использует приватный репозиторий `dapi/start-issue-e2e-fixture` и его
+control issue, требует авторизованный `gh`, не допускает fake Codex и создаёт
+отдельный временный clone и worktree parent. После успеха они удаляются; чтобы
+сохранить их, задайте `START_ISSUE_E2E_KEEP=1`. Скрипт также отклоняет любые
+изменения fixture worktree, кроме своего `.start-issue` state. Для проверки interactive resume:
+
+```bash
+START_ISSUE_E2E=1 \
+test/e2e/human-gate.sh --scenario human-gate
+```
+
+Выйдите из возобновлённой Codex-сессии, после чего скрипт проверит артефакты.
+
+#### Сценарии и проверки
+
+| Сценарий | Команда | Что проверяется |
+| --- | --- | --- |
+| `done` | `START_ISSUE_E2E=1 make e2e-human-gate` | Реальный Codex batch run выдаёт `thread.started`, сохраняет `thread-id`, `events.jsonl` и `last-message.txt`, заканчивается `STATUS: DONE` и не меняет fixture worktree за пределами `.start-issue` state. |
+| `human-gate` | `START_ISSUE_E2E=1 test/e2e/human-gate.sh --scenario human-gate` | Те же проверки артефактов и чистоты worktree, а также явный handoff `codex resume --include-non-interactive <thread_id>`. Перед завершением скрипта оператор выходит из возобновлённой interactive session. |
+
+Оба сценария проверяют авторизованный `gh`, реальный, а не fake Codex binary, и
+обязательный интерфейс справки `codex exec` (`--output-last-message`, без
+устаревшего флага `--ask-for-approval`). Выбранный Codex executable печатается
+в test output. Они не доказывают поведение приложения за пределами human-gate
+protocol и намеренно не входят в CI.
+
 ## Использование
 
 ```bash

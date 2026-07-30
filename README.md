@@ -269,6 +269,41 @@ State files:
 <worktree>/.start-issue/runs/<timestamp>/thread-id
 ```
 
+### Local real-Codex E2E smoke test
+
+The normal Bats suite uses a fake Codex CLI. To exercise the real local Codex
+CLI, run this opt-in test from a `start-issue` checkout:
+
+```bash
+START_ISSUE_E2E=1 make e2e-human-gate
+```
+
+The script uses the private `dapi/start-issue-e2e-fixture` repository and its
+control issue, requires authenticated `gh`, rejects the fake Codex binary, and
+creates an isolated temporary clone and worktree parent. It deletes those after
+success; set `START_ISSUE_E2E_KEEP=1` to retain them. It also rejects any
+fixture worktree change other than its `.start-issue` state. To test interactive resume, run:
+
+```bash
+START_ISSUE_E2E=1 \
+test/e2e/human-gate.sh --scenario human-gate
+```
+
+Exit the resumed Codex session to let the script verify the artifacts.
+
+#### Scenarios and checks
+
+| Scenario | Command | What it verifies |
+| --- | --- | --- |
+| `done` | `START_ISSUE_E2E=1 make e2e-human-gate` | A real Codex batch run emits `thread.started`, saves `thread-id`, `events.jsonl`, and `last-message.txt`, ends with `STATUS: DONE`, and leaves no fixture change other than `.start-issue` state. |
+| `human-gate` | `START_ISSUE_E2E=1 test/e2e/human-gate.sh --scenario human-gate` | The same artifact and clean-worktree checks, plus the reported explicit `codex resume --include-non-interactive <thread_id>` handoff. The operator exits the resumed interactive session before the script can finish. |
+
+Both scenarios verify authenticated `gh`, a real rather than fake Codex binary,
+and the required `codex exec` help interface (`--output-last-message`, without
+the obsolete `--ask-for-approval` flag). The selected Codex executable is
+printed in the test output. They do not prove application behavior beyond this
+human-gate protocol and are intentionally excluded from CI.
+
 Configuration precedence:
 
 1. Agent: CLI `--agent` / `--no-agent`, then project config, user config, `START_ISSUE_AGENT`, then built-in default `claude`
