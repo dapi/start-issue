@@ -26,10 +26,22 @@ memory-bank link audit, whitespace checks, and the Bats suite.
 ## Live E2E Through cmux
 
 Run a live agent E2E only when explicitly requested. Use a **terminal tab in
-the workspace for this repository**, not a new cmux workspace and not a tab in
-an unrelated project. From an external shell, `cmux current-workspace` may not
-identify the workspace visible to the user; first use `cmux tree --all`, find
-the `start-issue` workspace and its pane, then create the surface explicitly:
+the workspace that invoked the agent**, not a new cmux workspace and not a tab
+in an unrelated project. Resolve that workspace with `cmux identify`, which
+returns both the invocation `caller` and the global `focused` workspace. Use
+only `caller.workspace_ref` and `caller.pane_ref`; do not use
+`cmux current-workspace`, which reports global focus and can be unrelated.
+
+```bash
+caller_context="$(cmux identify)"
+workspace="$(printf '%s' "$caller_context" | jq -r '.caller.workspace_ref // empty')"
+pane="$(printf '%s' "$caller_context" | jq -r '.caller.pane_ref // empty')"
+test -n "$workspace" && test -n "$pane"
+```
+
+If `caller` is `null`, do not guess from a workspace name or global focus; ask
+for an explicit cmux workspace/pane target. With a resolved caller, create the
+surface explicitly:
 
 ```bash
 cmux new-surface --type terminal \
