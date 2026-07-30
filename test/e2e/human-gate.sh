@@ -66,8 +66,8 @@ fi
 
 prompt=$(cat <<EOF
 This is a controlled local human-gate E2E test.
-Inspect the repository only. Do not modify files, create commits, or call external services.
-Finish with this terminal status on its own line:
+Do not use tools, run commands, inspect files, modify files, create commits, or call external services.
+Reply with exactly this one line and nothing else:
 STATUS: $expected_status
 EOF
 )
