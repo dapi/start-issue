@@ -1739,6 +1739,7 @@ func TestHumanGateSavesThreadIDBeforeDone(t *testing.T) {
 	t.Setenv("START_ISSUE_RUN_ID", "done")
 	t.Setenv("CODEX_EVENTS", `{"type":"thread.started","thread_id":"thread-done"}`)
 	t.Setenv("CODEX_LAST", "STATUS: DONE")
+	t.Setenv("START_ISSUE_FAKE_CODEX_REJECT_ASK_FOR_APPROVAL", "1")
 
 	if err := humanGate("", worktree, "prompt", false); err != nil {
 		t.Fatal(err)
@@ -1793,6 +1794,9 @@ func TestHumanGateDryRunShowsAllStateArtifacts(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Fatalf("dry-run output missing %q:\n%s", want, output)
 		}
+	}
+	if strings.Contains(output, "--ask-for-approval") {
+		t.Fatalf("dry-run includes obsolete --ask-for-approval argument:\n%s", output)
 	}
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {
 		t.Fatalf("human-gate dry-run created state directory: %v", err)
@@ -1863,6 +1867,10 @@ func writeExecutable(t *testing.T, path, content string) {
 func writeFakeCodex(t *testing.T, bin string) {
 	t.Helper()
 	writeExecutable(t, filepath.Join(bin, "codex"), `#!/bin/sh
+if [ "$START_ISSUE_FAKE_CODEX_REJECT_ASK_FOR_APPROVAL" = "1" ] && [ "${*#*--ask-for-approval}" != "$*" ]; then
+  printf '%s\n' "unexpected obsolete --ask-for-approval flag" >&2
+  exit 1
+fi
 if [ -n "$START_ISSUE_CWD_LOG" ]; then
   pwd > "$START_ISSUE_CWD_LOG"
 fi

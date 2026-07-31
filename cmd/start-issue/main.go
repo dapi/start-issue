@@ -1818,7 +1818,7 @@ func humanGate(model, worktree, prompt string, dryRun bool) error {
 	}
 	dir := filepath.Join(worktree, ".start-issue", "runs", runID)
 	events, last := filepath.Join(dir, "events.jsonl"), filepath.Join(dir, "last-message.txt")
-	args := []string{"exec", "--cd", worktree, "--ask-for-approval", "never", "--sandbox", "workspace-write", "--json", "--output-last-message", last, "-"}
+	args := []string{"exec", "--cd", worktree, "--sandbox", "workspace-write", "--json", "--output-last-message", last, "-"}
 	if model != "" {
 		args = append([]string{"exec", "--model", model}, args[1:]...)
 	}
