@@ -31,7 +31,7 @@ the CLI: flags, prompts, help text, dry-run output, and agent launch commands.
 - Keep normal help concise; use dedicated help for complex modes such as
   `--human-gate-help`.
 - When adding interactive prompts, support non-interactive test coverage through
-  Bats input simulation.
+  Go test input simulation.
 
 ## If A Frontend Is Added Later
 

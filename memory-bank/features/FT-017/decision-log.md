@@ -46,7 +46,7 @@ This log records why `DEC-01` remains open. The canonical owner of the blocker a
 | Area | Accepted contract |
 | --- | --- |
 | Target matrix | `linux/amd64`, `linux/arm64`, `darwin/amd64`, `darwin/arm64`, and `windows/amd64`. The operating systems are requester-selected; the architecture set follows the explicit `dapi/port-selector` release pattern. |
-| Build/release | Use GoReleaser v2 with `CGO_ENABLED=0`, one statically built executable per target, `start-issue-<os>-<arch>` asset names, and a SHA-256 `checksums.txt` manifest. |
+| Build/release | Use GoReleaser v2 with `CGO_ENABLED=0`, one statically built executable per target, `start-issue-<os>-<arch>` asset names, and a SHA-256 `checksums.txt` manifest. During the v1-to-v2 cutover, also upload a `start-issue` bridge and its `start-issue.sha256` checksum for the v1 updater. |
 | POSIX install | Adapt the referenced install-script strategy: detect `uname -s`/`uname -m`, select the matching asset, download it, verify its checksum from `checksums.txt`, and install it under the public name `start-issue`. |
 | Windows delivery | Publish `start-issue-windows-amd64.exe` as a first-class release asset and document manual download/PATH installation. The existing POSIX shell installer is not a Windows installer. |
 | Cutover | No separate human release-approval gate. The normal tag-triggered release proceeds only after `CHK-01` through `CHK-03` are green. |
@@ -73,9 +73,36 @@ The requester directly chose macOS, Linux, and Windows and delegated release-str
 
 ### Decision
 
-1. Pin Go `1.21` in `go.mod`, `mise.toml`, and CI/release setup for this migration.
+1. Pin Go `1.24` in `go.mod`, `mise.toml`, and CI/release setup for this migration.
 2. The initial Windows contract is binary release plus manual installation and manual update: `start-issue update` on Windows must not try to overwrite its running `.exe`; it returns a clear instruction naming the matching release asset. POSIX retains verified automatic install/update behavior.
 
 ### Rationale and risk control
 
-Go 1.21 is the explicit baseline in the chosen release reference and yields a single reproducible toolchain contract. The Windows manual-update behavior avoids an unsafe or undeclared helper-process design. It is a documented platform-specific delivery difference, not a hidden parity exception, because the Bash baseline has no Windows runtime contract.
+Go 1.24 is the explicit baseline because its linker emits a Mach-O `LC_UUID`, which current macOS releases require. The Windows manual-update behavior avoids an unsafe or undeclared helper-process design. It is a documented platform-specific delivery difference, not a hidden parity exception, because the Bash baseline has no Windows runtime contract.
+
+## DL-03 — ID-01 dry-run worktree-path conflict handling
+
+**Status:** accepted on 2026-07-24 by the feature requester.
+
+### Case and approved expectation
+
+- **Stable case ID:** `ID-01`
+- **Parity case:** `worktree-path-conflict-dry-run` in
+  `cmd/start-issue/parity_integration_test.go`
+- **Bash baseline expectation:** accepts the supplied conflict choice during
+  `--dry-run` and reports `Worktree path already exists` before continuing
+  down the selected reuse path.
+- **Go expectation:** reports `Worktree path exists; would prompt for reuse or
+  delete/recreate` without consuming a choice or selecting a reuse/delete
+  outcome.
+
+### User-visible rationale and acceptance
+
+When a worktree path conflicts, the Go dry-run tells the user that a choice is
+still required. This avoids presenting one stdin-supplied choice as the
+determined outcome of a non-executing command and, importantly, avoids the
+legacy path in which the delete/recreate selection can reach mutation logic
+before Bash's later dry-run check. The different dry-run diagnostic is
+user-visible and is intentionally accepted for `ID-01`; all other observable
+records, fake-command logs, and filesystem state remain subject to `CHK-01`
+parity.

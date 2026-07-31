@@ -29,7 +29,7 @@ into feature packages.
 | `now` | Memory-bank adoption | Agents have project-specific process, product, domain, engineering, and ops context | Current memory-bank work | Template source from `dapi/memory-bank` | active |
 | `next` | New feature-flow adoption | New medium/large features use `brief.md -> optional design.md -> implementation-plan.md` | Future `FT-*` packages | AGENTS.md and flows docs | planned |
 | `next` | Release confidence | Release prep, changelog, version, build, and update path stay coherent | Existing release scripts | CI and `make test` | active |
-| `later` | Richer lifecycle commands | Possible `resume`, `list`, `cleanup`, or structured output | Unknown | Requires design and Bash/Python reevaluation | idea |
+| `later` | Richer lifecycle commands | Possible `resume`, `list`, `cleanup`, or structured output | Unknown | Requires Go design and module-boundary review | idea |
 
 ## Roadmap Rules
 
@@ -44,5 +44,5 @@ into feature packages.
 
 - `BET-01` Whether Codex human-gate patterns should remain Codex-only or become
   a generic agent capability after other CLIs expose equivalent contracts.
-- `BET-02` Whether future lifecycle complexity justifies moving orchestration
-  from Bash modules to a Python core.
+- `BET-02` Whether future lifecycle complexity warrants extracting Go helper
+  packages from the current command package.

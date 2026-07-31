@@ -70,7 +70,7 @@ make test
 ## Sufficient Coverage
 
 Coverage is sufficient when the changed behavior is exercised at the CLI level
-or at the closest practical shell helper boundary, and failure behavior is
+or at the closest practical Go helper boundary, and failure behavior is
 covered when it affects user trust or data safety.
 
 Line coverage is not a target. Scenario coverage matters more:
@@ -98,7 +98,7 @@ feature plan or final handoff.
 
 ## Simplify Review
 
-After tests pass, review for shell complexity:
+After tests pass, review for implementation complexity:
 
 - avoid scattered agent-specific branching;
 - prefer small functions with explicit inputs over implicit global mutation;
@@ -108,5 +108,5 @@ After tests pass, review for shell complexity:
 ## Verification Context Separation
 
 1. Functional verification: run relevant tests or `make test`.
-2. Simplify review: inspect the changed shell/docs for unnecessary complexity.
+2. Simplify review: inspect the changed Go code/docs for unnecessary complexity.
 3. Acceptance: map results back to `SC-*`/`CHK-*` or the user request.

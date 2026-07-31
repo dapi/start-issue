@@ -91,7 +91,7 @@ flowchart TD
     F -- yes --> G["Print planned actions<br/>and exit"]
     F -- no --> H["Create or reuse git worktree"]
 
-    H --> I["Run init.sh if enabled"]
+    H --> I["Run worktree init hook if enabled"]
     I --> J["Render agent prompt"]
     J --> K{"Agent selected?"}
 
@@ -105,12 +105,18 @@ flowchart TD
 ## Internal Architecture
 
 The Go entrypoint is `cmd/start-issue`. It owns argument parsing, configuration
-resolution, repository and worktree orchestration, and the adapter commands for
-supported agents. `git`, `gh`, and agent CLIs remain explicit external process
-boundaries.
-- `output.sh` renders help, status, dry-run output, and session framing.
-- `init.sh` owns `start-issue init` plus the user-config onboarding helpers behind `setup`.
-- `pipeline.sh` makes the orchestration pipeline explicit.
+resolution, repository and worktree orchestration, self-install/update, output,
+and adapter commands for supported agents. `git`, `gh`, and agent CLIs remain
+explicit external process boundaries.
+
+- Configuration and prompt helpers resolve CLI, environment, project, and user
+  defaults.
+- Repository/worktree helpers fetch issue metadata, plan reuse safely, and run
+  the optional `init.sh` hook found in a prepared worktree.
+- Agent helpers validate adapters, build launch commands, generate AI branch
+  names, and run Codex human-gate mode.
+- Release helpers select platform assets, verify checksums and staged
+  `--version` output, and atomically install updates.
 
 The internal pipeline is now:
 
@@ -121,7 +127,10 @@ The internal pipeline is now:
 5. Execute the plan.
 6. Launch the selected agent.
 
-The project should keep Bash as long as lifecycle commands, configuration shape, and output needs stay simple enough for shell modules to remain readable. If future work requires nested configuration, richer subcommands such as `resume` or `cleanup`, or more structured machine-readable output, that should be treated as the threshold for evaluating a Python core.
+The Go implementation keeps lifecycle commands, configuration shape, and output
+in one compiled CLI while retaining external-tool boundaries. Future additions
+should preserve the same focused helper boundaries rather than reintroducing a
+second runtime implementation.
 
 ## CLI Arguments
 
@@ -202,9 +211,11 @@ The workflow:
 2. Reads the version of the executable the user is currently running.
 3. Normalizes version strings so `1.11.1` and `v1.11.1` compare as equal.
 4. If the running version is current or newer than the latest published release, exits `0` with a clear status message.
-5. If a newer published release exists, downloads `start-issue` and `start-issue.sha256`, verifies the checksum, and installs the update into the same executable path the user invoked.
+5. If a newer published release exists, downloads the matching platform binary and `checksums.txt`, verifies the checksum, and installs the update into the resolved target of the executable the user invoked.
 
-The update workflow works outside a git repository. It requires `gh`, `jq`, and either `curl` or `wget`.
+The update workflow works outside a git repository and requires only `gh`.
+The Go binary parses release metadata, downloads assets, and verifies checksums
+internally.
 
 ## Codex Human-Gate
 
@@ -299,7 +310,7 @@ To improve the prompt template used for future development starts, run:
 start-issue 123 --agent codex --improve-prompt
 ```
 
-The command resolves the active prompt template with the normal precedence, fetches the issue as context, asks the selected agent for a complete improved prompt template, and writes a proposal file. It does not overwrite the active prompt. File-backed prompts write next to the source as `*.improved.md` by default; built-in and inline prompts write to `.start-issue/prompt.improved.md`. Use `--prompt-output-file` to choose another proposal path.
+The command resolves the active prompt template with the normal precedence, fetches the issue as context, asks the selected agent for a complete improved prompt template, and writes a proposal file. It does not overwrite the active prompt. Markdown prompt files write next to the source as `*.improved.md`; other file names append `.improved`. Built-in and inline prompts write to `.start-issue/prompt.improved.md`. Use `--prompt-output-file` to choose another proposal path.
 
 Prompt templates support:
 
@@ -329,11 +340,13 @@ Optional dependency for Zellij support:
 
 ## Requirements
 
-- Go 1.21+
 - `git`
 - `gh` CLI with authenticated GitHub session
-- `jq`
 - selected agent CLI unless `--agent none` or `--dry-run` is used
+
+Building from source additionally requires Go 1.24+. The optional Bash
+installer and the manual-install snippet require `bash`, `curl` or `wget`, and
+a SHA-256 tool; those tools are not used by `start-issue update`.
 
 ## Releases
 
@@ -345,6 +358,7 @@ GitHub Releases are published automatically when a SemVer tag like `v1.12.0` is 
 - `start-issue-darwin-arm64`
 - `start-issue-windows-amd64.exe`
 - `checksums.txt`
+- `start-issue` and `start-issue.sha256` (temporary v1 update bridge)
 
 To prepare a release locally:
 

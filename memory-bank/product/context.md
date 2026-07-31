@@ -79,9 +79,8 @@ tracker, or the developer's review and merge process.
 - `PCON-03` Prompt and config changes must be visible and reviewable; prompt
   improvement writes proposals instead of overwriting active templates.
 - `PCON-04` Agent-specific behavior belongs behind the adapter boundary.
-- `PCON-05` Bash remains acceptable while workflow complexity stays readable; a
-  richer lifecycle, nested config, or structured machine output is the threshold
-  for reevaluating a Python core.
+- `PCON-05` The Go CLI is the sole runtime. New lifecycle behavior belongs in
+  focused Go helpers and must not reintroduce a second shell or Python runtime.
 
 ## Source Documents
 

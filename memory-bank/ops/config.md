@@ -25,7 +25,8 @@ variables. The canonical precedence is:
 4. environment variables
 5. built-in defaults
 
-Config resolution is owned by `scripts/lib/start_issue/config.sh`. User-facing
+Config resolution is owned by the Go configuration helpers in
+`cmd/start-issue`. User-facing
 documentation must stay aligned in README and `doc/spec.md`.
 
 ## File Layout
@@ -54,12 +55,12 @@ User config:
 
 | Variable | Description | Default | Owner |
 | --- | --- | --- | --- |
-| `START_ISSUE_AGENT` | Default agent when CLI and config files do not set one | built-in `claude` | `config.sh` |
-| `START_ISSUE_MODEL` | Default model when CLI and config files do not set one | unset | `config.sh` |
-| `START_ISSUE_PROMPT` | Inline prompt template | none | `config.sh` |
-| `START_ISSUE_PROMPT_FILE` | Prompt template file | none | `config.sh` |
-| `START_ISSUE_WORKTREE_DIR` | Parent directory for created worktrees | `~/worktrees` | `config.sh` / `worktree.sh` |
-| `START_ISSUE_DUMP_PROMPT` | Print full rendered prompt in dry-run when set to `1` | unset | `output.sh` |
+| `START_ISSUE_AGENT` | Default agent when CLI and config files do not set one | built-in `claude` | Go configuration helpers |
+| `START_ISSUE_MODEL` | Default model when CLI and config files do not set one | unset | Go configuration helpers |
+| `START_ISSUE_PROMPT` | Inline prompt template | none | Go configuration helpers |
+| `START_ISSUE_PROMPT_FILE` | Prompt template file | none | Go configuration helpers |
+| `START_ISSUE_WORKTREE_DIR` | Parent directory for created worktrees | `~/worktrees` | Go configuration/worktree helpers |
+| `START_ISSUE_DUMP_PROMPT` | Print full rendered prompt in dry-run when set to `1` | unset | Go output helpers |
 
 `START_ISSUE_PROMPT` and `START_ISSUE_PROMPT_FILE` are mutually exclusive when
 no CLI prompt override is provided.

@@ -22,7 +22,7 @@ canonical_for:
 | --- | --- | --- | --- | --- | --- |
 | `SEG-01` | Maintainer/developer of this repository | Start work on a GitHub issue in an isolated worktree with the right agent | Repeated manual setup and inconsistent launch commands | One command prepares the expected workspace | README workflow and feature history |
 | `SEG-02` | Coding agent session | Receive enough context and repository instructions to work safely | Missing repo context, wrong prompt, unclear checks | Prompt contains issue/worktree/base branch and repo instructions are discoverable | Prompt template and AGENTS.md |
-| `SEG-03` | Release maintainer | Publish and update a single-file CLI safely | Manual version/changelog/tag/release steps can drift | `make release-*`, checksums, and update tests pass | Release docs and scripts |
+| `SEG-03` | Release maintainer | Publish and update platform-specific CLI binaries safely | Manual version/changelog/tag/release steps can drift | Tagged GoReleaser release, checksum manifest, and update tests pass | Release docs and workflows |
 
 ## Users And Actors
 
@@ -37,7 +37,7 @@ canonical_for:
 
 - Existing feature packages under [features/](../features/README.md).
 - Current public docs in [README.md](../../README.md) and [doc/spec.md](../../doc/spec.md).
-- Test suite behavior in `test/start_issue.bats`.
+- Test suite behavior in `cmd/start-issue/*_test.go`.
 
 ## Assumptions
 

@@ -18,14 +18,16 @@ audience: humans_and_agents
 
 Required tools for normal development:
 
-- Go 1.21+
+- Go 1.24+
 - `git`
 - `gh` with an authenticated GitHub session for issue/update flows
-- `jq`
-- `curl` or `wget` for installer/update paths
-- one checksum tool: `sha256sum`, `shasum`, or `openssl`
 
-Build the bundled script:
+The Go CLI parses release metadata, downloads update assets, and verifies
+checksums itself. `jq`, download tools, and checksum tools are not required for
+the CLI update workflow. The optional Bash installer still requires `bash`,
+`curl` or `wget`, and a SHA-256 tool.
+
+Build the binary:
 
 ```bash
 make build

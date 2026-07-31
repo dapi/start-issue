@@ -29,7 +29,7 @@ canonical_for:
 | `worktree parent directory` | Directory under which issue worktrees are created | `--worktree-dir`, `START_ISSUE_WORKTREE_DIR` | Specific worktree path |
 | `agent` | Selected coding CLI adapter: `claude`, `codex`, `kimi`, `pi`, or `none` | Config and launch | Model |
 | `model` | Optional model string passed to adapters that support explicit model args | Config and launch | Agent |
-| `agent adapter` | Internal boundary that validates agent support and builds agent-specific commands | `scripts/lib/start_issue/agent.sh` | Public agent CLI implementation |
+| `agent adapter` | Internal Go helper boundary that validates agent support and builds agent-specific commands | `cmd/start-issue` | Public agent CLI implementation |
 | `prompt template` | Text with supported placeholders rendered into an agent prompt | Prompt resolution and launch | Final rendered prompt |
 | `prompt source` | Where the active prompt came from: CLI, env, project config, user config, or built-in default | Config output and dry-run | Prompt location |
 | `project config` | `.start-issue/*` files under the git root | Repository-local defaults | User config |

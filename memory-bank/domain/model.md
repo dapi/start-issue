@@ -51,10 +51,10 @@ canonical_for:
 
 | Concept | Canonical owner | Allowed writers | Allowed readers | Notes |
 | --- | --- | --- | --- | --- |
-| `Configuration` | `config.sh` and `doc/spec.md` | CLI/config code and docs updates | Pipeline, output, adapters | Help and dry-run must stay aligned |
-| `WorktreePlan` | `worktree.sh` and feature docs | Worktree lifecycle changes | Pipeline, tests | Reuse must be exact and safe |
-| `AgentAdapter` | `agent.sh` | Agent feature work | Pipeline, branch naming, prompt improvement | Keep adapter-specific logic centralized |
-| `ReleaseMetadata` | `release.sh` / `update.sh` | Release/update features | Installer, update workflow | Latest source is GitHub Releases |
+| `Configuration` | Go configuration helpers and `doc/spec.md` | CLI/config code and docs updates | Pipeline, output, adapters | Help and dry-run must stay aligned |
+| `WorktreePlan` | Go worktree helpers and feature docs | Worktree lifecycle changes | Pipeline, tests | Reuse must be exact and safe |
+| `AgentAdapter` | Go agent adapter helpers | Agent feature work | Pipeline, branch naming, prompt improvement | Keep adapter-specific logic centralized |
+| `ReleaseMetadata` | Go release/update helpers | Release/update features | Installer, update workflow | Latest source is GitHub Releases |
 | `FeaturePackage` | `memory-bank/flows/feature-flow.md` | Agents and maintainers | Future feature work | Legacy packages are grandfathered |
 
 ## Model Boundaries

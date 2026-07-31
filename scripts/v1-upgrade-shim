@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+
+# This compatibility asset is published only to let v1.13.2 and older
+# installations complete their documented `start-issue update` migration. The
+# legacy updater requires assets named start-issue and start-issue.sha256.
+set -euo pipefail
+
+repository="${START_ISSUE_REPOSITORY:-dapi/start-issue}"
+
+fetch() {
+    local url="$1"
+    local destination="$2"
+
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$url" -o "$destination"
+        return
+    fi
+    if command -v wget >/dev/null 2>&1; then
+        wget -qO "$destination" "$url"
+        return
+    fi
+
+    echo "start-issue v1 upgrade bridge requires curl or wget." >&2
+    exit 1
+}
+
+sha256() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{ print $1 }'
+        return
+    fi
+    if command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | awk '{ print $1 }'
+        return
+    fi
+    if command -v openssl >/dev/null 2>&1; then
+        openssl dgst -sha256 "$1" | awk '{ print $NF }'
+        return
+    fi
+
+    echo "start-issue v1 upgrade bridge requires a SHA-256 tool." >&2
+    exit 1
+}
+
+os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+case "$os" in
+    linux|darwin) ;;
+    *) echo "Unsupported OS for start-issue upgrade: $os" >&2; exit 1 ;;
+esac
+
+case "$(uname -m)" in
+    x86_64|amd64) arch=amd64 ;;
+    arm64|aarch64) arch=arm64 ;;
+    *) echo "Unsupported architecture for start-issue upgrade: $(uname -m)" >&2; exit 1 ;;
+esac
+
+asset="start-issue-${os}-${arch}"
+asset_url="${START_ISSUE_UPGRADE_ASSET_URL:-https://github.com/${repository}/releases/latest/download/${asset}}"
+checksum_url="${START_ISSUE_UPGRADE_CHECKSUM_URL:-https://github.com/${repository}/releases/latest/download/checksums.txt}"
+temporary_dir="$(mktemp -d)"
+trap 'rm -rf "$temporary_dir"' EXIT
+
+binary="$temporary_dir/$asset"
+checksums="$temporary_dir/checksums.txt"
+fetch "$asset_url" "$binary"
+fetch "$checksum_url" "$checksums"
+
+expected="$(awk -v asset="$asset" '$2 == asset || $2 == "*" asset { print $1; exit }' "$checksums")"
+actual="$(sha256 "$binary")"
+if [[ -z "$expected" || "$expected" != "$actual" ]]; then
+    echo "Checksum verification failed for $asset." >&2
+    exit 1
+fi
+
+script_dir="$(cd -P -- "$(dirname -- "$0")" && pwd)"
+script_path="$script_dir/$(basename -- "$0")"
+install -m 0755 "$binary" "$script_path"
+exec "$script_path" "$@"

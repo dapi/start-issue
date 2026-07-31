@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+#
+# start-issue - Start working on a GitHub issue with git worktree and an agent
+#
+# Usage: start-issue <issue-url-or-number> [options]
+#        start-issue init [options]
+#        start-issue setup [options]
+#
+# Options:
+#   --repo, -r <owner/repo>    Repository (default: from git remote)
+#   --base, -b <branch>        Base branch (default: main or master)
+#   --worktree-dir, -w <dir>   Worktree directory (default: ~/worktrees)
+#   --agent <name>             Agent to launch: claude, codex, kimi, pi, none
+#   --project                  With init, write .start-issue config in the repo
+#   --user                     With init, write config in ~/.config/start-issue
+#   --force                    With init, overwrite existing config files
+#   --no-agent                 Only prepare the worktree, do not launch an agent
+#   --no-init                  Skip init.sh execution
+#   --improve-prompt           Generate an improved prompt template proposal
+#   --human-gate               Run Codex in batch mode and resume on HUMAN_GATE
+#   --human-gate-help          Show dedicated help for the human-gate mode
+#   --dry-run                  Show what would be done without executing
+#   --help, -h                 Show this help
+#
+
+set -euo pipefail
+
+VERSION="1.13.2"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+DEFAULT_WORKTREE_DIR="$HOME/worktrees"
+WORKTREE_DIR_SOURCE="built-in default"
+if [[ -n "${START_ISSUE_WORKTREE_DIR:-}" ]]; then
+    WORKTREE_DIR="$START_ISSUE_WORKTREE_DIR"
+    WORKTREE_DIR_SOURCE="START_ISSUE_WORKTREE_DIR"
+else
+    WORKTREE_DIR="$DEFAULT_WORKTREE_DIR"
+fi
+
+BASE_BRANCH=""
+REPO=""
+NO_INIT=false
+DRY_RUN=false
+FAST_MODE=true
+FLAT_WORKTREE=false
+INITIAL_COMMAND=""
+ISSUE_INPUT=""
+MISSING_ISSUE=false
+PROJECT_ROOT=""
+INIT_CONFIG=false
+INIT_SCOPE=""
+INIT_FORCE=false
+SETUP_MODE=false
+UPDATE_MODE=false
+
+AGENT=""
+AGENT_CLI=""
+AGENT_SOURCE=""
+MODEL=""
+MODEL_CLI=""
+MODEL_SOURCE=""
+PROMPT_TEMPLATE=""
+PROMPT_SOURCE=""
+PROMPT_LOCATION=""
+PROMPT_TEMPLATE_PATH=""
+PROMPT_FILE_CLI=""
+PROMPT_INLINE_CLI=""
+IMPROVE_PROMPT=false
+PROMPT_IMPROVEMENT_OUTPUT_FILE=""
+HUMAN_GATE_MODE=false
+HUMAN_GATE_HELP=false
+AGENT_PROMPT=""
+
+ISSUE_NUMBER=""
+ISSUE_JSON=""
+ISSUE_TITLE=""
+ISSUE_BODY=""
+ISSUE_LABELS=""
+ISSUE_URL=""
+BRANCH_NAME=""
+WORKTREE_PATH=""
+
+LAUNCH_CWD=""
+LAUNCH_CMD=()
+HUMAN_GATE_CMD=()
+CONFLICT_CHOICE=""
+HUMAN_GATE_RUN_ID=""
+HUMAN_GATE_STATE_DIR=""
+HUMAN_GATE_EVENTS_PATH=""
+HUMAN_GATE_LAST_MESSAGE_PATH=""
+HUMAN_GATE_THREAD_ID_PATH=""
+HUMAN_GATE_THREAD_ID=""
+HUMAN_GATE_FINAL_STATUS=""
+
+resolve_script_path() {
+    local source_path="${BASH_SOURCE[0]}"
+    local source_dir
+    local target_path
+
+    while [[ -L "$source_path" ]]; do
+        source_dir="$(cd -P "$(dirname "$source_path")" && pwd)"
+        target_path="$(readlink "$source_path")"
+        if [[ "$target_path" == /* ]]; then
+            source_path="$target_path"
+        else
+            source_path="$source_dir/$target_path"
+        fi
+    done
+
+    source_dir="$(cd -P "$(dirname "$source_path")" && pwd)"
+    printf "%s/%s" "$source_dir" "$(basename "$source_path")"
+}
+
+SCRIPT_PATH="$(resolve_script_path)"
+
+# BEGIN_MODULE_SOURCES
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+LIB_DIR="$SCRIPT_DIR/lib/start_issue"
+
+if [[ ! -d "$LIB_DIR" ]]; then
+    LIB_DIR="$SCRIPT_DIR/../lib/start_issue"
+fi
+
+# shellcheck source=scripts/lib/start_issue/utils.sh
+source "$LIB_DIR/utils.sh"
+# shellcheck source=scripts/lib/start_issue/config.sh
+source "$LIB_DIR/config.sh"
+# shellcheck source=scripts/lib/start_issue/agent.sh
+source "$LIB_DIR/agent.sh"
+# shellcheck source=scripts/lib/start_issue/init.sh
+source "$LIB_DIR/init.sh"
+# shellcheck source=scripts/lib/start_issue/github.sh
+source "$LIB_DIR/github.sh"
+# shellcheck source=scripts/lib/start_issue/release.sh
+source "$LIB_DIR/release.sh"
+# shellcheck source=scripts/lib/start_issue/update.sh
+source "$LIB_DIR/update.sh"
+# shellcheck source=scripts/lib/start_issue/worktree.sh
+source "$LIB_DIR/worktree.sh"
+# shellcheck source=scripts/lib/start_issue/output.sh
+source "$LIB_DIR/output.sh"
+# shellcheck source=scripts/lib/start_issue/cli.sh
+source "$LIB_DIR/cli.sh"
+# shellcheck source=scripts/lib/start_issue/pipeline.sh
+source "$LIB_DIR/pipeline.sh"
+# END_MODULE_SOURCES
+
+main() {
+    parse_args "$@"
+
+    if [[ "$HUMAN_GATE_HELP" == "true" ]]; then
+        show_human_gate_help
+        return
+    fi
+    echo -e "${BLUE}start-issue${NC} v$VERSION"
+    echo ""
+
+    if [[ "$INIT_CONFIG" == "true" ]]; then
+        run_config_init
+        return
+    fi
+
+    if [[ "$SETUP_MODE" == "true" ]]; then
+        run_setup_mode
+        return
+    fi
+
+    if [[ "$UPDATE_MODE" == "true" ]]; then
+        run_update_mode
+        return
+    fi
+
+    maybe_run_first_run_onboarding
+
+    if [[ "$MISSING_ISSUE" == "true" ]]; then
+        handle_missing_issue_mode
+    fi
+
+    run_start_issue_pipeline
+}
+
+main "$@"

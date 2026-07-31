@@ -20,6 +20,35 @@ jobs:
       - run: make build
       - run: .build/start-issue --version
 
+  platform-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            artifact: start-issue
+          - runner: macos-latest
+            artifact: start-issue
+          - runner: windows-latest
+            artifact: start-issue.exe
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go build -o ${{ matrix.artifact }} ./cmd/start-issue
+      - if: runner.os != 'Windows'
+        run: ./${{ matrix.artifact }} --version
+      - if: runner.os != 'Windows'
+        run: make test
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & .\${{ matrix.artifact }} --version
+          $update = (go run ./cmd/start-issue update | Out-String)
+          if ($update -notmatch 'Windows update is manual') { throw "Expected Windows manual-update instruction: $update" }
+
   cross-build:
     runs-on: ubuntu-latest
     strategy:

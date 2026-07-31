@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+    cat <<'EOF'
+Usage: scripts/prepare-release <patch|minor|major>
+
+This command:
+1. requires a clean git worktree
+2. bumps VERSION in scripts/start-issue
+3. moves CHANGELOG.md Unreleased entries under the new version
+4. runs make test and make build
+5. creates a release commit and local annotated git tag
+
+Push the branch and tag afterwards with:
+  git push origin master --follow-tags
+EOF
+}
+
+update_changelog() {
+    local next_version="$1"
+    local release_date="$2"
+    local changelog_file="CHANGELOG.md"
+    local tmpfile
+
+    if [[ ! -f "$changelog_file" ]]; then
+        echo "$changelog_file is missing." >&2
+        return 1
+    fi
+
+    if ! grep -Eq '^## \[Unreleased\]$' "$changelog_file"; then
+        echo "$changelog_file must contain a '## [Unreleased]' section." >&2
+        return 1
+    fi
+
+    if grep -Eq "^## \\[$next_version\\] -" "$changelog_file"; then
+        echo "$changelog_file already contains a section for $next_version." >&2
+        return 1
+    fi
+
+    if ! awk '
+        /^## \[Unreleased\]$/ { in_unreleased = 1; next }
+        in_unreleased && /^## \[/ { in_unreleased = 0 }
+        in_unreleased && $0 !~ /^[[:space:]]*$/ && $0 !~ /^###[[:space:]]/ { found = 1 }
+        END { exit found ? 0 : 1 }
+    ' "$changelog_file"; then
+        echo "$changelog_file has no entries under '## [Unreleased]'." >&2
+        return 1
+    fi
+
+    tmpfile="$(mktemp)"
+    awk -v next_version="$next_version" -v release_date="$release_date" '
+        /^## \[Unreleased\]$/ {
+            print
+            print ""
+            print "## [" next_version "] - " release_date
+            in_unreleased = 1
+            next
+        }
+
+        in_unreleased && /^## \[/ {
+            in_unreleased = 0
+        }
+
+        { print }
+    ' "$changelog_file" > "$tmpfile"
+
+    mv "$tmpfile" "$changelog_file"
+}
+
+if [[ $# -ne 1 ]]; then
+    usage >&2
+    exit 1
+fi
+
+kind="$1"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+if [[ -n "$(git status --porcelain)" ]]; then
+    echo "Refusing to prepare a release from a dirty worktree." >&2
+    echo "Commit or stash current changes first." >&2
+    exit 1
+fi
+
+current_branch="$(git branch --show-current)"
+if [[ "$current_branch" != "master" && "$current_branch" != "main" ]]; then
+    echo "Preparing a release from branch '$current_branch'." >&2
+fi
+
+trap 'git checkout -- scripts/start-issue CHANGELOG.md >/dev/null 2>&1 || true' ERR
+
+next_version="$(bash scripts/bump-version "$kind")"
+tag="v$next_version"
+if git rev-parse "$tag" >/dev/null 2>&1; then
+    echo "Tag $tag already exists." >&2
+    false
+fi
+
+release_date="$(date +%F)"
+
+update_changelog "$next_version" "$release_date"
+
+make test
+make build
+
+git add scripts/start-issue CHANGELOG.md
+git commit -m "Release $tag"
+git tag -a "$tag" -m "Release $tag"
+
+printf 'Prepared %s\n' "$tag"
+printf 'Next step: git push origin %s --follow-tags\n' "$current_branch"

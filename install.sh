@@ -81,6 +81,7 @@ release_install_verified_asset() {
     local tmpdir
     local tmpfile
     local checksum_file
+    local asset_name
     local expected_checksum
     local actual_checksum
     local cleanup_cmd
@@ -105,7 +106,10 @@ release_install_verified_asset() {
     if declare -F debug >/dev/null 2>&1; then
         debug "Verifying checksum"
     fi
-    expected_checksum="$(awk -v asset="$(basename "$asset_url")" '$2 == asset || $2 == "*" asset { print $1; exit }' "$checksum_file")"
+    asset_name="${asset_url%%\?*}"
+    asset_name="${asset_name%%\#*}"
+    asset_name="${asset_name##*/}"
+    expected_checksum="$(awk -v asset="$asset_name" '$2 == asset || $2 == "*" asset { print $1; exit }' "$checksum_file")"
     actual_checksum="$(release_sha256_file "$tmpfile")"
 
     if [[ -z "$expected_checksum" ]]; then
@@ -154,13 +158,13 @@ parse_args() {
 main() {
     parse_args "$@"
 
-    if [[ -z "$ASSET_URL" ]]; then
+    if [[ -z "$ASSET_URL" || -z "$CHECKSUM_URL" ]]; then
         os="$(uname -s | tr '[:upper:]' '[:lower:]')"
         case "$(uname -m)" in x86_64|amd64) arch=amd64 ;; arm64|aarch64) arch=arm64 ;; *) die "Unsupported architecture: $(uname -m)" ;; esac
         case "$os" in linux|darwin) ;; *) die "Unsupported OS: $os" ;; esac
         asset="start-issue-$os-$arch"
-        ASSET_URL="https://github.com/$REPO/releases/latest/download/$asset"
-        CHECKSUM_URL="https://github.com/$REPO/releases/latest/download/checksums.txt"
+        ASSET_URL="${ASSET_URL:-https://github.com/$REPO/releases/latest/download/$asset}"
+        CHECKSUM_URL="${CHECKSUM_URL:-https://github.com/$REPO/releases/latest/download/checksums.txt}"
     fi
 
     if [[ "$DEBUG" -eq 1 ]]; then

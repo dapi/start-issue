@@ -21,9 +21,9 @@ audience: humans_and_agents
 
 Agents may do these without asking when they are in scope:
 
-- edit shell modules, tests, and memory-bank docs;
+- edit Go modules, tests, and memory-bank docs;
 - run local checks including `make test`;
-- add focused Bats tests for changed behavior;
+- add focused Go tests for changed behavior;
 - create or update feature packages;
 - fix memory-bank link/index issues found by the audit;
 - update docs/spec/help when directly required by a behavior change.
@@ -37,7 +37,7 @@ Proceed, but surface the plan/result clearly:
 - prompt contract changes;
 - new agent adapter behavior;
 - migration from legacy feature package layout to new feature-flow layout;
-- broad refactors across several shell modules.
+- broad refactors across several Go packages.
 
 ## Escalation
 

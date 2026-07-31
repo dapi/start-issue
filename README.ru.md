@@ -19,34 +19,27 @@
 Установить последний опубликованный релиз:
 
 ```bash
-go install github.com/dapi/start-issue/cmd/start-issue@latest
+go install github.com/dapi/start-issue/v2/cmd/start-issue@latest
 ```
 
-Скрипт установки скачивает asset из последнего GitHub Release в `~/.local/bin/start-issue` по умолчанию.
-
-Для диагностики, если установка на машине подвисает:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/dapi/start-issue/master/install.sh | bash -s -- --debug
-```
-
-Этот режим включает трассировку shell и подробный вывод `curl` или `wget`, чтобы было видно, на каком шаге всё остановилось.
+Опубликованные релизы содержат бинарники для конкретной платформы и файл
+`checksums.txt`. После первоначальной установки через Go команда
+`start-issue install` самостоятельно выбирает бинарник для текущей POSIX-платформы,
+проверяет SHA-256 и устанавливает его в `~/.local/bin/start-issue`.
 
 Ручная установка:
 
 ```bash
-mkdir -p ~/.local/bin
-curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o ~/.local/bin/start-issue
-chmod +x ~/.local/bin/start-issue
-```
-
-При желании можно проверить checksum:
-
-```bash
 tmpdir="$(mktemp -d)"
-curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o "$tmpdir/start-issue"
-curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue.sha256 -o "$tmpdir/start-issue.sha256"
-(cd "$tmpdir" && shasum -a 256 -c start-issue.sha256)
+os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+arch="$(uname -m)"
+case "$arch" in x86_64) arch=amd64 ;; arm64|aarch64) arch=arm64 ;; esac
+asset="start-issue-${os}-${arch}"
+curl -fsSL "https://github.com/dapi/start-issue/releases/latest/download/${asset}" -o "$tmpdir/$asset"
+curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/checksums.txt -o "$tmpdir/checksums.txt"
+(cd "$tmpdir" && grep -E " [*]?${asset}$" checksums.txt | shasum -a 256 -c -)
+mkdir -p ~/.local/bin
+install -m 0755 "$tmpdir/$asset" ~/.local/bin/start-issue
 ```
 
 Сборка и установка из исходников:
@@ -55,7 +48,7 @@ curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-is
 make install
 ```
 
-Команда собирает self-contained `start-issue` из модульных исходников и устанавливает его в `~/.local/bin/start-issue`.
+Команда собирает Go-бинарник `start-issue` из исходников и устанавливает его в `~/.local/bin/start-issue`.
 
 Убедитесь, что `~/.local/bin` есть в вашем `PATH`.
 
@@ -183,7 +176,7 @@ flowchart TD
     F -- yes --> G["Напечатать план<br/>и выйти"]
     F -- no --> H["Создать или переиспользовать<br/>git worktree"]
 
-    H --> I["Запустить init.sh<br/>если включено"]
+    H --> I["Запустить hook инициализации<br/>если включен"]
     I --> J["Сформировать prompt<br/>для agent"]
     J --> K{"Agent выбран?"}
 
@@ -197,18 +190,15 @@ flowchart TD
 ## Внутренняя архитектура
 
 CLI entrypoint — `cmd/start-issue`; runtime, build и тесты реализованы на Go.
-`make build` и `make install` собирают эти модули обратно в single-file script для дистрибуции и локальной установки.
+`make build` и `make install` собирают и устанавливают Go-бинарник.
 
-- `cli.sh` парсит аргументы и нормализует флаги в состояние workflow.
-- `config.sh` разрешает конфигурацию agent, model и prompt.
-- `github.sh` определяет контекст репозитория и получает metadata issue.
-- `worktree.sh` планирует поведение branch/worktree и выполняет worktree-side effects.
-- `agent.sh` владеет операциями agent adapter: validation, сборка launch command, AI branch naming и prompt improvement.
-- `release.sh` владеет download/checksum/version-normalization helper-логикой, общей для install и update paths.
-- `update.sh` владеет workflow self-update и определением latest release.
-- `output.sh` рендерит help, status, dry-run output и session framing.
-- `init.sh` владеет `start-issue init` и helper-логикой user-config onboarding за `setup`.
-- `pipeline.sh` делает orchestration pipeline явным.
+- Helpers конфигурации и prompt разрешают CLI, environment, project и user defaults.
+- Helpers repository/worktree получают metadata issue, безопасно планируют reuse и
+  запускают optional hook `init.sh` внутри подготовленной worktree.
+- Helpers agent adapter валидируют agent, строят launch commands, генерируют AI
+  branch names и выполняют Codex human-gate mode.
+- Helpers release выбирают platform assets, проверяют checksum и staged
+  `--version`, затем атомарно устанавливают update.
 
 Внутренний pipeline теперь такой:
 
@@ -219,7 +209,10 @@ CLI entrypoint — `cmd/start-issue`; runtime, build и тесты реализ�
 5. Execute the plan.
 6. Launch the selected agent.
 
-Bash стоит сохранять, пока lifecycle commands, shape конфигурации и требования к output остаются достаточно простыми для читаемых shell-модулей. Если будущие задачи потребуют nested configuration, более богатых subcommands вроде `resume` или `cleanup`, или структурированного machine-readable output, это следует считать порогом для оценки Python core.
+Go implementation сохраняет lifecycle commands, configuration shape и output в
+одном compiled CLI, оставляя `git`, `gh` и agent CLIs внешними process
+boundaries. Новые возможности должны сохранять эти focused helper boundaries,
+а не возвращать второй runtime.
 
 ## Аргументы CLI
 
@@ -300,9 +293,10 @@ Workflow:
 2. Читает версию executable, который пользователь запустил.
 3. Нормализует версии, поэтому `1.11.1` и `v1.11.1` считаются равными.
 4. Если текущая версия уже актуальна или новее последнего опубликованного релиза, команда завершается с кодом `0` и печатает понятный статус.
-5. Если опубликован более новый релиз, команда скачивает `start-issue` и `start-issue.sha256`, проверяет checksum и устанавливает обновление в тот же executable path, который был вызван.
+5. Если опубликован более новый релиз, команда скачивает бинарник для текущей платформы и `checksums.txt`, проверяет checksum и устанавливает обновление в resolved target executable path, который был вызван.
 
-Workflow обновления работает вне git repository. Для него нужны `gh`, `jq` и либо `curl`, либо `wget`.
+Workflow обновления работает вне git repository и требует только `gh`. Go-бинарник
+сам разбирает metadata release, скачивает assets и проверяет checksums.
 
 Приоритет конфигурации:
 
@@ -324,7 +318,7 @@ Claude по умолчанию использует plugin-native команду
 start-issue 123 --agent codex --improve-prompt
 ```
 
-Команда выбирает активный prompt template по обычному приоритету, получает issue как контекст, просит выбранного агента вернуть полный улучшенный prompt template и записывает proposal-файл. Активный prompt не перезаписывается. Для prompt-файлов proposal по умолчанию создается рядом с источником как `*.improved.md`; для built-in и inline prompt используется `.start-issue/prompt.improved.md`. Используйте `--prompt-output-file`, чтобы указать другой путь.
+Команда выбирает активный prompt template по обычному приоритету, получает issue как контекст, просит выбранного агента вернуть полный улучшенный prompt template и записывает proposal-файл. Активный prompt не перезаписывается. Для Markdown prompt-файлов proposal по умолчанию создается рядом с источником как `*.improved.md`; к остальным именам файлов добавляется `.improved`. Для built-in и inline prompt используется `.start-issue/prompt.improved.md`. Используйте `--prompt-output-file`, чтобы указать другой путь.
 
 Prompt templates поддерживают:
 
@@ -354,34 +348,35 @@ Prompt templates поддерживают:
 
 ## Требования
 
-- `bash`
 - `git`
 - `gh` CLI с авторизованной GitHub session
-- `jq`
 - CLI выбранного агента, если не используется `--agent none` или `--dry-run`
 
-Для `curl | bash` installer и workflow self-update нужны `bash` и либо `curl`, либо `wget`.
+Для сборки из исходников дополнительно нужен Go 1.24+. Опциональному Bash
+installer и manual-install snippet нужны `bash`, `curl` или `wget` и SHA-256
+tool; `start-issue update` эти инструменты не использует.
 
 ## Релизы
 
-GitHub Releases публикуются автоматически, когда в репозиторий пушится SemVer tag вроде `v1.12.0`. Release workflow заново прогоняет тесты, проверяет, что tag совпадает с `VERSION` в `scripts/start-issue`, собирает bundled-скрипт `start-issue` и загружает:
+GitHub Releases публикуются автоматически, когда в репозиторий пушится SemVer tag вроде `v2.0.0`. Release workflow заново прогоняет тесты, собирает Go-бинарники для поддерживаемых платформ и загружает:
 
-- `start-issue`
-- `start-issue.sha256`
+- `start-issue-<os>-<arch>` (и `.exe` для Windows)
+- `checksums.txt`
+- `start-issue` и `start-issue.sha256` (временный bridge для обновления с v1)
 
 Подготовить релиз локально можно так:
 
 ```bash
-make release-patch
-make release-minor
-make release-major
+make test
+git tag v2.0.0
+git push origin v2.0.0
 ```
 
 Перед подготовкой релиза добавьте user-facing изменения в `CHANGELOG.md` под `## [Unreleased]`.
 
-Каждая команда требует чистое рабочее дерево, поднимает `VERSION`, переносит unreleased-записи из `CHANGELOG.md` под новую версию и дату, запускает `make test` и `make build`, создает локальный commit вида `Release v1.12.0` и создает matching annotated git tag.
+Создавайте релизы из чистого рабочего дерева после успешных `make test` и `make build`. Tag определяет версию публикуемого бинарного файла.
 
-Опубликовать подготовленный релиз:
+Опубликовать подготовленный release можно также вместе с веткой:
 
 ```bash
 git push origin master --follow-tags
