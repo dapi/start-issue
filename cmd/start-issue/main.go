@@ -266,11 +266,12 @@ func run(o options) error {
 }
 
 func runWithReader(o options, reader *bufio.Reader) error {
-	if err := maybeRunFirstRunOnboarding(o.dryRun, o.command, reader); err != nil {
-		return err
-	}
+	onboardingErr := maybeRunFirstRunOnboarding(o.dryRun, o.command, reader)
 	if err := need("git"); err != nil {
 		return err
+	}
+	if onboardingErr != nil {
+		return onboardingErr
 	}
 	root, err := output("git", "rev-parse", "--show-toplevel")
 	if err != nil {
