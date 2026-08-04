@@ -13,7 +13,7 @@ derived_from:
   - ../../../README.ru.md
   - ../../../doc/spec.md
 status: active
-delivery_status: in_progress
+delivery_status: done
 audience: humans_and_agents
 must_not_define:
   - selected_design

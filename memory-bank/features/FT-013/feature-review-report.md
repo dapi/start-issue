@@ -16,8 +16,8 @@ audience: humans_and_agents
 
 ## Final status
 
-`done` — document review stopped early after cycle 3 because no `critical` or
-`important` findings remained. No human gate was required.
+`done` — document and runtime review stopped early after cycle 3 because no
+`critical` or `important` findings remained. No human gate was required.
 
 ## Cycle 1
 
@@ -60,12 +60,11 @@ audience: humans_and_agents
 
 - `python3 scripts/check_memory_bank_index.py --max-depth 4`: passed.
 - `git diff --check`: passed.
-- `env -u GOROOT -u GOTOOLDIR mise exec -- make test`: passed. The initial
-  direct invocation had inherited a mismatched GOROOT/GOTOOLDIR; `mise.toml`
-  selects the compatible Go 1.24.13 toolchain.
+- `make test`: passed on 2026-08-04, including `go vet ./...`, `go test ./...`,
+  the memory-bank link audit, and `git diff --check`.
 
 ## Remaining observations
 
-No critical or important document findings remain. Runtime verification gates
-for the existing implementation pass locally; GitHub issue closure remains a
-separate maintainer action.
+No critical or important document or runtime findings remain. The existing Go
+implementation satisfies issue #35, local verification gates pass, and the
+feature lifecycle is closed as `done` with its implementation plan archived.

@@ -8,7 +8,7 @@ derived_from:
   - design.md
   - decision-log.md
   - ../../engineering/testing-policy.md
-status: active
+status: archived
 audience: humans_and_agents
 must_not_define:
   - ft_013_scope
@@ -97,10 +97,16 @@ review pass.
 
 ## Plan-local Evidence
 
-- `EVID-03` Review-improve cycle reports stored in `feature-review-report.md`.
+- `EVID-01` `cmd/start-issue/main_test.go` and
+  `cmd/start-issue/parity_integration_test.go`; `make test` passed on 2026-08-04.
+- `EVID-02` `README.md`, `README.ru.md`, `doc/spec.md`, and the successful
+  memory-bank link audit and `git diff --check` within `make test` on
+  2026-08-04.
+- `EVID-03` Review-improve cycle results stored in
+  `feature-review-report.md`.
 
-## Ready For Acceptance
+## Acceptance Result
 
-All canonical IDs are traceable to checks, the current Go runtime is the
-grounding source, and the final acceptance decision remains owned by
-`brief.md`.
+All canonical checks passed, the current Go runtime and public documentation
+satisfy `SC-01` through `SC-07`, the simplify review found no required runtime
+change, and `brief.md` records the delivery as done.
