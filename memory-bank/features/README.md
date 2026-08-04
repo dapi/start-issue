@@ -30,13 +30,18 @@ audience: humans_and_agents
 - Вместо `XXX` используй идентификатор, принятый в проекте: issue id, ticket id или другой стабильный ключ
 - Один package = одна delivery-единица
 
-## Instantiated Packages
+## Feature packages
+
+- [Missing feature packages inventory](missing.md)
+  Comparison of GitHub issues with instantiated packages, including current
+  gaps, duplicates, and superseded migration work.
 
 - [FT-016: Real Codex human-gate E2E suite](FT-016/README.md)
   Opt-in local smoke suite that validates the real Codex human-gate path.
 
-- [FT-017: Go parity-first migration](FT-017/README.md)
-  Issue #34 package for migrating the CLI to Go with executable parity before cutover. The Bash runtime remains the baseline until the package's parity evidence permits cutover.
+- [FT-017: Codex human-gate delivery permissions](FT-017/README.md)
+  Explicit restricted/default and opt-in full-delivery capability contract for
+  Codex human-gate runs.
 
 - [FT-018: Agent CLI launch compatibility](FT-018/README.md)
   Issue #34 follow-up package for current Kimi Code CLI command and cwd compatibility.

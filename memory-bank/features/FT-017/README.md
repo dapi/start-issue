@@ -1,30 +1,37 @@
 ---
-title: "FT-017: Go parity-first migration"
+title: "FT-017: Codex human-gate delivery permissions"
 doc_kind: feature
 doc_function: index
-purpose: "Navigation for issue #34. Read the canonical brief, selected design, decision log, then the derived execution plan."
+purpose: "Navigation for the Codex human-gate permission and full-delivery contract feature package."
 derived_from:
+  - ../../dna/governance.md
   - brief.md
+  - design.md
+  - implementation-plan.md
 status: active
 audience: humans_and_agents
 ---
 
-# FT-017: Go parity-first migration
+# FT-017: Codex human-gate delivery permissions
 
 ## About
 
-This package tracks [issue #34](https://github.com/dapi/start-issue/issues/34): rewrite the `start-issue` CLI in Go through a parity-first migration, without changing the user-facing workflow unintentionally.
+This package tracks GitHub issue #37. It extends the FT-015 batch/resume flow
+with an explicit capability contract for restricted work and opt-in end-to-end
+Git delivery.
 
-## Annotated Index
+## Annotated index
 
 - [brief.md](brief.md)
-  Read first for the canonical problem, scope, blocker, and verify contract.
+  Canonical problem space, scope, acceptance scenarios, checks, and evidence
+  contract.
+- [design.md](design.md)
+  Selected permission-mode design, Codex command contract, trust boundary,
+  failure modes, and rollout/backout rules.
+- [implementation-plan.md](implementation-plan.md)
+  Grounded execution sequence, test strategy, checkpoints, and approval gate
+  for live GitHub-writing verification.
 
 - [decision-log.md](decision-log.md)
-  Read for the FPF-grounded, accepted release-distribution decision.
-
-- [design.md](design.md)
-  Read for the selected Go architecture, parity oracle, distribution contract, C2 view, and rollout/backout semantics.
-
-- [implementation-plan.md](implementation-plan.md)
-  Read for grounded execution sequencing, test strategy, checkpoints, and stop conditions.
+  Historical release-distribution decisions retained from the earlier FT-017
+  migration package.

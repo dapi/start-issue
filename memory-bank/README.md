@@ -72,3 +72,7 @@ flows and templates remain upstream-derived process references.
   Setup onboarding and first-run user config.
 - [features/FT-015/README.md](features/FT-015/README.md)
   Codex batch human-gate mode with resume flow.
+- [features/FT-016/README.md](features/FT-016/README.md)
+  Opt-in real Codex human-gate E2E suite.
+- [features/FT-017/README.md](features/FT-017/README.md)
+  Codex human-gate delivery permission modes.
