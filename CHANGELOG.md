@@ -11,6 +11,8 @@ This project follows Semantic Versioning.
 ### Changed
 
 - Documented the completed self-update feature lifecycle from issue #35.
+- Added the reviewed FT-013 feature brief, design, implementation plan, and
+  lifecycle evidence for the self-update workflow.
 
 ## [2.0.1] - 2026-08-04
 
