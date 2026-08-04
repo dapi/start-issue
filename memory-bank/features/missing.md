@@ -22,7 +22,7 @@ replacement for a feature `brief.md`.
 
 | Issue | Current state | Memory-bank state | Gap / recommended action |
 | --- | --- | --- | --- |
-| [#35](https://github.com/dapi/start-issue/issues/35) | Open; duplicates the already delivered #13 contract | FT-013 documents and implements the release-backed self-update, but does not reference #35. | Do not create a second package. Reconcile #35 with FT-013: add the issue as provenance or close the duplicate after verifying the acceptance criteria against current tests. |
+| [#35](https://github.com/dapi/start-issue/issues/35) | Open; reconciled to the existing delivery slice | FT-013 is the single owner and now references #35 as provenance; current Go implementation and tests cover the contract. | Keep one package; close or update the GitHub issue separately after acceptance verification. |
 
 ## Closed issues without a dedicated package
 
