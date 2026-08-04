@@ -42,7 +42,7 @@ done
 
 [[ "$scenario" == "done" || "$scenario" == "human-gate" ]] || fail "scenario must be done or human-gate"
 [[ "${START_ISSUE_E2E:-}" == "1" ]] || fail "set START_ISSUE_E2E=1 to authorize a real Codex session"
-start_issue_bin="${START_ISSUE_E2E_BINARY:-$repo_root/scripts/start-issue}"
+start_issue_bin="${START_ISSUE_E2E_BINARY:-$repo_root/.build/start-issue}"
 
 [[ -x "$start_issue_bin" ]] || fail "start-issue executable not found: $start_issue_bin"
 

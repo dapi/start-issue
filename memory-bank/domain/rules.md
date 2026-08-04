@@ -33,15 +33,15 @@ canonical_for:
 
 | Policy ID | Policy | Input | Output / Verdict | Owner |
 | --- | --- | --- | --- | --- |
-| `POL-01` | Branch type selection | Issue labels | `feature/`, `fix/`, `docs/`, `refactor/`, `test/`, `chore/`, or `hotfix/` prefix | `worktree.sh` |
-| `POL-02` | Model support | Resolved agent and optional model | Adapter command includes model or fails if unsupported | `agent.sh` |
-| `POL-03` | Release comparison | Installed version and latest tag | no-op, update, or fail | `update.sh` |
-| `POL-04` | First-run gate | Missing `~/.config/start-issue` on ordinary launch | Run setup or create marker directory, then continue | `pipeline.sh` / `init.sh` |
+| `POL-01` | Branch type selection | Issue labels | `feature/`, `fix/`, `docs/`, `refactor/`, `test/`, `chore/`, or `hotfix/` prefix | Go worktree helper |
+| `POL-02` | Model support | Resolved agent and optional model | Adapter command includes model or fails if unsupported | Go agent adapter |
+| `POL-03` | Release comparison | Installed version and latest tag | no-op, update, or fail | Go update helper |
+| `POL-04` | First-run gate | Missing `~/.config/start-issue` on ordinary launch | Run setup or create marker directory, then continue | Go orchestration/config helpers |
 
 ## Cross-Context Rules
 
 - `XDR-01` Changes to public CLI behavior must update help text, README,
-  Russian README/spec when relevant, and Bats coverage together.
+  Russian README/spec when relevant, and Go test coverage together.
 - `XDR-02` Changes to release behavior must update release docs, release/update
   tests, and install/update code together.
 - `XDR-03` Changes to memory-bank structure must keep

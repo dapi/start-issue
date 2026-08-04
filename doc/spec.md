@@ -3,10 +3,10 @@
 ## Обзор
 
 **Название**: `start-issue`
-**Тип**: Bash CLI с модульной shell-архитектурой
+**Тип**: Go CLI
 **Назначение**: автоматизировать начало работы над GitHub issue: получить issue через `gh`, опционально переименовать zellij tab через `zellij-tab-status`, создать git worktree, при необходимости запустить `init.sh` и запустить выбранный coding agent.
 
-Для разработки код остается модульным в `scripts/lib/start_issue/`, но install/distribution path должен собирать self-contained single-file script.
+Runtime, build и тесты реализованы на Go; distribution path публикует platform-specific single-file binaries.
 
 ## Поддерживаемые агенты
 
@@ -22,20 +22,15 @@
 
 ## Внутренняя архитектура
 
-Публичный CLI contract остается за `scripts/start-issue`, но внутренняя реализация разбита на shell-модули в `scripts/lib/start_issue/`.
+Публичный CLI contract реализует `cmd/start-issue`. Внутренняя реализация разделена на focused Go helpers в одном command package.
 
-| Модуль | Ответственность |
+| Граница | Ответственность |
 |--------|-----------------|
-| `cli.sh` | CLI parsing и нормализация входных флагов |
-| `config.sh` | Разрешение agent/prompt config и prompt rendering |
-| `github.sh` | Parse issue input, detect repo/base branch, fetch issue metadata |
-| `release.sh` | Release download, checksum verification, and version normalization helpers shared by install/update flows |
-| `update.sh` | Self-update mode, latest-release lookup, version comparison, and install orchestration |
-| `worktree.sh` | Branch naming, worktree planning, worktree/init/zellij side effects |
-| `agent.sh` | Agent adapter contract: validate, branch-name generation, prompt improvement, launch command |
-| `output.sh` | Help, status rendering, dry-run output, session header |
-| `init.sh` | Workflow конфигурационного `init` |
-| `pipeline.sh` | Явная orchestration pipeline |
+| CLI/config/prompt | Parse input, config resolution и prompt rendering |
+| Repository/worktree | Parse issue input, repo/base detection, GitHub metadata и worktree lifecycle |
+| Agent adapters | Validation, branch-name generation, prompt improvement и launch commands |
+| Release/update | Asset selection, checksum/version verification и install orchestration |
+| Output/onboarding | Help, status rendering, dry-run output, `init` и `setup` workflows |
 
 Agent-specific behavior должен быть централизован за единым adapter boundary:
 
@@ -44,7 +39,7 @@ Agent-specific behavior должен быть централизован за е
 - generate branch name in `--ai`
 - improve prompt template in `--improve-prompt`
 
-Если будущие изменения потребуют nested configuration, richer lifecycle subcommands (`resume`, `list`, `cleanup`) или полноценный structured output, это считается порогом для оценки Python core вместо дальнейшего роста Bash.
+Будущие изменения должны сохранять эти границы в Go, не создавая второй runtime или дублирующие implementation paths.
 
 ## Входные данные
 
@@ -78,10 +73,10 @@ Agent-specific behavior должен быть централизован за е
 | `--improve-prompt` | Сгенерировать reviewable proposal улучшенного prompt template и выйти до создания worktree | false |
 | `--human-gate` | Codex-only batch mode для issue workflow с resume на `STATUS: HUMAN_GATE` | false |
 | `--human-gate-help` | Показать отдельную справку по human-gate mode | false |
-| `--prompt-output-file` | Путь proposal-файла для `--improve-prompt` | Для prompt-файла: рядом с source как `*.improved.md`; иначе `.start-issue/prompt.improved.md` |
+| `--prompt-output-file` | Путь proposal-файла для `--improve-prompt` | Для `.md`: рядом с source как `*.improved.md`; для остальных файлов: `<source>.improved`; иначе `.start-issue/prompt.improved.md` |
 | `--no-init` | Пропустить запуск `init.sh` | false |
 | `--command` / `-c` | Совместимый Claude command для дефолтного Claude prompt | `/task-router:route-task` |
-| `--ai` | Генерировать имя ветки выбранным агентом | false, используется быстрая bash-эвристика |
+| `--ai` | Генерировать имя ветки выбранным агентом | false, используется быстрая Go-эвристика |
 | `--project` | Для `init`: записать конфигурацию проекта в `.start-issue` | интерактивный выбор |
 | `--user` | Для `init`: записать пользовательскую конфигурацию в `~/.config/start-issue` | интерактивный выбор |
 | `--force` | Для `init`: перезаписать существующие `agent`, `prompt.md` и при необходимости сбросить `model` к unset | false |
@@ -137,7 +132,7 @@ git rev-parse --show-toplevel
 4. Записать результат в reviewable proposal-файл.
 5. Завершить выполнение до переименования Zellij tab, генерации branch, создания worktree, запуска `init.sh` и запуска agent session.
 
-Режим не перезаписывает active prompt template. Если active prompt взят из файла, proposal по умолчанию пишется рядом с ним как `*.improved.md`. Если active prompt built-in или inline, proposal по умолчанию пишется в `.start-issue/prompt.improved.md` в git top-level directory. `--prompt-output-file` задает путь явно.
+Режим не перезаписывает active prompt template. Если active prompt взят из файла `.md`, proposal по умолчанию пишется рядом с ним как `*.improved.md`; для любого другого имени файла к исходному пути добавляется `.improved`. Если active prompt built-in или inline, proposal по умолчанию пишется в `.start-issue/prompt.improved.md` в git top-level directory. `--prompt-output-file` задает путь явно.
 
 Если proposal-файл уже существует, скрипт завершается с ошибкой, чтобы не перезаписать reviewable артефакт. `--agent none` в этом режиме невалиден.
 
@@ -148,7 +143,7 @@ git rev-parse --show-toplevel
 - project scope: `{git-root}/.start-issue/agent`, optional `{git-root}/.start-issue/model` и `{git-root}/.start-issue/prompt.md`
 - user scope: `~/.config/start-issue/agent`, optional `~/.config/start-issue/model` и `~/.config/start-issue/prompt.md`
 
-Если не передан `--project` или `--user`, команда интерактивно спрашивает scope. Project scope требует запуск внутри git repository; user scope может выполняться вне git repository. Режим `init` не требует issue, `gh` или `jq`.
+Если не передан `--project` или `--user`, команда интерактивно спрашивает scope. Project scope требует запуск внутри git repository; user scope может выполняться вне git repository. Режим `init` не требует issue или `gh`.
 
 По умолчанию записывается agent `claude` и стандартный Claude prompt. `--agent` меняет записываемый agent; `--model` записывает sibling `model` config; `--prompt` или `--prompt-file` меняют записываемый prompt. Если `--model` не передан, built-in behavior остается unset и новый `model` файл не создается. Если выбран не `claude` и prompt явно не задан, записывается portable prompt. Если существующий `agent` сохраняется без `--force`, default prompt выбирается по сохраненному agent, а не по built-in default или CLI override.
 
@@ -161,7 +156,7 @@ git rev-parse --show-toplevel
 Контракт режима:
 
 1. Режим работает только с `~/.config/start-issue` и не пишет project config в `.start-issue`.
-2. Режим не требует issue, git repository, `gh` или `jq`.
+2. Режим не требует issue, git repository или `gh`.
 3. Если директория `~/.config/start-issue` отсутствует, она создается в начале setup.
 4. Команда спрашивает default agent: `claude`, `codex`, `kimi`, `pi` или `skip`.
 5. `skip` означает, что файл `~/.config/start-issue/agent` должен отсутствовать.
@@ -192,16 +187,12 @@ git rev-parse --show-toplevel
 3. Текущая установленная версия берется из executable, который пользователь реально запустил.
 4. Перед сравнением версии нормализуются удалением одного опционального префикса `v`.
 5. Если текущая версия равна latest release или новее него, команда завершается с кодом `0` и не переустанавливает бинарник.
-6. Если latest release новее, команда скачивает `start-issue` и `start-issue.sha256`, проверяет checksum и устанавливает обновление в тот же executable path.
+6. Если latest release новее, команда скачивает binary для текущей платформы и `checksums.txt`, проверяет checksum и staged `--version`, затем устанавливает обновление в resolved target running executable.
 7. Ошибки release lookup, download, checksum verification и install являются фатальными и должны давать понятное сообщение.
 
 Зависимости режима:
 
 - `gh` CLI с авторизованной GitHub session
-- `jq`
-- `curl` или `wget`
-- `install`
-- один из `sha256sum`, `shasum` или `openssl`
 
 ## Codex human-gate mode
 
@@ -351,7 +342,7 @@ Templating правила:
 
 Если первый positional argument равен `setup` или включен `--setup`:
 
-1. Не требовать git repository, `gh`, `jq` или issue input.
+1. Не требовать git repository, `gh` или issue input.
 2. Создать `~/.config/start-issue`, если директория отсутствует.
 3. Спросить default agent: `claude`, `codex`, `kimi`, `pi` или `skip`.
 4. Если выбран `skip`, не создавать `~/.config/start-issue/agent`.
@@ -363,7 +354,7 @@ Templating правила:
 ### Фаза 1: Валидация и парсинг
 
 1. Распарсить CLI arguments.
-2. Проверить зависимости: `git`, `gh`, `jq`, авторизацию `gh`.
+2. Проверить зависимости: `git`, `gh`, авторизацию `gh`.
 3. Проверить, что текущая директория внутри git repo.
 4. Определить project root через `git rev-parse --show-toplevel`.
 5. Распарсить issue URL или issue number.
@@ -390,7 +381,7 @@ Templating правила:
 Если включен update mode:
 
 1. Не требовать `git` и не проверять текущую директорию как git repository.
-2. Проверить зависимости update workflow: `gh`, `jq`, `install` и download/checksum tooling.
+2. Проверить зависимость update workflow: `gh`.
 3. Получить latest release metadata через:
 
 ```bash
@@ -400,13 +391,13 @@ gh api "repos/dapi/start-issue/releases/latest"
 4. Извлечь:
 
 - `tag_name`
-- `browser_download_url` для asset `start-issue`
-- `browser_download_url` для asset `start-issue.sha256`
+- `browser_download_url` для binary текущей платформы
+- `browser_download_url` для `checksums.txt`
 
 5. Нормализовать installed version и `tag_name`, удалив один опциональный префикс `v`.
 6. Если versions равны, завершиться с понятным сообщением `already up to date`.
 7. Если installed version новее latest published release, завершиться с кодом `0` и сообщением, что update не нужен.
-8. Если latest published release новее, скачать оба asset, проверить checksum и установить обновление в путь текущего executable.
+8. Если latest published release новее, скачать оба asset, проверить checksum и staged `--version`, затем установить обновление в resolved target текущего executable.
 
 ### Фаза 2: Получение issue
 
@@ -439,7 +430,7 @@ zellij-tab-status --set-name "#{ISSUE_NUMBER}"
 
 ### Фаза 4: Имя ветки
 
-По умолчанию используется быстрая bash-эвристика.
+По умолчанию используется быстрая Go-эвристика.
 
 Правила типа ветки:
 
@@ -459,7 +450,7 @@ zellij-tab-status --set-name "#{ISSUE_NUMBER}"
 {type}/issue-{number}-{kebab-case-title}
 ```
 
-`--ai` пытается сгенерировать имя ветки через выбранный agent в non-interactive mode и fallback-ится на bash-эвристику при ошибке или невалидном формате. Если задана explicit model, adapter обязан передать ее в non-interactive command вместо тихого игнорирования.
+`--ai` пытается сгенерировать имя ветки через выбранный agent в non-interactive mode и fallback-ится на Go-эвристику при ошибке или невалидном формате. Если задана explicit model, adapter обязан передать ее в non-interactive command вместо тихого игнорирования.
 
 ### Фаза 5: Создание worktree
 
@@ -512,7 +503,7 @@ codex:
   exec codex [--model "$MODEL"] --cd "$WORKTREE_PATH" --dangerously-bypass-approvals-and-sandbox "$PROMPT"
 
 kimi:
-  exec kimi [--model "$MODEL"] --work-dir "$WORKTREE_PATH" --yolo -p "$PROMPT"
+  cd "$WORKTREE_PATH" && exec kimi [--model "$MODEL"] -p "$PROMPT"
 
 pi:
   cd "$WORKTREE_PATH"
@@ -545,7 +536,6 @@ none:
 | Не в git repo | `Not in a git repository` |
 | `gh` отсутствует | `gh CLI not found. Install: https://cli.github.com` |
 | `gh` не авторизован | `gh not authenticated. Run: gh auth login` |
-| `jq` отсутствует | `jq not found. Please install jq.` |
 | Issue не найден | `Issue #{number} not found in {owner}/{repo}` |
 | Agent неизвестен | `Unknown agent: {agent}` |
 | Model config пустая | `Model config is empty. Remove the empty model config or set a value.` |
@@ -601,12 +591,10 @@ start-issue --human-gate-help
 
 Обязательные:
 
-- `bash`
 - `git`
 - `gh` CLI с авторизованной GitHub session
-- `jq`
 
-Для `start-issue setup` обязателен только `bash`. Для `start-issue init --user` обязателен только `bash`. Для `start-issue init --project` нужны `bash` и `git`.
+Для `start-issue setup` и `start-issue init --user` не требуется внешний CLI. Для `start-issue init --project` нужен `git`.
 
 Опциональные:
 

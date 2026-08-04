@@ -2,51 +2,31 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    tags: ["v*"]
 
 permissions:
   contents: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   release:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up mise
-        uses: jdx/mise-action@v2
-
-      - name: Install test dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck
-
-      - name: Verify tag matches script version
-        run: |
-          script_version="$(awk -F'"' '/^VERSION="/ { print $2; exit }' scripts/start-issue)"
-          tag_version="${GITHUB_REF_NAME#v}"
-          test "$script_version" = "$tag_version"
-
-      - name: Run checks
-        run: make test
-
-      - name: Build release artifact
-        run: |
-          make build
-          cp .build/start-issue start-issue
-          sha256sum start-issue > start-issue.sha256
-
-      - name: Publish GitHub release
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make test
+      - run: make e2e-sandbox
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: ~> v2
+          args: release --clean
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "$GITHUB_REF_NAME" \
-            start-issue \
-            start-issue.sha256 \
-            --generate-notes
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false

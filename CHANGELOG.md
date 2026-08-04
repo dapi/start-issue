@@ -16,6 +16,13 @@ This project follows Semantic Versioning.
 
 - Removed the obsolete `codex exec --ask-for-approval` argument from the Codex human-gate workflow, restoring compatibility with current Codex CLI versions.
 
+## [2.0.0] - 2026-07-22
+
+### Changed
+
+- Replaced the Bash CLI, Bats suite, and shell build/release tooling with the Go implementation and Go test suite.
+- Changed distribution to platform-specific Go binaries with `checksums.txt` verification.
+
 ## [1.13.2] - 2026-07-19
 
 ### Added

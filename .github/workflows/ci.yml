@@ -5,76 +5,81 @@ on:
   push:
     branches: [master, main]
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+permissions:
+  contents: read
 
 jobs:
   test:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make test
+      - run: make build
+      - run: .build/start-issue --version
 
-      - name: Set up mise
-        uses: jdx/mise-action@v2
+  sandbox-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make e2e-sandbox
 
-      - name: Install test dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck
-
-      - name: Static checks
-        run: |
-          bash -n scripts/start-issue
-          shellcheck install.sh scripts/start-issue scripts/build-start-issue scripts/bump-version scripts/prepare-release scripts/lib/start_issue/*.sh
-          git diff --check
-
-      - name: Legacy environment drift check
-        run: |
-          legacy_name="CLAUDE""_WORKTREE_DIR"
-          if grep -R --line-number "$legacy_name" scripts README.md README.ru.md docs doc test .github; then
-            echo "Legacy Claude worktree environment variable name must not be used."
-            exit 1
-          fi
-
-      - name: Integration tests
-        run: mise exec -- bats test
-
-  install-script:
-    runs-on: ${{ matrix.os }}
+  platform-smoke:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-
+        include:
+          - runner: ubuntu-latest
+            artifact: start-issue
+          - runner: macos-latest
+            artifact: start-issue
+          - runner: windows-latest
+            artifact: start-issue.exe
+    runs-on: ${{ matrix.runner }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Build local release artifact
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go build -o ${{ matrix.artifact }} ./cmd/start-issue
+      - if: runner.os != 'Windows'
+        run: ./${{ matrix.artifact }} --version
+      - if: runner.os != 'Windows'
+        run: make test
+      - if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          bash scripts/build-start-issue "$RUNNER_TEMP/start-issue" >/dev/null
-          chmod +x "$RUNNER_TEMP/start-issue"
+          & .\${{ matrix.artifact }} --version
+          $update = (go run ./cmd/start-issue update | Out-String)
+          if ($update -notmatch 'Windows update is manual') { throw "Expected Windows manual-update instruction: $update" }
 
-      - name: Generate checksum file
-        run: |
-          if command -v sha256sum >/dev/null 2>&1; then
-            checksum="$(sha256sum "$RUNNER_TEMP/start-issue" | awk '{ print $1 }')"
-          else
-            checksum="$(shasum -a 256 "$RUNNER_TEMP/start-issue" | awk '{ print $1 }')"
-          fi
-          printf '%s  %s\n' "$checksum" start-issue > "$RUNNER_TEMP/start-issue.sha256"
-
-      - name: Test install.sh via pipe
-        run: |
-          curl -fsSL "file://$GITHUB_WORKSPACE/install.sh" | env \
-            PREFIX="$RUNNER_TEMP/prefix" \
-            START_ISSUE_ASSET_URL="file://$RUNNER_TEMP/start-issue" \
-            START_ISSUE_CHECKSUM_URL="file://$RUNNER_TEMP/start-issue.sha256" \
-            bash
-
-      - name: Verify installed binary
-        run: |
-          test -x "$RUNNER_TEMP/prefix/bin/start-issue"
-          "$RUNNER_TEMP/prefix/bin/start-issue" --version | grep '^start-issue v'
+  cross-build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+          - os: darwin
+            arch: amd64
+          - os: darwin
+            arch: arm64
+          - os: windows
+            arch: amd64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go build ./cmd/start-issue
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}

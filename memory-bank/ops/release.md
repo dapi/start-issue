@@ -14,55 +14,63 @@ audience: humans_and_agents
 
 # Release And Deployment
 
-`start-issue` is distributed as a single-file Bash executable through GitHub
+`start-issue` is distributed as platform-specific Go binaries through GitHub
 Releases. There is no server deployment.
 
 ## Release Flow
 
 1. Add user-facing changes under `## [Unreleased]` in `CHANGELOG.md`.
-2. Run one release prep command:
+2. From a clean worktree, run the required checks and create the SemVer tag.
+  The tag is the source of the release version:
 
 ```bash
-make release-patch
-make release-minor
-make release-major
+make test
+make build
+git tag -a vX.Y.Z -m "Release vX.Y.Z"
 ```
 
-3. The release script bumps `VERSION`, updates changelog entries, runs
-   `make test`, runs `make build`, creates `Release vX.Y.Z`, and creates an
-   annotated tag.
-4. Publish with:
+3. Publish with:
 
 ```bash
 git push origin master --follow-tags
 ```
 
-5. GitHub Actions builds the release asset and checksum.
+If a lightweight tag was created instead, push that exact tag explicitly:
+
+```bash
+git push origin vX.Y.Z
+```
+
+4. GitHub Actions reruns the test suite and uses GoReleaser to publish the
+   binaries and checksum manifest.
 
 ## Release Assets
 
-Each release uploads:
+Each release uploads one binary for every supported target:
 
-- `start-issue`
-- `start-issue.sha256`
+- `start-issue-linux-amd64`
+- `start-issue-linux-arm64`
+- `start-issue-darwin-amd64`
+- `start-issue-darwin-arm64`
+- `start-issue-windows-amd64.exe`
+- `checksums.txt`
+- `start-issue` and `start-issue.sha256` during the v1-to-v2 transition only
 
 The installer and self-update workflow download the release asset and verify the
-checksum before install.
+checksum before install. The two legacy-named assets are a verified POSIX
+migration bridge: v1.13.2 and older updaters install it, then it resolves,
+verifies, and replaces itself with the matching v2 platform binary.
 
-## Release Commands
+## Version Source
 
 ```bash
 make print-version
-make bump-patch
-make bump-minor
-make bump-major
-make release-patch
-make release-minor
-make release-major
 ```
 
-Do not run release commands with a dirty worktree unless the release script
-explicitly supports the current state.
+`make build` and `make install` derive the embedded version from `git describe`
+using the nearest SemVer tag. A tagged release therefore reports the tag
+version, while a checkout between tags reports its describe suffix. GoReleaser
+embeds the pushed release tag in published binaries.
 
 ## Release Verification
 
@@ -75,9 +83,10 @@ make build
 
 Release-specific checks:
 
-- `VERSION` in `scripts/start-issue` matches the tag without the `v` prefix.
+- `make print-version` matches the intended tag version when run at that tag.
 - `CHANGELOG.md` has the new version/date section.
-- Release asset and checksum are present in GitHub Releases after CI.
+- All five platform assets, `checksums.txt`, and the v1 migration bridge assets
+  `start-issue`/`start-issue.sha256` are present in GitHub Releases after CI.
 - `start-issue update` can resolve the latest release and no-op/install
   correctly.
 

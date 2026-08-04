@@ -31,3 +31,7 @@ Git delivery.
 - [implementation-plan.md](implementation-plan.md)
   Grounded execution sequence, test strategy, checkpoints, and approval gate
   for live GitHub-writing verification.
+
+- [decision-log.md](decision-log.md)
+  Historical release-distribution decisions retained from the earlier FT-017
+  migration package.

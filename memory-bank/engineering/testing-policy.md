@@ -2,7 +2,7 @@
 title: Testing Policy
 doc_kind: engineering
 doc_function: canonical
-purpose: "Testing policy for start-issue: required local checks, Bats coverage, release checks, memory-bank audit, and manual-only exceptions."
+purpose: "Testing policy for start-issue: required Go checks, release checks, memory-bank audit, and manual-only exceptions."
 derived_from:
   - ../dna/governance.md
   - ../flows/feature-flow.md
@@ -33,24 +33,24 @@ make test
 
 `make test` runs:
 
-1. `bash -n scripts/start-issue`
-2. `shellcheck install.sh scripts/start-issue scripts/build-start-issue scripts/bump-version scripts/prepare-release scripts/lib/start_issue/*.sh test/e2e/*.sh`
-3. `python3 scripts/check_memory_bank_index.py --max-depth 4`
-4. `git diff --check`
-5. `bats test`
+1. `gofmt` cleanliness for `cmd/`
+2. `go vet ./...`
+3. `go test ./...`
+4. `python3 scripts/check_memory_bank_index.py --max-depth 4`
+5. `git diff --check`
 
 ## Test Stack
 
-- Shell syntax: `bash -n`
-- Static analysis: `shellcheck`
-- Behavior/regression tests: Bats under `test/`
+- Formatting: `gofmt`
+- Static analysis: `go vet`
+- Behavior/regression tests: Go tests under `cmd/` and future Go packages
 - Opt-in real-agent E2E smoke tests: scripts under `test/e2e/`, run manually and never in CI
 - Memory-bank navigation: `scripts/check_memory_bank_index.py`
 - Whitespace/conflict-marker check: `git diff --check`
 
 ## Core Rules
 
-- Any deterministic behavior change needs automated Bats coverage.
+- Any deterministic behavior change needs automated Go test coverage.
 - Any public CLI contract change must update help/output assertions and docs.
 - Any config precedence change must test the winning source and displayed source.
 - Any worktree lifecycle change must test safe reuse/reject/delete behavior.
@@ -65,12 +65,12 @@ make test
 - Legacy `feature.md` packages own their existing `SC-*`, `CHK-*`, and `EVID-*`
   until migrated.
 - `implementation-plan.md` owns concrete test commands and sequencing.
-- Bats tests own executable regression behavior.
+- Go tests own executable regression behavior.
 
 ## Sufficient Coverage
 
 Coverage is sufficient when the changed behavior is exercised at the CLI level
-or at the closest practical shell helper boundary, and failure behavior is
+or at the closest practical Go helper boundary, and failure behavior is
 covered when it affects user trust or data safety.
 
 Line coverage is not a target. Scenario coverage matters more:
@@ -98,16 +98,15 @@ feature plan or final handoff.
 
 ## Simplify Review
 
-After tests pass, review for shell complexity:
+After tests pass, review for implementation complexity:
 
 - avoid scattered agent-specific branching;
-- prefer small functions with explicit inputs over implicit global mutation where
-  practical within the existing Bash style;
+- prefer small functions with explicit inputs over implicit global mutation;
 - avoid abstraction unless it removes real duplication or clarifies a boundary;
 - keep user-facing output stable and direct.
 
 ## Verification Context Separation
 
 1. Functional verification: run relevant tests or `make test`.
-2. Simplify review: inspect the changed shell/docs for unnecessary complexity.
+2. Simplify review: inspect the changed Go code/docs for unnecessary complexity.
 3. Acceptance: map results back to `SC-*`/`CHK-*` or the user request.

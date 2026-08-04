@@ -20,7 +20,7 @@ limited to GitHub and external CLIs.
 | Environment | Purpose | Access path | Notes |
 | --- | --- | --- | --- |
 | GitHub repository | Issues, CI, releases, tags | `gh`, git remote, GitHub UI | Auth required for issue/update/release operations |
-| GitHub Releases | Distribution source for installer and update | `gh api`, release URLs | Publishes `start-issue` and checksum |
+| GitHub Releases | Distribution source for installer and update | `gh api`, release URLs | Publishes platform binaries and `checksums.txt` |
 | User machine | Installed executable and user config | local filesystem | Update installs into running executable path |
 
 ## Common Operations
@@ -53,7 +53,7 @@ gh api repos/dapi/start-issue/releases/latest --jq .tag_name
 There is no centralized runtime observability. Diagnostics come from:
 
 - command output;
-- Bats test logs;
+- Go test logs;
 - GitHub Actions logs;
 - human-gate state files under
   `<worktree>/.start-issue/runs/<timestamp>/`.

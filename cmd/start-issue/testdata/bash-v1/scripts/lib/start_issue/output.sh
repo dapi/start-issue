@@ -331,7 +331,7 @@ print_manual_next_steps() {
     echo "Suggested agent commands:"
     echo "  claude"
     echo "  codex --cd $(shell_join "$WORKTREE_PATH")"
-    echo "  kimi --work-dir $(shell_join "$WORKTREE_PATH")"
+    echo "  (cd $(shell_join "$WORKTREE_PATH") && kimi)"
     echo "  pi"
 }
 
@@ -367,9 +367,9 @@ print_dry_run_launch_command() {
                 ;;
             kimi)
                 if [[ -n "$MODEL" ]]; then
-                    cmd=$(shell_join kimi --model "$MODEL" --work-dir "$WORKTREE_PATH" --yolo -p "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                    cmd=$(shell_join kimi --model "$MODEL" -p "<rendered prompt: ${#AGENT_PROMPT} chars>")
                 else
-                    cmd=$(shell_join kimi --work-dir "$WORKTREE_PATH" --yolo -p "<rendered prompt: ${#AGENT_PROMPT} chars>")
+                    cmd=$(shell_join kimi -p "<rendered prompt: ${#AGENT_PROMPT} chars>")
                 fi
                 ;;
             pi)
@@ -414,9 +414,9 @@ print_dry_run_human_gate_command() {
         echo "   Prompt omitted from command display because it is large."
         echo "   Set START_ISSUE_DUMP_PROMPT=1 to print the full rendered prompt."
         if [[ -n "$MODEL" ]]; then
-            cmd=$(shell_join codex exec --model "$MODEL" --cd "$WORKTREE_PATH" --sandbox workspace-write --json --output-last-message "$HUMAN_GATE_LAST_MESSAGE_PATH" "<rendered prompt via stdin>")
+            cmd=$(shell_join codex exec --model "$MODEL" --cd "$WORKTREE_PATH" --ask-for-approval never --sandbox workspace-write --json --output-last-message "$HUMAN_GATE_LAST_MESSAGE_PATH" "<rendered prompt via stdin>")
         else
-            cmd=$(shell_join codex exec --cd "$WORKTREE_PATH" --sandbox workspace-write --json --output-last-message "$HUMAN_GATE_LAST_MESSAGE_PATH" "<rendered prompt via stdin>")
+            cmd=$(shell_join codex exec --cd "$WORKTREE_PATH" --ask-for-approval never --sandbox workspace-write --json --output-last-message "$HUMAN_GATE_LAST_MESSAGE_PATH" "<rendered prompt via stdin>")
         fi
     else
         cmd="$(shell_join "${HUMAN_GATE_CMD[@]}") < <(rendered prompt via stdin)"

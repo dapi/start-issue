@@ -16,38 +16,19 @@ It fetches issue metadata with `gh`, creates a git worktree with a branch name b
 
 ## Install
 
-Install the latest published release:
+Install from source with Go:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/dapi/start-issue/master/install.sh | bash
+go install github.com/dapi/start-issue/v2/cmd/start-issue@latest
 ```
 
-The installer downloads the latest GitHub Release asset into `~/.local/bin/start-issue` by default.
+Published releases contain platform-specific Go binaries and a `checksums.txt`
+manifest. Download the asset matching your OS and architecture from the release
+page and verify it against that manifest before adding it to `PATH`.
 
-For developer diagnostics on a machine where the install appears to hang:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/dapi/start-issue/master/install.sh | bash -s -- --debug
-```
-
-This enables shell tracing plus verbose `curl` or `wget` output so you can see which step is blocking.
-
-Manual install:
-
-```bash
-mkdir -p ~/.local/bin
-curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o ~/.local/bin/start-issue
-chmod +x ~/.local/bin/start-issue
-```
-
-Verify the download if you want:
-
-```bash
-tmpdir="$(mktemp -d)"
-curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue -o "$tmpdir/start-issue"
-curl -fsSL https://github.com/dapi/start-issue/releases/latest/download/start-issue.sha256 -o "$tmpdir/start-issue.sha256"
-(cd "$tmpdir" && shasum -a 256 -c start-issue.sha256)
-```
+After bootstrapping the Go command, `start-issue install` performs the same
+platform selection and SHA-256 verification before installing the latest POSIX
+release binary into `~/.local/bin`.
 
 Build and install from source:
 
@@ -55,7 +36,7 @@ Build and install from source:
 make install
 ```
 
-This builds a self-contained `start-issue` script from the modular sources and installs it to `~/.local/bin/start-issue`.
+This builds and installs the Go binary to `~/.local/bin/start-issue`.
 
 Make sure `~/.local/bin` is in your `PATH`.
 
@@ -110,7 +91,7 @@ flowchart TD
     F -- yes --> G["Print planned actions<br/>and exit"]
     F -- no --> H["Create or reuse git worktree"]
 
-    H --> I["Run init.sh if enabled"]
+    H --> I["Run worktree init hook if enabled"]
     I --> J["Render agent prompt"]
     J --> K{"Agent selected?"}
 
@@ -123,19 +104,19 @@ flowchart TD
 
 ## Internal Architecture
 
-The CLI entrypoint remains `scripts/start-issue`, but the implementation is now split into focused shell modules under `scripts/lib/start_issue/`.
-`make build` and `make install` bundle those modules back into a single-file script for distribution and local installation.
+The Go entrypoint is `cmd/start-issue`. It owns argument parsing, configuration
+resolution, repository and worktree orchestration, self-install/update, output,
+and adapter commands for supported agents. `git`, `gh`, and agent CLIs remain
+explicit external process boundaries.
 
-- `cli.sh` parses arguments and normalizes flags into workflow state.
-- `config.sh` resolves agent, model, and prompt configuration.
-- `github.sh` resolves repository context and fetches issue metadata.
-- `worktree.sh` plans branch/worktree behavior and runs worktree-side effects.
-- `agent.sh` owns agent adapter operations: validation, launch command construction, AI branch naming, and prompt improvement.
-- `release.sh` owns release download, checksum, and version-normalization helpers shared by install and update paths.
-- `update.sh` owns the self-update workflow and latest-release resolution.
-- `output.sh` renders help, status, dry-run output, and session framing.
-- `init.sh` owns `start-issue init` plus the user-config onboarding helpers behind `setup`.
-- `pipeline.sh` makes the orchestration pipeline explicit.
+- Configuration and prompt helpers resolve CLI, environment, project, and user
+  defaults.
+- Repository/worktree helpers fetch issue metadata, plan reuse safely, and run
+  the optional `init.sh` hook found in a prepared worktree.
+- Agent helpers validate adapters, build launch commands, generate AI branch
+  names, and run Codex human-gate mode.
+- Release helpers select platform assets, verify checksums and staged
+  `--version` output, and atomically install updates.
 
 The internal pipeline is now:
 
@@ -146,7 +127,10 @@ The internal pipeline is now:
 5. Execute the plan.
 6. Launch the selected agent.
 
-The project should keep Bash as long as lifecycle commands, configuration shape, and output needs stay simple enough for shell modules to remain readable. If future work requires nested configuration, richer subcommands such as `resume` or `cleanup`, or more structured machine-readable output, that should be treated as the threshold for evaluating a Python core.
+The Go implementation keeps lifecycle commands, configuration shape, and output
+in one compiled CLI while retaining external-tool boundaries. Future additions
+should preserve the same focused helper boundaries rather than reintroducing a
+second runtime implementation.
 
 ## CLI Arguments
 
@@ -227,9 +211,11 @@ The workflow:
 2. Reads the version of the executable the user is currently running.
 3. Normalizes version strings so `1.11.1` and `v1.11.1` compare as equal.
 4. If the running version is current or newer than the latest published release, exits `0` with a clear status message.
-5. If a newer published release exists, downloads `start-issue` and `start-issue.sha256`, verifies the checksum, and installs the update into the same executable path the user invoked.
+5. If a newer published release exists, downloads the matching platform binary and `checksums.txt`, verifies the checksum, and installs the update into the resolved target of the executable the user invoked.
 
-The update workflow works outside a git repository. It requires `gh`, `jq`, and either `curl` or `wget`.
+The update workflow works outside a git repository and requires only `gh`.
+The Go binary parses release metadata, downloads assets, and verifies checksums
+internally.
 
 ## Codex Human-Gate
 
@@ -304,6 +290,19 @@ the obsolete `--ask-for-approval` flag). The selected Codex executable is
 printed in the test output. They do not prove application behavior beyond this
 human-gate protocol and are intentionally excluded from CI.
 
+### CI sandbox E2E
+
+Run the deterministic built-binary E2E locally:
+
+```bash
+make e2e-sandbox
+```
+
+It uses a temporary local git repository plus fake `gh` and Kimi commands, but
+real worktree creation, `init.sh`, prompt rendering, model/cwd forwarding, and
+dry-run behavior. It needs no network, credentials, or external agent and runs
+in the `sandbox-e2e` CI job.
+
 Configuration precedence:
 
 1. Agent: CLI `--agent` / `--no-agent`, then project config, user config, `START_ISSUE_AGENT`, then built-in default `claude`
@@ -316,7 +315,9 @@ Claude uses the plugin-native command by default:
 /task-router:route-task {ISSUE_URL}
 ```
 
-Other agents use a portable prompt by default.
+Other agents use a portable prompt by default. Kimi is launched from the
+worktree directory because current Kimi Code CLI versions do not support the
+legacy `--work-dir` option and reject `--yolo` together with `--prompt`.
 
 To improve the prompt template used for future development starts, run:
 
@@ -324,7 +325,7 @@ To improve the prompt template used for future development starts, run:
 start-issue 123 --agent codex --improve-prompt
 ```
 
-The command resolves the active prompt template with the normal precedence, fetches the issue as context, asks the selected agent for a complete improved prompt template, and writes a proposal file. It does not overwrite the active prompt. File-backed prompts write next to the source as `*.improved.md` by default; built-in and inline prompts write to `.start-issue/prompt.improved.md`. Use `--prompt-output-file` to choose another proposal path.
+The command resolves the active prompt template with the normal precedence, fetches the issue as context, asks the selected agent for a complete improved prompt template, and writes a proposal file. It does not overwrite the active prompt. Markdown prompt files write next to the source as `*.improved.md`; other file names append `.improved`. Built-in and inline prompts write to `.start-issue/prompt.improved.md`. Use `--prompt-output-file` to choose another proposal path.
 
 Prompt templates support:
 
@@ -354,32 +355,37 @@ Optional dependency for Zellij support:
 
 ## Requirements
 
-- `bash`
 - `git`
 - `gh` CLI with authenticated GitHub session
-- `jq`
 - selected agent CLI unless `--agent none` or `--dry-run` is used
 
-The `curl | bash` installer and self-update workflow need `bash` plus either `curl` or `wget`.
+Building from source additionally requires Go 1.24+. The optional Bash
+installer and the manual-install snippet require `bash`, `curl` or `wget`, and
+a SHA-256 tool; those tools are not used by `start-issue update`.
 
 ## Releases
 
-GitHub Releases are published automatically when a SemVer tag like `v1.12.0` is pushed. The release workflow reruns the test suite, verifies that the tag matches `VERSION` in `scripts/start-issue`, builds the bundled `start-issue` script, and uploads:
+GitHub Releases are published automatically when a SemVer tag like `v1.12.0` is pushed. The release workflow reruns the Go test suite and publishes platform-specific binaries with a checksum manifest:
 
-- `start-issue`
-- `start-issue.sha256`
+- `start-issue-linux-amd64`
+- `start-issue-linux-arm64`
+- `start-issue-darwin-amd64`
+- `start-issue-darwin-arm64`
+- `start-issue-windows-amd64.exe`
+- `checksums.txt`
+- `start-issue` and `start-issue.sha256` (temporary v1 update bridge)
 
 To prepare a release locally:
 
 ```bash
-make release-patch
-make release-minor
-make release-major
+make test
+git tag v2.0.0
+git push origin v2.0.0
 ```
 
 Before preparing a release, add user-facing changes under `## [Unreleased]` in `CHANGELOG.md`.
 
-Each command requires a clean worktree, bumps `VERSION`, moves the `CHANGELOG.md` unreleased entries under the new version and date, runs `make test` and `make build`, creates a local commit like `Release v1.12.0`, and creates the matching annotated git tag.
+Create releases from a clean worktree after `make test` and `make build` pass. The tag is the source of the published binary version.
 
 Publish the prepared release with:
 

@@ -42,3 +42,9 @@ audience: humans_and_agents
 - [FT-017: Codex human-gate delivery permissions](FT-017/README.md)
   Explicit restricted/default and opt-in full-delivery capability contract for
   Codex human-gate runs.
+
+- [FT-018: Agent CLI launch compatibility](FT-018/README.md)
+  Issue #34 follow-up package for current Kimi Code CLI command and cwd compatibility.
+
+- [FT-019: CI sandbox E2E coverage](FT-019/README.md)
+  Deterministic built-binary E2E scenarios for local worktree/agent and dry-run paths in CI/CD.

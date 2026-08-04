@@ -19,15 +19,15 @@ canonical_for:
 
 | Metric ID | Metric | Why it matters | Current baseline | Target | Review cadence |
 | --- | --- | --- | --- | --- | --- |
-| `NSM-01` | Successful issue-start completion for supported workflows | It captures the core product value | Covered by Bats regression scenarios | No known regression in supported flows | Each release |
+| `NSM-01` | Successful issue-start completion for supported workflows | It captures the core product value | Covered by Go regression and parity scenarios | No known regression in supported flows | Each release |
 
 ## Product Metrics
 
 | Metric ID | Metric | Owner | Baseline | Target | Measurement method | Source |
 | --- | --- | --- | --- | --- | --- | --- |
 | `MET-01` | Local verification pass rate | Maintainer | `make test` is canonical | Pass before release and handoff | Local command and CI | Makefile / GitHub Actions |
-| `MET-02` | Config visibility | Maintainer | Missing issue and dry-run paths print effective config | Every config source change updates output tests | Bats assertions | `test/start_issue.bats` |
-| `MET-03` | Release artifact integrity | Maintainer | Release asset plus `.sha256` | Installer/update verify checksum | Release workflow and tests | GitHub Releases |
+| `MET-02` | Config visibility | Maintainer | Missing issue and dry-run paths print effective config | Every config source change updates output tests | Go output assertions | `cmd/start-issue/*_test.go` |
+| `MET-03` | Release artifact integrity | Maintainer | Platform binary plus `checksums.txt` | Installer/update verify checksum | Release workflow and Go tests | GitHub Releases |
 | `MET-04` | Memory-bank navigation health | Maintainer/agent | New audit introduced | `scripts/check_memory_bank_index.py --max-depth 4` passes | Local audit in `make test` | memory-bank audit |
 
 ## Guardrails

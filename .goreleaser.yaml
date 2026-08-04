@@ -1,0 +1,38 @@
+version: 2
+project_name: start-issue
+
+before:
+  hooks:
+    - go mod tidy
+    - sh -c 'mkdir -p .release && cp scripts/v1-upgrade-shim .release/start-issue && chmod 0755 .release/start-issue && (cd .release && sha256sum start-issue > start-issue.sha256)'
+
+builds:
+  - id: start-issue
+    main: ./cmd/start-issue
+    binary: start-issue
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - id: binaries
+    formats: [binary]
+    name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  # Keep the release invisible until GoReleaser has uploaded both the normal
+  # assets and the v1 bridge required by older self-updaters.
+  draft: true
+  extra_files:
+    - glob: .release/start-issue
+      name_template: start-issue
+    - glob: .release/start-issue.sha256
+      name_template: start-issue.sha256

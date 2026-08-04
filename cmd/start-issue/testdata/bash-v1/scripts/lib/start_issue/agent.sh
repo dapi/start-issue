@@ -97,6 +97,7 @@ build_human_gate_command() {
             codex exec
             --model "$MODEL"
             --cd "$WORKTREE_PATH"
+            --ask-for-approval never
             --sandbox workspace-write
             --json
             --output-last-message "$HUMAN_GATE_LAST_MESSAGE_PATH"
@@ -106,6 +107,7 @@ build_human_gate_command() {
         HUMAN_GATE_CMD=(
             codex exec
             --cd "$WORKTREE_PATH"
+            --ask-for-approval never
             --sandbox workspace-write
             --json
             --output-last-message "$HUMAN_GATE_LAST_MESSAGE_PATH"
@@ -321,9 +323,9 @@ generate_improved_prompt_template() {
             ;;
         kimi)
             if [[ -n "$MODEL" ]]; then
-                output=$(kimi --model "$MODEL" --work-dir "$PROJECT_ROOT" --quiet -p "$request" 2>/dev/null) || return 1
+                output=$(cd "$PROJECT_ROOT" && kimi --model "$MODEL" -p "$request" 2>/dev/null) || return 1
             else
-                output=$(kimi --work-dir "$PROJECT_ROOT" --quiet -p "$request" 2>/dev/null) || return 1
+                output=$(cd "$PROJECT_ROOT" && kimi -p "$request" 2>/dev/null) || return 1
             fi
             ;;
         pi)
@@ -378,9 +380,9 @@ Reply with ONLY the branch name."
             ;;
         kimi)
             if [[ -n "$MODEL" ]]; then
-                output=$(kimi --model "$MODEL" --work-dir "$PROJECT_ROOT" --quiet -p "$prompt" 2>/dev/null) || return 1
+                output=$(cd "$PROJECT_ROOT" && kimi --model "$MODEL" -p "$prompt" 2>/dev/null) || return 1
             else
-                output=$(kimi --work-dir "$PROJECT_ROOT" --quiet -p "$prompt" 2>/dev/null) || return 1
+                output=$(cd "$PROJECT_ROOT" && kimi -p "$prompt" 2>/dev/null) || return 1
             fi
             ;;
         pi)
@@ -449,10 +451,11 @@ build_launch_command() {
             fi
             ;;
         kimi)
+            LAUNCH_CWD="$WORKTREE_PATH"
             if [[ -n "$MODEL" ]]; then
-                LAUNCH_CMD=(kimi --model "$MODEL" --work-dir "$WORKTREE_PATH" --yolo -p "$AGENT_PROMPT")
+                LAUNCH_CMD=(kimi --model "$MODEL" -p "$AGENT_PROMPT")
             else
-                LAUNCH_CMD=(kimi --work-dir "$WORKTREE_PATH" --yolo -p "$AGENT_PROMPT")
+                LAUNCH_CMD=(kimi -p "$AGENT_PROMPT")
             fi
             ;;
         pi)

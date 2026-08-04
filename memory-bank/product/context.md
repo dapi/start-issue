@@ -67,7 +67,7 @@ tracker, or the developer's review and merge process.
 | Metric ID | Metric | Baseline | Target | Measurement method |
 | --- | --- | --- | --- | --- |
 | `MET-01` | Time from issue reference to prepared worktree | Manual setup | One command for common cases | Manual workflow review and regression tests |
-| `MET-02` | Predictability of config and launch behavior | Historically implicit defaults | Effective agent, model, prompt source, and launch command are visible | CLI output, `--dry-run`, Bats coverage |
+| `MET-02` | Predictability of config and launch behavior | Historically implicit defaults | Effective agent, model, prompt source, and launch command are visible | CLI output, `--dry-run`, Go test coverage |
 | `MET-03` | Release/install reliability | Manual install/update risk | Checksummed release asset and self-update path | Release workflow and installer/update tests |
 
 ## Product Constraints
@@ -79,9 +79,8 @@ tracker, or the developer's review and merge process.
 - `PCON-03` Prompt and config changes must be visible and reviewable; prompt
   improvement writes proposals instead of overwriting active templates.
 - `PCON-04` Agent-specific behavior belongs behind the adapter boundary.
-- `PCON-05` Bash remains acceptable while workflow complexity stays readable; a
-  richer lifecycle, nested config, or structured machine output is the threshold
-  for reevaluating a Python core.
+- `PCON-05` The Go CLI is the sole runtime. New lifecycle behavior belongs in
+  focused Go helpers and must not reintroduce a second shell or Python runtime.
 
 ## Source Documents
 
