@@ -32,5 +32,13 @@ audience: humans_and_agents
 
 ## Feature packages
 
+- [Missing feature packages inventory](missing.md)
+  Comparison of GitHub issues with instantiated packages, including current
+  gaps, duplicates, and superseded migration work.
+
 - [FT-016: Real Codex human-gate E2E suite](FT-016/README.md)
   Opt-in local smoke suite that validates the real Codex human-gate path.
+
+- [FT-017: Codex human-gate delivery permissions](FT-017/README.md)
+  Explicit restricted/default and opt-in full-delivery capability contract for
+  Codex human-gate runs.
