@@ -80,7 +80,7 @@ start-issue 123 --agent kimi
 The script creates the worktree, renders the portable prompt, and launches:
 
 ```bash
-kimi --work-dir "$WORKTREE_PATH" --yolo -p "$PROMPT"
+cd "$WORKTREE_PATH" && kimi -p "$PROMPT"
 ```
 
 Use an explicit Kimi model:

@@ -1711,7 +1711,7 @@ func TestLaunchUsesAdapterSpecificWorkingDirectory(t *testing.T) {
 				t.Fatal(err)
 			}
 			want := caller
-			if agent == "claude" || agent == "pi" {
+			if agent == "claude" || agent == "kimi" || agent == "pi" {
 				want = worktree
 			}
 			if strings.TrimSpace(string(got)) != want {
@@ -1727,7 +1727,7 @@ func TestHelperArgsAreNonInteractive(t *testing.T) {
 		t.Fatalf("pi helper args: %s", got)
 	}
 	kimi := helperArgs("kimi", "model", "/repo", "prompt")
-	if got := fmt.Sprint(kimi); got != "[kimi --model model --work-dir /repo --quiet -p prompt]" {
+	if got := fmt.Sprint(kimi); got != "[kimi --model model -p prompt]" {
 		t.Fatalf("kimi helper args: %s", got)
 	}
 }

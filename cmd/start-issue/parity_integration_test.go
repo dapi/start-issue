@@ -538,7 +538,7 @@ func assertAgentLaunchContract(t *testing.T, result parityResult, agent string) 
 	commands := map[string]string{
 		"claude": "claude --model fixture-model --dangerously-skip-permissions",
 		"codex":  "codex --model fixture-model --cd",
-		"kimi":   "kimi --model fixture-model --work-dir",
+		"kimi":   "cd <WORKTREES>/",
 		"pi":     "pi --model fixture-model",
 	}
 	assertParityOutputContains(t, result, "[DRY-RUN] Would run:", commands[agent])
@@ -575,7 +575,7 @@ func launchAdapterPrefix(command, agent string) string {
 	markers := map[string]string{
 		"claude": "--dangerously-skip-permissions",
 		"codex":  "--dangerously-bypass-approvals-and-sandbox",
-		"kimi":   "--yolo -p",
+		"kimi":   "-p",
 		"pi":     "pi --model fixture-model",
 	}
 	marker := markers[agent]

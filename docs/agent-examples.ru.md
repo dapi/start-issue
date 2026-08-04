@@ -80,7 +80,7 @@ start-issue 123 --agent kimi
 Скрипт создает worktree, рендерит portable prompt и запускает:
 
 ```bash
-kimi --work-dir "$WORKTREE_PATH" --yolo -p "$PROMPT"
+cd "$WORKTREE_PATH" && kimi -p "$PROMPT"
 ```
 
 Использовать явную model Kimi:

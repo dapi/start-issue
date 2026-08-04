@@ -1,4 +1,4 @@
-.PHONY: build install uninstall test e2e-human-gate print-version bump-patch bump-minor bump-major release-patch release-minor release-major
+.PHONY: build install uninstall test e2e-sandbox e2e-human-gate print-version bump-patch bump-minor bump-major release-patch release-minor release-major
 
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
@@ -33,6 +33,9 @@ test:
 
 e2e-human-gate: build
 	@START_ISSUE_E2E_BINARY="$(abspath $(BUILD_OUTPUT))" bash test/e2e/human-gate.sh
+
+e2e-sandbox: build
+	@START_ISSUE_SANDBOX_BINARY="$(abspath $(BUILD_OUTPUT))" bash test/e2e/sandbox.sh
 
 print-version:
 	@echo "$(VERSION)"

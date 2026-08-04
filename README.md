@@ -290,6 +290,19 @@ the obsolete `--ask-for-approval` flag). The selected Codex executable is
 printed in the test output. They do not prove application behavior beyond this
 human-gate protocol and are intentionally excluded from CI.
 
+### CI sandbox E2E
+
+Run the deterministic built-binary E2E locally:
+
+```bash
+make e2e-sandbox
+```
+
+It uses a temporary local git repository plus fake `gh` and Kimi commands, but
+real worktree creation, `init.sh`, prompt rendering, model/cwd forwarding, and
+dry-run behavior. It needs no network, credentials, or external agent and runs
+in the `sandbox-e2e` CI job.
+
 Configuration precedence:
 
 1. Agent: CLI `--agent` / `--no-agent`, then project config, user config, `START_ISSUE_AGENT`, then built-in default `claude`
@@ -302,7 +315,9 @@ Claude uses the plugin-native command by default:
 /task-router:route-task {ISSUE_URL}
 ```
 
-Other agents use a portable prompt by default.
+Other agents use a portable prompt by default. Kimi is launched from the
+worktree directory because current Kimi Code CLI versions do not support the
+legacy `--work-dir` option and reject `--yolo` together with `--prompt`.
 
 To improve the prompt template used for future development starts, run:
 

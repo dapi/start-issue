@@ -21,18 +21,24 @@ Releases. There is no server deployment.
 
 1. Add user-facing changes under `## [Unreleased]` in `CHANGELOG.md`.
 2. From a clean worktree, run the required checks and create the SemVer tag.
-   The tag is the source of the release version:
+  The tag is the source of the release version:
 
 ```bash
 make test
 make build
-git tag vX.Y.Z
+git tag -a vX.Y.Z -m "Release vX.Y.Z"
 ```
 
 3. Publish with:
 
 ```bash
 git push origin master --follow-tags
+```
+
+If a lightweight tag was created instead, push that exact tag explicitly:
+
+```bash
+git push origin vX.Y.Z
 ```
 
 4. GitHub Actions reruns the test suite and uses GoReleaser to publish the

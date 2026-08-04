@@ -503,7 +503,7 @@ codex:
   exec codex [--model "$MODEL"] --cd "$WORKTREE_PATH" --dangerously-bypass-approvals-and-sandbox "$PROMPT"
 
 kimi:
-  exec kimi [--model "$MODEL"] --work-dir "$WORKTREE_PATH" --yolo -p "$PROMPT"
+  cd "$WORKTREE_PATH" && exec kimi [--model "$MODEL"] -p "$PROMPT"
 
 pi:
   cd "$WORKTREE_PATH"

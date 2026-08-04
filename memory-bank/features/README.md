@@ -37,3 +37,9 @@ audience: humans_and_agents
 
 - [FT-017: Go parity-first migration](FT-017/README.md)
   Issue #34 package for migrating the CLI to Go with executable parity before cutover. The Bash runtime remains the baseline until the package's parity evidence permits cutover.
+
+- [FT-018: Agent CLI launch compatibility](FT-018/README.md)
+  Issue #34 follow-up package for current Kimi Code CLI command and cwd compatibility.
+
+- [FT-019: CI sandbox E2E coverage](FT-019/README.md)
+  Deterministic built-binary E2E scenarios for local worktree/agent and dry-run paths in CI/CD.

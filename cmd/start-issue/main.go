@@ -1476,7 +1476,7 @@ func aiBranchName(agent, model, root, number, title, labels string) (string, err
 	}
 	prompt := fmt.Sprintf("Git branch name for issue #%s: %q (labels: %s).\nFormat: {type}/issue-%s-{kebab-case-name}\nTypes: bug/fix -> fix, enhancement -> feature, hotfix -> hotfix, docs -> docs, refactor -> refactor, test -> test, chore -> chore, default -> feature.\nIf the title contains non-English text (for example Cyrillic), transliterate it to English for the kebab-case name.\nStrip leading bracketed process/stage tags (for example [brief], [investigation], [PR-008]) from the kebab-case name; they mark workflow stage. The {type} still comes from the labels above.\nReply with ONLY the branch name.", number, title, labels, number)
 	args := helperArgs(agent, model, root, prompt)
-	result, err := output(args[0], args[1:]...)
+	result, err := helperOutput(agent, root, args)
 	if err != nil {
 		return "", err
 	}
@@ -1768,7 +1768,7 @@ func improvePrompt(root, agent, model, prompt, source, promptFile string, o opti
 	}
 	request := promptImprovementRequest(prompt, source, in, repo, number, labels)
 	args := helperArgs(agent, model, root, request)
-	result, err := output(args[0], args[1:]...)
+	result, err := helperOutput(agent, root, args)
 	if err != nil {
 		return fmt.Errorf("Could not generate improved prompt with %s", agent)
 	}
@@ -1911,7 +1911,7 @@ func printLaunch(a, m, w, p string) {
 
 func launchDisplayCommand(a, m, w, p string) string {
 	command := shellJoin(launchArgs(a, m, w, p))
-	if a == "claude" || a == "pi" {
+	if a == "claude" || a == "kimi" || a == "pi" {
 		return "cd " + shellQuote(w) + " && " + command
 	}
 	return command
@@ -1923,7 +1923,7 @@ func launch(a, m, w, p string) error {
 	}
 	args := launchArgs(a, m, w, p)
 	var err error
-	if a == "claude" || a == "pi" {
+	if a == "claude" || a == "kimi" || a == "pi" {
 		err = commandAt(w, args...)
 	} else {
 		err = command(args[0], args[1:]...)
@@ -1953,7 +1953,7 @@ func printManualNextSteps(model, worktree string) {
 	fmt.Println("Suggested agent commands:")
 	fmt.Println("  claude")
 	fmt.Printf("  codex --cd %s\n", shellQuote(worktree))
-	fmt.Printf("  kimi --work-dir %s\n", shellQuote(worktree))
+	fmt.Printf("  (cd %s && kimi)\n", shellQuote(worktree))
 	fmt.Println("  pi")
 }
 
@@ -1992,7 +1992,7 @@ func launchArgs(a, m, w, p string) []string {
 		if m != "" {
 			x = append(x, "--model", m)
 		}
-		return append(x, "--work-dir", w, "--yolo", "-p", p)
+		return append(x, "-p", p)
 	default:
 		x := []string{"pi"}
 		if m != "" {
@@ -2027,7 +2027,7 @@ func helperArgs(agent, model, root, prompt string) []string {
 		if model != "" {
 			args = append(args, "--model", model)
 		}
-		return append(args, "--work-dir", root, "--quiet", "-p", prompt)
+		return append(args, "-p", prompt)
 	case "pi":
 		args := []string{"pi"}
 		if model != "" {
@@ -2037,6 +2037,12 @@ func helperArgs(agent, model, root, prompt string) []string {
 	default:
 		return nil
 	}
+}
+func helperOutput(agent, root string, args []string) (string, error) {
+	if agent == "kimi" {
+		return outputAt(root, args[0], args[1:]...)
+	}
+	return output(args[0], args[1:]...)
 }
 func command(name string, args ...string) error {
 	c := exec.Command(name, args...)
@@ -2055,6 +2061,12 @@ func commandAt(dir string, args ...string) error {
 }
 func output(name string, args ...string) (string, error) {
 	b, e := exec.Command(name, args...).Output()
+	return string(b), e
+}
+func outputAt(dir, name string, args ...string) (string, error) {
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	b, e := cmd.Output()
 	return string(b), e
 }
 func need(n string) error {

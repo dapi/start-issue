@@ -137,6 +137,19 @@ test/e2e/human-gate.sh --scenario human-gate
 в test output. Они не доказывают поведение приложения за пределами human-gate
 protocol и намеренно не входят в CI.
 
+### CI sandbox E2E
+
+Детерминированный E2E для собранного бинарника можно запустить локально:
+
+```bash
+make e2e-sandbox
+```
+
+Он использует временный локальный git-репозиторий и fake-команды `gh` и Kimi,
+но реально проверяет создание worktree, `init.sh`, рендер prompt, передачу
+model/cwd и dry-run. Сеть, credentials и внешние агенты не нужны; в CI это
+отдельный job `sandbox-e2e`.
+
 ## Использование
 
 ```bash
@@ -310,7 +323,9 @@ Claude по умолчанию использует plugin-native команду
 /task-router:route-task {ISSUE_URL}
 ```
 
-Другие агенты по умолчанию используют portable prompt.
+Другие агенты по умолчанию используют portable prompt. Kimi запускается из
+директории worktree: актуальные версии Kimi Code CLI не поддерживают старую
+опцию `--work-dir` и запрещают сочетать `--yolo` с `--prompt`.
 
 Чтобы улучшить prompt template, который будет использоваться для будущих стартов разработки, запустите:
 
