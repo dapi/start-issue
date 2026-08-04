@@ -6,6 +6,12 @@ This project follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-08-04
+
+### Changed
+
+- Documented the completed self-update feature lifecycle from issue #35.
+
 ## [2.0.1] - 2026-08-04
 
 ### Fixed
