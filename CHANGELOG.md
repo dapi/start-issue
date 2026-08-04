@@ -6,6 +6,14 @@ This project follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-08-04
+
+### Fixed
+
+- Added explicit terminal diagnostics before conflict input and agent handoff.
+- Human-gate runs now report non-zero `codex exec` failures with exit code 1
+  while preserving captured thread state for diagnosis.
+
 ### Added
 
 - Added an opt-in local E2E smoke suite for the real Codex human-gate workflow.

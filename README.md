@@ -230,6 +230,12 @@ The batch flow:
 
 This mode is intentionally Codex-only. `--human-gate` with any other agent fails clearly instead of being ignored.
 
+When the workflow is about to block for a branch/worktree decision, it prints
+`Waiting for input: ...`. Before handing control to an interactive agent or
+Codex batch run, it prints `Handing off to <agent> in <worktree>`. A non-zero
+exit from `codex exec` is reported as a failed human-gate run with exit code 1;
+the captured events and thread id remain available for diagnosis.
+
 Dedicated help:
 
 ```bash

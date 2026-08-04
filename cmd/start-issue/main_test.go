@@ -514,6 +514,22 @@ func TestPathConflictChoiceRejectsUnregisteredDirectoryWithoutDeleteOption(t *te
 	}
 }
 
+func TestConflictChoicesReportWaitingForInput(t *testing.T) {
+	branchOutput := captureStdout(t, func() {
+		_ = branchConflictChoice("feature/issue-1-demo", "", bufio.NewReader(strings.NewReader("0\n")))
+	})
+	if !strings.Contains(branchOutput, "Waiting for input: branch already exists") {
+		t.Fatalf("branch conflict did not report waiting for input:\n%s", branchOutput)
+	}
+
+	pathOutput := captureStdout(t, func() {
+		_, _ = pathConflictChoice(t.TempDir(), "refs/heads/feature/issue-1-demo", true, bufio.NewReader(strings.NewReader("0\n")))
+	})
+	if !strings.Contains(pathOutput, "Waiting for input: worktree path already exists") {
+		t.Fatalf("path conflict did not report waiting for input:\n%s", pathOutput)
+	}
+}
+
 func TestDetachedWorktreeIsRegisteredAndRemovable(t *testing.T) {
 	bin, log, primary, detached := t.TempDir(), filepath.Join(t.TempDir(), "git.log"), t.TempDir(), t.TempDir()
 	writeExecutable(t, filepath.Join(bin, "git"), fmt.Sprintf(`#!/bin/sh
@@ -1657,6 +1673,21 @@ func TestPrintLaunchShowsWorktreeCWDForClaudeAndPi(t *testing.T) {
 	}
 }
 
+func TestLaunchSelectedReportsAgentHandoff(t *testing.T) {
+	bin := t.TempDir()
+	writeExecutable(t, filepath.Join(bin, "codex"), "#!/bin/sh\nexit 0\n")
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	worktree := t.TempDir()
+	output := captureStdout(t, func() {
+		if err := launchSelected(options{}, "codex", "", worktree, "prompt"); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if !strings.Contains(output, "Handing off to codex in "+worktree) {
+		t.Fatalf("agent handoff was not reported:\n%s", output)
+	}
+}
+
 func TestCanonicalPathMakesRelativeWorktreeAbsolute(t *testing.T) {
 	if got := canonicalPath(filepath.Join("worktrees", "feature", "issue-34")); !filepath.IsAbs(got) {
 		t.Fatalf("worktree path is relative: %q", got)
@@ -1764,6 +1795,29 @@ func TestHumanGateSavesThreadIDWhenFinalMessageIsMissing(t *testing.T) {
 	}
 	threadID, readErr := os.ReadFile(filepath.Join(worktree, ".start-issue", "runs", "missing-last-message", "thread-id"))
 	if readErr != nil || string(threadID) != "thread-recovery\n" {
+		t.Fatalf("thread-id = %q, %v", threadID, readErr)
+	}
+}
+
+func TestHumanGateExecFailureReturnsExitCodeOne(t *testing.T) {
+	worktree, bin := t.TempDir(), t.TempDir()
+	writeFakeCodex(t, bin)
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("START_ISSUE_RUN_ID", "exec-failure")
+	t.Setenv("CODEX_EVENTS", `{"type":"thread.started","thread_id":"thread-failure"}`)
+	t.Setenv("CODEX_LAST", "STATUS: DONE")
+	t.Setenv("CODEX_EXEC_EXIT", "42")
+
+	err := humanGate("", worktree, "prompt", false)
+	var exit exitError
+	if !errors.As(err, &exit) || exit.code != 1 {
+		t.Fatalf("got %T %v, want human-gate exit code 1", err, err)
+	}
+	if !strings.Contains(err.Error(), "Codex batch run failed") {
+		t.Fatalf("error = %v, want batch failure diagnostic", err)
+	}
+	threadID, readErr := os.ReadFile(filepath.Join(worktree, ".start-issue", "runs", "exec-failure", "thread-id"))
+	if readErr != nil || string(threadID) != "thread-failure\n" {
 		t.Fatalf("thread-id = %q, %v", threadID, readErr)
 	}
 }
@@ -1888,7 +1942,7 @@ if [ "$1" = "exec" ]; then
   if [ "$CODEX_SKIP_LAST" != "1" ]; then
     printf '%s\n' "$CODEX_LAST" > "$last"
   fi
-  exit 0
+  exit "${CODEX_EXEC_EXIT:-0}"
 fi
 if [ "$1" = "resume" ]; then
   exit "${CODEX_RESUME_EXIT:-0}"

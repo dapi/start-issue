@@ -1586,6 +1586,7 @@ func branchConflictChoice(branch, existing string, reader *bufio.Reader) string 
 	if existing != "" {
 		fmt.Printf("   Existing worktree: %s\n", existing)
 	}
+	fmt.Println("Waiting for input: branch already exists")
 	fmt.Print("\n  1) Use existing worktree and continue\n  2) Create new branch with different name\n  3) Delete branch/worktree and recreate\n  0) Exit\n\nChoice: ")
 	return readChoice(reader)
 }
@@ -1600,6 +1601,7 @@ func pathConflictChoice(worktree, branch string, registered bool, reader *bufio.
 	} else {
 		fmt.Printf("   Registered branch: %s\n", strings.TrimPrefix(branch, "refs/heads/"))
 	}
+	fmt.Println("Waiting for input: worktree path already exists")
 	fmt.Print("\n  1) Use existing worktree\n  2) Delete and recreate\n  0) Exit\n\nChoice: ")
 	return readChoice(reader), nil
 }
@@ -1751,9 +1753,19 @@ func launchSelected(o options, agent, model, worktree, prompt string) error {
 		return nil
 	}
 	if o.humanGate {
+		if !o.dryRun {
+			printAgentHandoff(agent, worktree)
+		}
 		return humanGate(model, worktree, prompt, false)
 	}
+	if !o.dryRun && agent != "none" {
+		printAgentHandoff(agent, worktree)
+	}
 	return launch(agent, model, worktree, prompt)
+}
+
+func printAgentHandoff(agent, worktree string) {
+	fmt.Printf("Handing off to %s in %s\n", agent, worktree)
 }
 func improvePrompt(root, agent, model, prompt, source, promptFile string, o options, in issue, repo, number, labels string) error {
 	if agent == "none" {
@@ -1841,13 +1853,19 @@ func humanGate(model, worktree, prompt string, dryRun bool) error {
 	cmd.Stdin = strings.NewReader(prompt)
 	cmd.Stdout = file
 	cmd.Stderr = os.Stderr
-	_ = cmd.Run()
+	runErr := cmd.Run()
 	threadID, err := captureThreadID(events)
 	if err != nil {
+		if runErr != nil {
+			return exitError{code: 1, err: fmt.Errorf("Codex batch run failed: %w", runErr)}
+		}
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(dir, "thread-id"), []byte(threadID+"\n"), 0644); err != nil {
 		return err
+	}
+	if runErr != nil {
+		return exitError{code: 1, err: fmt.Errorf("Codex batch run failed: %w", runErr)}
 	}
 	body, err := os.ReadFile(last)
 	if err != nil {
@@ -2254,7 +2272,14 @@ State artifacts:
   <worktree>/.start-issue/runs/<timestamp>/last-message.txt
   <worktree>/.start-issue/runs/<timestamp>/thread-id
 
-Recovery:
+Final status examples:
+  STATUS: DONE
+  STATUS: HUMAN_GATE
+  HUMAN_GATE must include one concrete question and actionable options.
+
+Troubleshooting:
+  Inspect events.jsonl and last-message.txt when batch parsing fails.
+  The explicit thread id is saved before status handling when available.
   If automatic resume fails, run:
     codex resume --include-non-interactive <thread_id>`)
 }
