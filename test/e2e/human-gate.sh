@@ -18,7 +18,8 @@ clone after a successful run; set START_ISSUE_E2E_KEEP=1 to retain it. The
 HUMAN_GATE scenario opens Codex resume interactively; exit it to continue.
 FULL_DELIVERY also requires START_ISSUE_E2E_FULL_DELIVERY=1. It authorizes an
 unsandboxed Codex run that creates a unique fixture commit, remote branch, and
-pull request. Those remote artifacts are retained as evidence.
+pull request. Its temporary fixture and diagnostic artifacts are retained as
+evidence automatically.
 EOF
 }
 
@@ -176,7 +177,7 @@ unexpected_changes="$(git -C "$worktree_path" status --porcelain | awk '$0 !~ /^
 [[ -z "$unexpected_changes" ]] || fail "fixture worktree has unexpected changes: $unexpected_changes"
 
 printf 'PASS: real Codex human-gate %s scenario. State: %s\n' "$scenario" "$state_dir"
-if [[ "${START_ISSUE_E2E_KEEP:-}" == "1" ]]; then
+if [[ "$scenario" == "full-delivery" || "${START_ISSUE_E2E_KEEP:-}" == "1" ]]; then
     printf 'The temporary fixture is preserved at: %s\n' "$fixture_root"
 else
     git -C "$fixture_dir" worktree remove --force "$worktree_path"

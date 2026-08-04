@@ -253,6 +253,9 @@ func parse(args []string) (options, error) {
 	if o.mode != "" && o.issue != "" {
 		return o, fmt.Errorf("Use either %s or <issue-url-or-number>, not both.", o.mode)
 	}
+	if o.humanGatePermissionsSource == "CLI" && !o.humanGate {
+		return o, errors.New("--human-gate-permissions requires --human-gate.")
+	}
 	if !validHumanGatePermissions(o.humanGatePermissions) {
 		return o, fmt.Errorf("Invalid human-gate permissions %q. Use restricted or full-delivery.", o.humanGatePermissions)
 	}
@@ -2201,7 +2204,7 @@ Options:
                              prompt template and write a reviewable proposal
   --human-gate               Codex-only batch mode that resumes on HUMAN_GATE
   --human-gate-permissions <restricted|full-delivery>
-                             Permission contract for --human-gate
+                             Requires --human-gate; permission contract for it
                              Default: START_ISSUE_HUMAN_GATE_PERMISSIONS or restricted
   --human-gate-help          Show detailed help for the human-gate mode
   --prompt-output-file <path>
@@ -2321,6 +2324,7 @@ Permission modes:
 
 Precedence:
   --human-gate-permissions, START_ISSUE_HUMAN_GATE_PERMISSIONS, restricted.
+  --human-gate-permissions requires --human-gate.
 
 Flow:
   The normal issue workflow creates or reuses the worktree, renders the

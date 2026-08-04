@@ -72,7 +72,7 @@ Agent-specific behavior должен быть централизован за е
 | `--prompt-file` | Файл prompt template | См. приоритет prompt |
 | `--improve-prompt` | Сгенерировать reviewable proposal улучшенного prompt template и выйти до создания worktree | false |
 | `--human-gate` | Codex-only batch mode для issue workflow с resume на `STATUS: HUMAN_GATE` | false |
-| `--human-gate-permissions <restricted\|full-delivery>` | Capability contract для human-gate; CLI имеет приоритет над `START_ISSUE_HUMAN_GATE_PERMISSIONS` | `restricted` |
+| `--human-gate-permissions <restricted\|full-delivery>` | Capability contract для human-gate; требует `--human-gate`; CLI имеет приоритет над `START_ISSUE_HUMAN_GATE_PERMISSIONS` | `restricted` |
 | `--human-gate-help` | Показать отдельную справку по human-gate mode | false |
 | `--prompt-output-file` | Путь proposal-файла для `--improve-prompt` | Для `.md`: рядом с source как `*.improved.md`; для остальных файлов: `<source>.improved`; иначе `.start-issue/prompt.improved.md` |
 | `--no-init` | Пропустить запуск `init.sh` | false |

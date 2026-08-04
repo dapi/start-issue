@@ -159,7 +159,7 @@ second runtime implementation.
 | `--prompt-file PATH` | Prompt template file for the selected agent. With `init`, the file content to write. Mutually exclusive with `--prompt`. |
 | `--improve-prompt` | Ask the selected agent to generate a reviewable improved prompt template proposal, then exit before creating a worktree. |
 | `--human-gate` | Codex-only batch mode for issue work. Runs `codex exec`, exits on `STATUS: DONE`, and resumes the same session on `STATUS: HUMAN_GATE`. |
-| `--human-gate-permissions restricted\|full-delivery` | Select the human-gate capability contract. CLI overrides `START_ISSUE_HUMAN_GATE_PERMISSIONS`; default is `restricted`. |
+| `--human-gate-permissions restricted\|full-delivery` | Select the human-gate capability contract. Requires `--human-gate`; CLI overrides `START_ISSUE_HUMAN_GATE_PERMISSIONS`; default is `restricted`. |
 | `--human-gate-help` | Show dedicated help for the Codex human-gate workflow, including prompt contract, exit codes, and state files. |
 | `--prompt-output-file PATH` | Proposal output path for `--improve-prompt`. |
 | `--no-init` | Do not run `init.sh` even if it exists in the created worktree. |
@@ -324,7 +324,7 @@ Exit the resumed Codex session to let the script verify the artifacts.
 
 To validate actual commit, push, and PR creation in the private fixture, use
 the separately authorized unsandboxed scenario. It creates and retains a unique
-remote branch and PR as evidence:
+remote branch, PR, and local diagnostic fixture as evidence:
 
 ```bash
 START_ISSUE_E2E=1 START_ISSUE_E2E_FULL_DELIVERY=1 \
@@ -337,7 +337,7 @@ START_ISSUE_E2E=1 START_ISSUE_E2E_FULL_DELIVERY=1 \
 | --- | --- | --- |
 | `done` | `START_ISSUE_E2E=1 make e2e-human-gate` | A real Codex batch run emits `thread.started`, saves `thread-id`, `events.jsonl`, and `last-message.txt`, ends with `STATUS: DONE`, and leaves no fixture change other than `.start-issue` state. |
 | `human-gate` | `START_ISSUE_E2E=1 test/e2e/human-gate.sh --scenario human-gate` | The same artifact and clean-worktree checks, plus the reported explicit `codex resume --include-non-interactive <thread_id>` handoff. The operator exits the resumed interactive session before the script can finish. |
-| `full-delivery` | `START_ISSUE_E2E=1 START_ISSUE_E2E_FULL_DELIVERY=1 test/e2e/human-gate.sh --scenario full-delivery` | The current Codex accepts the global full-delivery option and completes a unique fixture commit, push, and PR; the runner prints the retained PR URL. |
+| `full-delivery` | `START_ISSUE_E2E=1 START_ISSUE_E2E_FULL_DELIVERY=1 test/e2e/human-gate.sh --scenario full-delivery` | The current Codex accepts the global full-delivery option and completes a unique fixture commit, push, and PR; the runner prints the retained PR URL and local artifact path. |
 
 All scenarios verify authenticated `gh`, a real rather than fake Codex binary,
 and the required `codex exec` help interface (`--output-last-message`, without

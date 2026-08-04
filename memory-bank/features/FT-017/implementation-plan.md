@@ -94,7 +94,7 @@ creates retained fixture GitHub state.
 
 | Approval Gate ID | Trigger | Applies to | Why approval is required | Approver / evidence |
 | --- | --- | --- | --- | --- |
-| `AG-01` | Running a real full-delivery session that can commit, push, and create/update a PR | `STEP-06`, `WS-4`, `CHK-03` | The run is unsandboxed and creates external GitHub state | User names/approves the fixture target; retained log and PR URL record approval context |
+| `AG-01` | Running a real full-delivery session that can commit, push, and create/update a PR | `STEP-06`, `WS-4`, `CHK-03` | The run is unsandboxed and creates external GitHub state | User names/approves the fixture target; retained fixture directory, log, state artifacts, and PR URL record approval context |
 
 ## Work Order
 

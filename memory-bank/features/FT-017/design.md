@@ -119,7 +119,7 @@ enforces credentials and repository authorization independently.
 
 | Contract ID | Input / Output | Producer / Consumer | Semantics / Constraints |
 | --- | --- | --- | --- |
-| `CTR-01` | `--human-gate-permissions restricted\|full-delivery` | CLI parser / config resolver | CLI value wins over environment; invalid or empty explicit values fail before issue fetch. |
+| `CTR-01` | `--human-gate-permissions restricted\|full-delivery` | CLI parser / config resolver | CLI value wins over environment; it requires `--human-gate`; invalid or empty explicit values fail before issue fetch. |
 | `CTR-02` | `START_ISSUE_HUMAN_GATE_PERMISSIONS` | shell environment / config resolver | Used only when CLI input is absent; unset resolves to `restricted`. |
 | `CTR-03` | Restricted Codex command | launcher / Codex | `codex [--model MODEL] exec --cd WORKTREE --sandbox workspace-write --json --output-last-message PATH -`. |
 | `CTR-04` | Full-delivery Codex command | launcher / Codex | `codex [--model MODEL] --dangerously-bypass-approvals-and-sandbox exec --cd WORKTREE --json --output-last-message PATH -`; selected only by explicit `full-delivery`. |

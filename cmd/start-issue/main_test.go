@@ -79,7 +79,7 @@ func TestParseHumanGatePermissionsPrecedenceAndValidation(t *testing.T) {
 		t.Fatalf("environment permissions = %q (%s)", o.humanGatePermissions, o.humanGatePermissionsSource)
 	}
 
-	o, err = parse([]string{"1", "--human-gate-permissions", "restricted"})
+	o, err = parse([]string{"1", "--human-gate", "--human-gate-permissions", "restricted"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,10 @@ func TestParseHumanGatePermissionsPrecedenceAndValidation(t *testing.T) {
 		t.Fatalf("CLI permissions = %q (%s)", o.humanGatePermissions, o.humanGatePermissionsSource)
 	}
 
-	if _, err := parse([]string{"1", "--human-gate-permissions", "unlimited"}); err == nil || !strings.Contains(err.Error(), "Use restricted or full-delivery") {
+	if _, err := parse([]string{"1", "--human-gate-permissions", "restricted"}); err == nil || !strings.Contains(err.Error(), "requires --human-gate") {
+		t.Fatalf("permission flag without human-gate error = %v", err)
+	}
+	if _, err := parse([]string{"1", "--human-gate", "--human-gate-permissions", "unlimited"}); err == nil || !strings.Contains(err.Error(), "Use restricted or full-delivery") {
 		t.Fatalf("invalid CLI permissions error = %v", err)
 	}
 	t.Setenv("START_ISSUE_HUMAN_GATE_PERMISSIONS", "unlimited")
