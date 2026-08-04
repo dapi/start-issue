@@ -35,13 +35,9 @@ existing FT-015 batch, state, status, and resume behavior.
 
 | Path / module | Current role | Why relevant | Reuse / mirror |
 | --- | --- | --- | --- |
-| `scripts/start-issue` | Initializes shared CLI state and sources modules | New resolved permission state needs a safe default | Follow existing agent/model state initialization |
-| `scripts/lib/start_issue/cli.sh` | Parses public options and validates mode combinations | Owns the new CLI input and early rejection path | Follow `--human-gate`/`--model` value parsing patterns |
-| `scripts/lib/start_issue/config.sh` | Resolves config values and sources | Owns CLI/environment/default precedence | Mirror model resolution without adding project/user persistence |
-| `scripts/lib/start_issue/agent.sh` | Builds and runs Codex human-gate commands | Main permission mapping and supported grammar change surface | Keep array-based command construction and FT-015 state helpers |
-| `scripts/lib/start_issue/output.sh` | Renders help, dry-run, and runtime status | Must expose mode, capabilities, and warning consistently | Extend current human-gate help and dry-run output |
-| `test/helpers/fake-bin/codex` | Deterministic Codex command double | Must validate global option order and both sandbox mappings | Extend argument capture/rejection behavior |
-| `test/start_issue.bats` | Public CLI and human-gate regression suite | Existing tests cover restricted command, DONE, HUMAN_GATE, and errors | Add precedence, invalid value, full-delivery, and order assertions |
+| `cmd/start-issue/main.go` | Go CLI parser, config resolution, launcher, help, and human-gate state | Owns the new option, command mapping, and diagnostics | Extend existing options and array-based `exec.Cmd` construction |
+| `cmd/start-issue/main_test.go` | Deterministic Go regression suite | Existing tests cover human-gate command, DONE, HUMAN_GATE, and errors | Add precedence, invalid value, full-delivery, and order assertions |
+| `cmd/start-issue/parity_integration_test.go` | Go/Bash observable parity coverage | Protects unaffected legacy behavior during the Go implementation | Keep non-human-gate parity cases green |
 | `test/e2e/human-gate.sh` | Opt-in real-Codex smoke runner | Closest existing live verification surface | Add a separately guarded full-delivery scenario only after approval |
 | `README.md`, `README.ru.md`, `doc/spec.md` | Public and canonical behavior docs | Must match help and command behavior | Update together with output assertions |
 
@@ -59,15 +55,15 @@ existing FT-015 batch, state, status, and resume behavior.
 
 | Open Question ID | Question | Why unresolved | Blocks | Default action / escalation owner |
 | --- | --- | --- | --- | --- |
-| `OQ-01` | Which future Codex versions remain compatible after `0.145.0`? | The external CLI has no repository-owned stability guarantee. | Does not block implementation; affects future maintenance | Treat `0.145.0` as the tested baseline and update adapter/docs together on command-shape failure. |
+| `OQ-01` | Which future Codex versions remain compatible after the issue baseline? | The external CLI has no repository-owned stability guarantee and no local executable is installed. | Does not block deterministic implementation; blocks final live acceptance | Treat the approved live executable as the acceptance baseline and update adapter/docs together on command-shape failure. |
 | `OQ-02` | Which isolated fixture repository/issue should receive the live full-delivery PR? | Live target selection is operator-owned and may change. | `STEP-06` only | Require explicit target and approval through `AG-01`; never infer from global focus or an unrelated repo. |
 
 ## Environment Contract
 
 | Area | Contract | Used by | Failure symptom |
 | --- | --- | --- | --- |
-| setup | Bash, Git, jq, shellcheck, Bats, fake agent binaries, and the current modular source tree | `STEP-01` - `STEP-05` | `make test` dependency or fixture failure |
-| supported Codex | Local reference is `codex-cli 0.145.0`; approval/sandbox options must be accepted before `exec` | `STEP-03`, `STEP-06` | Real CLI rejects command before emitting `thread.started` |
+| setup | Go, Bash, Git, and the current Go source tree; deterministic tests use fakes | `STEP-01` - `STEP-05` | `make test` dependency or fixture failure |
+| supported Codex | Issue baseline is `0.144.6`; the approved live executable must accept the recorded command forms | `STEP-03`, `STEP-06` | Real CLI rejects command before emitting `thread.started` |
 | deterministic test | `make test` is canonical and must not use network or real agent binaries | `CHK-01`, `STEP-02` - `STEP-05` | External side effects or nondeterministic test failures |
 | live access | Explicit opt-in, authenticated `gh`, real Codex, authorized fixture repo/issue, network, and permission to push/create a PR | `STEP-06` | Missing auth, push rejection, absent PR, or no terminal status |
 | secrets | Credentials remain in existing authenticated tools/environment and never enter tracked files or command output | all steps | Token-like data appears in diff, logs, or state artifacts |
@@ -99,10 +95,10 @@ existing FT-015 batch, state, status, and resume behavior.
 
 | Step ID | Actor | Implements | Goal | Touchpoints | Artifact | Verifies | Evidence IDs | Check command / procedure | Blocked by | Needs approval | Escalate if |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `STEP-01` | agent | `REQ-03`, `SOL-01`, `SD-02`, `CTR-01`, `CTR-02`, `FM-03` | Add CLI/environment/default resolution and fail-fast validation | `scripts/start-issue`, `cli.sh`, `config.sh` | Resolved mode and source | `CHK-01`, `NEG-01` | `EVID-01` | Focused Bats tests, then `make test` | `PRE-01` | none | Validation occurs after fetch or mutation |
-| `STEP-02` | agent | `REQ-07`, `INV-01`, `INV-02` | Extend fake Codex and tests before changing launcher behavior | Fake Codex, Bats suite | Red/green command contract tests | `CHK-01`, `SC-01` - `SC-04` | `EVID-01` | `bats test/start_issue.bats` | `STEP-01` | none | Fake cannot distinguish global and exec arguments |
-| `STEP-03` | agent | `REQ-01`, `REQ-02`, `REQ-04`, `SOL-02`, `SOL-03`, `CTR-03`, `CTR-04`, `INV-04` | Build validated restricted/full-delivery commands in supported order | `agent.sh` | Array-based Codex command mapping | `CHK-01`, `SC-02`, `SC-03` | `EVID-01` | Focused Bats tests; inspect `--dry-run` command | `STEP-02`, `PRE-02` | none | Supported Codex rejects generated grammar |
-| `STEP-04` | agent | `REQ-01`, `REQ-06`, `SOL-04`, `CTR-05`, `FM-02`, `FM-04` | Add capability output, warning, dedicated help, and public docs | `output.sh`, README files, spec | Consistent operator contract | `CHK-02`, `SC-05`, `NEG-02` | `EVID-02` | Help assertions and documentation review | `STEP-03` | none | Docs imply permission equals credentials or product authorization |
+| `STEP-01` | agent | `REQ-03`, `SOL-01`, `SD-02`, `CTR-01`, `CTR-02`, `FM-03` | Add CLI/environment/default resolution and fail-fast validation | `cmd/start-issue/main.go`, `main_test.go` | Resolved mode and source | `CHK-01`, `NEG-01` | `EVID-01` | Focused Go tests, then `make test` | `PRE-01` | none | Validation occurs after fetch or mutation |
+| `STEP-02` | agent | `REQ-07`, `INV-01`, `INV-02` | Extend the fake Codex process and Go tests before changing launcher behavior | `cmd/start-issue/main_test.go` | Red/green command contract tests | `CHK-01`, `SC-01` - `SC-04` | `EVID-01` | `go test ./cmd/start-issue` | `STEP-01` | none | Fake cannot distinguish global and exec arguments |
+| `STEP-03` | agent | `REQ-01`, `REQ-02`, `REQ-04`, `SOL-02`, `SOL-03`, `CTR-03`, `CTR-04`, `INV-04` | Build validated restricted/full-delivery commands in supported order | `cmd/start-issue/main.go` | Array-based Codex command mapping | `CHK-01`, `SC-02`, `SC-03` | `EVID-01` | Focused Go tests; inspect `--dry-run` command | `STEP-02`, `PRE-02` | none | Supported Codex rejects generated grammar |
+| `STEP-04` | agent | `REQ-01`, `REQ-06`, `SOL-04`, `CTR-05`, `FM-02`, `FM-04` | Add capability output, warning, dedicated help, and public docs | `cmd/start-issue/main.go`, README files, spec | Consistent operator contract | `CHK-02`, `SC-05`, `NEG-02` | `EVID-02` | Help assertions and documentation review | `STEP-03` | none | Docs imply permission equals credentials or product authorization |
 | `STEP-05` | agent | `REQ-05`, `REQ-07`, `SOL-05`, `INV-05`, `RB-01`, `RB-02` | Run full deterministic regression and simplify review | All changed runtime/tests/docs | Green local suite and complexity verdict | `CHK-01`, `CHK-02`, `SC-04` | `EVID-01`, `EVID-02`, `EVID-09` | `make test`; inspect diff for unnecessary branches/abstractions | `STEP-01` - `STEP-04` | none | FT-015 state/resume behavior changes |
 | `STEP-06` | human + agent | `REQ-08`, `SOL-06`, `SD-04`, `SC-06`, `NEG-03`, `RB-03` | Extend/run isolated live full-delivery verification and retain evidence | E2E runner and approved fixture repo/issue | E2E log, state artifacts, commit and PR URL | `CHK-03`, `EC-06` | `EVID-03` | Follow canonical cmux caller-tab procedure and poll to terminal PASS/failure | `STEP-05`, `PRE-03`, `OQ-02` | `AG-01` | Target/auth/caller context is missing, or any unexpected external scope appears |
 

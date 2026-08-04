@@ -43,7 +43,7 @@ supported Codex CLI while closing the remaining capability-contract gap.
 | --- | --- | --- | --- | --- |
 | `MET-01` | Human-gate capability contract visibility | One implicit `workspace-write` command | Every run reports either restricted or full-delivery permissions | Dry-run/help assertions |
 | `MET-02` | Full Git delivery reachability | GitHub/network/Git writes are not guaranteed | An explicitly authorized mode can edit, test, commit, push, and create/update a PR | Deterministic command tests plus opt-in live E2E evidence |
-| `MET-03` | Supported Codex command compatibility | Compatibility can drift with CLI option placement | Generated commands are accepted by the supported Codex CLI contract | Bats command-shape coverage and real-Codex smoke validation |
+| `MET-03` | Supported Codex command compatibility | Compatibility can drift with CLI option placement | Generated commands are accepted by the supported Codex CLI contract | Go command-shape tests and real-Codex smoke validation |
 
 ### Scope
 
@@ -86,8 +86,10 @@ supported Codex CLI while closing the remaining capability-contract gap.
 
 ### Constraints / Assumptions
 
-- `ASM-01` The supported reference environment is Codex CLI `0.145.0`, whose
-  global permission options are accepted before the `exec` subcommand.
+- `ASM-01` Issue #37 reproduces the rejected argument order with Codex CLI
+  `0.144.6`; the feature must verify the exact supported command grammar with
+  the approved executable before acceptance. The repository does not pin an
+  installed Codex version.
 - `ASM-02` Full delivery requires independently configured GitHub
   authentication and repository authorization; `start-issue` can select a
   launcher policy but cannot grant those external capabilities.
@@ -173,8 +175,8 @@ supported Codex CLI while closing the remaining capability-contract gap.
 
 | Check ID | Covers | How to check | Expected result | Evidence path |
 | --- | --- | --- | --- | --- |
-| `CHK-01` | `EC-01` - `EC-04`, `SC-01` - `SC-04`, `NEG-01` | `make test` | Syntax, shellcheck, memory-bank audit, and deterministic Bats coverage pass for both modes and FT-015 regressions. | Local terminal/CI test output |
-| `CHK-02` | `EC-01`, `EC-05`, `SC-01`, `SC-05`, `NEG-02` | Review `--help`, `--human-gate-help`, README files, and spec alongside output assertions | All surfaces state the same default, opt-in, capability, risk, and troubleshooting contract. | Review diff and Bats output |
+| `CHK-01` | `EC-01` - `EC-04`, `SC-01` - `SC-04`, `NEG-01` | `make test` | Go formatting/vet/tests, memory-bank audit, and deterministic human-gate coverage pass for both modes and FT-015 regressions. | Local terminal/CI test output |
+| `CHK-02` | `EC-01`, `EC-05`, `SC-01`, `SC-05`, `NEG-02` | Review `--help`, `--human-gate-help`, README files, and spec alongside Go output assertions | All surfaces state the same default, opt-in, capability, risk, and troubleshooting contract. | Review diff and Go test output |
 | `CHK-03` | `EC-02`, `EC-03`, `EC-06`, `SC-02`, `SC-03`, `SC-06`, `NEG-03` | With explicit approval, run the real-Codex full-delivery E2E procedure from FT-017's plan | Supported Codex accepts the command and the isolated fixture records commit, push, PR, terminal status, and retained artifacts. | Retained E2E artifact directory and fixture PR URL |
 
 ### Test matrix
@@ -198,5 +200,5 @@ supported Codex CLI while closing the remaining capability-contract gap.
 | Evidence ID | Artifact | Producer | Path contract | Reused by checks |
 | --- | --- | --- | --- | --- |
 | `EVID-01` | Local and CI test output | implementer / CI | Terminal output and GitHub Actions job | `CHK-01` |
-| `EVID-02` | Documentation diff plus help assertions | implementer / reviewer | Changed docs and Bats output | `CHK-02` |
+| `EVID-02` | Documentation diff plus help assertions | implementer / reviewer | Changed docs and Go test output | `CHK-02` |
 | `EVID-03` | Live-E2E log, state files, commit/PR identifiers | approved operator | Retained E2E artifact path printed by runner | `CHK-03` |

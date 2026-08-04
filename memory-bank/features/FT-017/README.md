@@ -33,5 +33,4 @@ Git delivery.
   for live GitHub-writing verification.
 
 - [decision-log.md](decision-log.md)
-  Historical release-distribution decisions retained from the earlier FT-017
-  migration package.
+  FPF decisions, evidence provenance, and the remaining live-verification gate.

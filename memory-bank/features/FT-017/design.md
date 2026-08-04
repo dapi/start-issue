@@ -31,10 +31,12 @@ capability boundary around that lifecycle. The solution must keep restricted
 behavior safe by default while giving an operator one deliberate, visible way
 to authorize end-to-end Git delivery.
 
-The local reference CLI is Codex `0.145.0`. Its approval and sandbox flags are
-global options, while JSONL and last-message outputs are `exec` options. The
-design therefore needs a stable semantic contract owned by `start-issue`, not
-an unchecked string of arbitrary Codex arguments.
+Issue #37 reproduces the obsolete `--ask-for-approval` placement with Codex
+`0.144.6`. The current upstream Codex `exec` source exposes
+`--dangerously-bypass-approvals-and-sandbox` as a global option and keeps the
+JSONL/last-message contract on `exec`. The design therefore owns a semantic
+contract rather than passing arbitrary Codex arguments; the exact approved
+release remains a live-verification concern.
 
 ## C4 Applicability
 
@@ -66,10 +68,9 @@ enforces credentials and repository authorization independently.
 - `SOL-01` Add one semantic configuration axis named human-gate permissions
   with exactly two values: `restricted` and `full-delivery`. Resolve it as CLI
   option → environment variable → built-in `restricted`.
-- `SOL-02` Map `restricted` to Codex global options
-  `--ask-for-approval never --sandbox workspace-write` and map explicit
-  `full-delivery` to
-  `--ask-for-approval never --sandbox danger-full-access`.
+- `SOL-02` Keep `restricted` on the existing `--sandbox workspace-write`
+  command and map explicit `full-delivery` to the global
+  `--dangerously-bypass-approvals-and-sandbox` option.
 - `SOL-03` Build the command in supported grammar order: `codex`, global model
   and permission options, `exec`, then worktree and batch-output options.
 - `SOL-04` Print the resolved semantic mode and a concise capability statement
@@ -96,8 +97,8 @@ enforces credentials and repository authorization independently.
 | Trade-off ID | Decision | Benefit | Cost / Risk |
 | --- | --- | --- | --- |
 | `TRD-01` | Expose two semantic modes instead of raw Codex controls | Small, testable public contract with stable operator meaning | Advanced Codex policies are not expressible through this feature. |
-| `TRD-02` | Use `danger-full-access` for explicit full delivery | Provides network and Git metadata writes required by the delivery contract | Batch commands are unsandboxed and must be treated as high risk. |
-| `TRD-03` | Keep `never` approval for batch execution | Preserves unattended human-gate semantics | Capability errors cannot escalate mid-run and must be diagnosed clearly. |
+| `TRD-02` | Use the explicit Codex bypass option for full delivery | Covers the approvals and sandbox boundaries implicated by issue #37 | Batch commands are unsandboxed and must be treated as high risk. |
+| `TRD-03` | Use the explicit bypass mode for unattended batch execution | Preserves unattended human-gate semantics for the selected full-delivery mode | Capability errors cannot escalate mid-run and must be diagnosed clearly. |
 
 ## Accepted Local Decisions
 
@@ -120,8 +121,8 @@ enforces credentials and repository authorization independently.
 | --- | --- | --- | --- |
 | `CTR-01` | `--human-gate-permissions restricted\|full-delivery` | CLI parser / config resolver | CLI value wins over environment; invalid or empty explicit values fail before issue fetch. |
 | `CTR-02` | `START_ISSUE_HUMAN_GATE_PERMISSIONS` | shell environment / config resolver | Used only when CLI input is absent; unset resolves to `restricted`. |
-| `CTR-03` | Restricted Codex command | launcher / Codex | `codex [--model MODEL] --ask-for-approval never --sandbox workspace-write exec --cd WORKTREE --json --output-last-message PATH -`. |
-| `CTR-04` | Full-delivery Codex command | launcher / Codex | Same shape as `CTR-03`, with `--sandbox danger-full-access`; selected only by explicit `full-delivery`. |
+| `CTR-03` | Restricted Codex command | launcher / Codex | `codex [--model MODEL] exec --cd WORKTREE --sandbox workspace-write --json --output-last-message PATH -`. |
+| `CTR-04` | Full-delivery Codex command | launcher / Codex | `codex [--model MODEL] --dangerously-bypass-approvals-and-sandbox exec --cd WORKTREE --json --output-last-message PATH -`; selected only by explicit `full-delivery`. |
 | `CTR-05` | Permission status output | launcher / operator | Reports semantic mode and capability boundary before execution and in dry-run; full delivery includes an unsandboxed-execution warning. |
 
 ## Invariants
