@@ -18,6 +18,11 @@ This project follows Semantic Versioning.
 
 - Added an opt-in local E2E smoke suite for the real Codex human-gate workflow.
 
+### Changed
+
+- Completed the parity-first Go CLI migration and closed issue #34 after
+  verifying tests, sandbox E2E, release artifacts, and local installation.
+
 ## [1.13.3] - 2026-07-30
 
 ### Fixed
