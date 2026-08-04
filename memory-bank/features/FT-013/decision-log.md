@@ -2,11 +2,11 @@
 title: "FT-013: Decision Log"
 doc_kind: feature
 doc_function: decision_log
-purpose: "Feature-local decisions for FT-013. Records how issue ambiguities and document conflicts were resolved."
+purpose: "Feature-local decisions and conflict resolutions for the issue #35/#13 self-update slice."
 derived_from:
-  - feature.md
-  - solution.md
-  - ../../../install.sh
+  - brief.md
+  - design.md
+  - ../../../cmd/start-issue/main.go
   - ../../../README.md
   - ../../../doc/spec.md
 status: active
@@ -17,115 +17,80 @@ audience: humans_and_agents
 
 ## Decisions
 
-### `DL-01` Release-backed installer contract is the update baseline
+### `DL-01` Issue #35 is reconciled to FT-013
 
-- Date: 2026-05-24
+- Date: 2026-08-04
 - Status: accepted
-- Context:
-  Issue #13 requires the update source to be the latest GitHub Release rather than the local checkout.
-  The current repository already documents and implements a release-backed install path in `README.md`, `README.ru.md`, and `install.sh`.
-- Decision:
-  The self-update workflow reuses the same release-backed contract as `install.sh`: release asset plus checksum, verification before install, and installation into the project's standard binary target shape.
-- Evidence:
-  `install.sh` downloads `releases/latest/download/start-issue` and `start-issue.sha256`, verifies the checksum, and installs with mode `0755`.
-  `README.md` documents that install path as the primary "latest release" installation flow.
-- Consequence:
-  Update behavior stays consistent with the documented installation story and avoids inventing a second release-install mechanism.
+- Context: Issue #35 requests a release-backed self-update command for the installed CLI. The feature inventory identifies it as a duplicate of the existing issue #13 self-update slice.
+- Decision: FT-013 remains the single feature package; issue #35 is added as provenance and no second package is created.
+- Evidence: GitHub issue #35, `memory-bank/features/missing.md`, and the existing FT-013 package.
+- Consequence: Scope, design, plan, and verification have one canonical owner.
 
-### `DL-02` The running executable path is the safe default update target
+### `DL-02` Current Go runtime is the implementation baseline
 
-- Date: 2026-05-24
+- Date: 2026-08-04
 - Status: accepted
-- Context:
-  Issue #13 explicitly notes that multiple `start-issue` executables may exist in `PATH` and says the safest default is to update the resolved executable path for the current invocation.
-- Decision:
-  The update workflow detects the executable path of the running `start-issue` process and updates that path rather than guessing a different installation target.
-- Evidence:
-  The issue's design notes define this as the safest default.
-  This matches the feature requirement to detect the currently installed version from the executable the user is running.
-- Consequence:
-  The command updates the installation the user actually invoked and avoids silently modifying another `PATH` entry.
+- Context: Legacy FT-013 documents referenced `scripts/start-issue` and Bash tests, but the current repository entrypoint is `cmd/start-issue/main.go` and the current test surfaces are Go and parity tests.
+- Decision: Active feature documents use the current Go implementation and tests as grounding; legacy `feature.md` and `solution.md` are archived redirects.
+- Evidence: `cmd/start-issue/main.go`, `cmd/start-issue/main_test.go`, `cmd/start-issue/parity_integration_test.go`, `Makefile`.
+- Consequence: Plan steps and evidence no longer claim unstarted Bash work.
 
-### `DL-03` Update mode must not depend on git repository state
+### `DL-03` Release metadata and platform assets are the update contract
 
-- Date: 2026-05-24
+- Date: 2026-08-04
 - Status: accepted
-- Context:
-  Issue #13 requires the command to work outside a git repository.
-  The normal issue-starting workflow currently depends on git repo discovery, remote detection, and worktree planning.
-- Decision:
-  Update mode is treated as a separate top-level workflow that bypasses issue parsing, repo detection, base-branch detection, and worktree orchestration.
-- Evidence:
-  The issue says the update command should work outside a git repository.
-  Current `doc/spec.md` shows the ordinary workflow requires git repository context for issue starts.
-- Consequence:
-  Update mode can run from any directory and does not create accidental coupling to the issue-starting path.
+- Context: Issue #35 requires the latest GitHub Release, a binary, and SHA-256 verification. The current Go CLI resolves release metadata with `gh`, selects the current-platform asset, and downloads `checksums.txt`.
+- Decision: Use `gh api repos/<repository>/releases/latest`, the current-platform binary asset, and `checksums.txt`; keep the documented repository override available.
+- Evidence: `updateMode`, `githubRelease.assetURLs`, `releaseAssetName`, `validChecksum`, README self-update section, and `doc/spec.md`.
+- Consequence: Verification covers both metadata resolution and asset integrity without reintroducing the legacy shell installer as a runtime dependency.
 
-### `DL-04` Version comparison uses normalized tags, not raw surface strings
+### `DL-04` The running executable is the update target
 
-- Date: 2026-05-24
+- Date: 2026-08-04
 - Status: accepted
-- Context:
-  The current CLI exposes a bare numeric version such as `1.12.0` in `scripts/start-issue`.
-  Issue #13 refers to GitHub release names with a `v` prefix such as `v1.11.1`.
-  Raw string comparison would therefore misclassify equivalent versions.
-- Decision:
-  The update workflow compares normalized version strings by stripping one optional leading `v` from both the installed version and the latest release tag before equality and ordering checks.
-- Evidence:
-  `scripts/start-issue` currently defines `VERSION=\"1.12.0\"`.
-  Issue #13 states the latest published release is `v1.11.1`.
-- Consequence:
-  The no-op path reflects semantic version equality rather than formatting differences, and tests must cover the normalization rule.
+- Context: Issue #35 requires updating the executable invoked by the user. Multiple installations may exist, and the current implementation resolves `os.Executable()` then evaluates symlinks.
+- Decision: Update the resolved executable path for the current process; never guess another PATH entry or silently fall back to the default install path.
+- Evidence: `runningExecutablePath`, `SD-01`, and issue #35 user experience/acceptance text.
+- Consequence: The command updates the installation actually invoked.
 
-### `DL-05` Release lookup and asset download are separate contracts
+### `DL-05` Update is upgrade-only
 
-- Date: 2026-05-24
+- Date: 2026-08-04
 - Status: accepted
-- Context:
-  Issue #13 requires the command to resolve the latest published release from GitHub Releases and also to install the release artifact.
-  `install.sh` already defines how assets and checksum files are downloaded, but it does not need to compare versions first.
-- Decision:
-  FT-013 separates release metadata lookup from asset download:
-  lookup resolves the canonical latest release tag and asset/checksum URLs;
-  installer helpers then download, verify, and install those resolved assets.
-- Evidence:
-  The issue requires both latest-release resolution and version comparison.
-  `install.sh` already provides the download and verification contract for the release asset and checksum.
-- Consequence:
-  The design keeps one source of truth for "what is latest" and a separate source of truth for "how to install it," reducing drift and simplifying tests.
+- Context: The requirement says current or newer installations must exit successfully without downloading; unconditional “latest release” replacement could downgrade a newer binary.
+- Decision: Compare semantic versions; equal or newer is a successful no-op.
+- Evidence: `compareVersions`, `updateMode`, `SC-03`, and `SC-04`.
+- Consequence: Self-update never replaces a newer installed version.
 
-### `DL-06` Self-update must not downgrade a newer local executable
+### `DL-06` Replacement requires checksum and staged-version verification
 
-- Date: 2026-05-24
+- Date: 2026-08-04
 - Status: accepted
-- Context:
-  The repository currently contains `VERSION="1.12.0"` in `scripts/start-issue`.
-  Issue #13 states that on 2026-05-24 the latest published release is `v1.11.1`.
-  A self-update command that blindly installed "latest published release" would therefore downgrade a newer local executable.
-- Decision:
-  If the running executable version is newer than the latest published GitHub release, the update workflow exits successfully with a no-op status and leaves the executable unchanged.
-- Evidence:
-  `scripts/start-issue` currently exposes version `1.12.0`.
-  Issue #13 states that the latest published release is `v1.11.1`.
-- Consequence:
-  Self-update remains an upgrade-only workflow and does not clobber a newer local or pre-release installation.
+- Context: A checksum verifies bytes, while a release asset can still be mislabeled or incompatible. Replacement must not destroy the working binary on a failed update.
+- Decision: Download to memory, verify `checksums.txt`, stage beside the target with executable mode, verify staged `--version` against the release tag, then rename atomically.
+- Evidence: `validChecksum`, `stageBinary`, `verifyStagedBinary`, `installVerifiedUpdate`, and focused tests.
+- Consequence: checksum, version, permission, or rename failures leave the existing target untouched.
+
+### `DL-07` Update mode is independent of repository context
+
+- Date: 2026-08-04
+- Status: accepted
+- Context: Issue #35 explicitly requires operation outside a git repository; ordinary issue-starting flow has separate repository/worktree prerequisites.
+- Decision: Dispatch update mode before ordinary repo/worktree orchestration and require only the update-specific external boundary.
+- Evidence: `main`, `runMode`, `updateMode`, `SC-06`, and `TestRunModeUpdateDoesNotRequireHomeDirectory`.
+- Consequence: update can run outside git while ordinary issue-start behavior remains isolated.
 
 ## Conflict Resolution
 
-- Resolved conflict: "standard install location used by the project" versus "update the resolved executable path for the current invocation."
-  Conflicting sources:
-  issue #13 requirements emphasize the standard install location;
-  issue #13 design notes emphasize the running executable path as the safest default when multiple installations exist.
-  Resolution:
-  interpret the release-backed installer contract as the standard install behavior and the running executable path as the concrete target for self-update.
-  Why this is consistent:
-  it preserves the existing installation method while making the self-update target explicit and safe.
+### Legacy FT-013 documents vs current Go implementation
 
-- Resolved conflict: bare CLI version strings versus `v`-prefixed release tags.
-  Conflicting sources:
-  `scripts/start-issue` exposes a bare numeric `VERSION`;
-  issue #13 and GitHub Releases use `v`-prefixed release tags.
-  Resolution:
-  compare normalized versions rather than raw strings.
-  Why this is consistent:
-  it preserves the current CLI output surface while matching the release system's tagging convention.
+The archived `feature.md` / `solution.md` described Bash paths and issue #13
+only. They conflicted with the current Go change surface and issue #35
+provenance. `DL-02` resolves this by making `brief.md` and `design.md` active
+owners and retaining the old files only as migration redirects.
+
+### Generic checksum wording vs current release manifest
+
+Issue #35 says “its SHA-256 checksum”; the repository's current release contract
+uses a platform binary plus `checksums.txt`. `DL-03` makes that existing
+contract explicit without changing issue scope.
