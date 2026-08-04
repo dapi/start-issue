@@ -10,7 +10,7 @@ derived_from:
   - ../FT-015/feature.md
   - https://github.com/dapi/start-issue/issues/37
 status: active
-delivery_status: planned
+delivery_status: in_progress
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence
@@ -87,9 +87,9 @@ supported Codex CLI while closing the remaining capability-contract gap.
 ### Constraints / Assumptions
 
 - `ASM-01` Issue #37 reproduces the rejected argument order with Codex CLI
-  `0.144.6`; the feature must verify the exact supported command grammar with
-  the approved executable before acceptance. The repository does not pin an
-  installed Codex version.
+  `0.144.6`. Local parser validation confirms both selected command forms on
+  Codex CLI `0.145.0`; live full-delivery behavior still requires the explicit
+  `CHK-03` approval gate. The repository does not pin an installed version.
 - `ASM-02` Full delivery requires independently configured GitHub
   authentication and repository authorization; `start-issue` can select a
   launcher policy but cannot grant those external capabilities.

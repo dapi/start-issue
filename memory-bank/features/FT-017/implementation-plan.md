@@ -22,6 +22,11 @@ must_not_define:
 Implement the accepted FT-017 permission-mode contract while preserving the
 existing FT-015 batch, state, status, and resume behavior.
 
+Deterministic implementation, documentation, command-shape coverage, and local
+Codex CLI `0.145.0` parser validation are complete. `STEP-06` remains pending
+because the real full-delivery run requires explicit `AG-01` authorization and
+creates retained fixture GitHub state.
+
 ## Grounding / Support References
 
 | Document | Role in this plan | Facts reused | Conflict action |
@@ -55,7 +60,7 @@ existing FT-015 batch, state, status, and resume behavior.
 
 | Open Question ID | Question | Why unresolved | Blocks | Default action / escalation owner |
 | --- | --- | --- | --- | --- |
-| `OQ-01` | Which future Codex versions remain compatible after the issue baseline? | The external CLI has no repository-owned stability guarantee and no local executable is installed. | Does not block deterministic implementation; blocks final live acceptance | Treat the approved live executable as the acceptance baseline and update adapter/docs together on command-shape failure. |
+| `OQ-01` | Which future Codex versions remain compatible after the issue baseline? | The external CLI has no repository-owned stability guarantee; local parser validation covers `0.145.0` only. | Does not block deterministic implementation; blocks claims about future versions | Treat the approved live executable as the acceptance baseline and update adapter/docs together on command-shape failure. |
 | `OQ-02` | Which isolated fixture repository/issue should receive the live full-delivery PR? | Live target selection is operator-owned and may change. | `STEP-06` only | Require explicit target and approval through `AG-01`; never infer from global focus or an unrelated repo. |
 
 ## Environment Contract
@@ -63,7 +68,7 @@ existing FT-015 batch, state, status, and resume behavior.
 | Area | Contract | Used by | Failure symptom |
 | --- | --- | --- | --- |
 | setup | Go, Bash, Git, and the current Go source tree; deterministic tests use fakes | `STEP-01` - `STEP-05` | `make test` dependency or fixture failure |
-| supported Codex | Issue baseline is `0.144.6`; the approved live executable must accept the recorded command forms | `STEP-03`, `STEP-06` | Real CLI rejects command before emitting `thread.started` |
+| supported Codex | Issue failure baseline is `0.144.6`; local parser validation covers `0.145.0`; the approved live executable must complete the recorded full-delivery flow | `STEP-03`, `STEP-06` | Parser rejection or no `thread.started` event |
 | deterministic test | `make test` is canonical and must not use network or real agent binaries | `CHK-01`, `STEP-02` - `STEP-05` | External side effects or nondeterministic test failures |
 | live access | Explicit opt-in, authenticated `gh`, real Codex, authorized fixture repo/issue, network, and permission to push/create a PR | `STEP-06` | Missing auth, push rejection, absent PR, or no terminal status |
 | secrets | Credentials remain in existing authenticated tools/environment and never enter tracked files or command output | all steps | Token-like data appears in diff, logs, or state artifacts |

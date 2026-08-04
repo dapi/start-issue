@@ -59,8 +59,9 @@ names keep the public contract independent from Codex's low-level flags.
   `dangerously_bypass_approvals_and_sandbox` as a global option for `exec`.
 - The same source marks `model`, `json`, and `output-last-message` as global
   options compatible with the `exec` command.
-- The local repository has no installed `codex` executable, so live parser
-  validation cannot be performed in this worktree.
+- The local Codex CLI `0.145.0` accepts both selected command forms through its
+  parser/help path. No agent session or external GitHub write was performed by
+  this parser validation.
 
 ### Decision
 
@@ -95,8 +96,8 @@ removed from the execution plan.
 
 ## Open evidence gate
 
-The exact supported release/version matrix is not asserted locally. Before
-`delivery_status: done`, the approved live Codex executable must accept both
-command forms and a retained E2E artifact must prove the declared full-delivery
-behavior. If that verification fails, reject `full-delivery` and keep the
-restricted path as the safe fallback.
+The exact future release/version matrix is not asserted locally. Before
+`delivery_status: done`, a retained approved E2E artifact must prove the
+declared full-delivery behavior on the selected Codex executable. If that
+verification fails, reject `full-delivery` and keep the restricted path as the
+safe fallback.

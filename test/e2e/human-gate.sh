@@ -10,12 +10,15 @@ scenario="done"
 
 usage() {
     cat <<'EOF'
-Usage: START_ISSUE_E2E=1 test/e2e/human-gate.sh [--scenario done|human-gate]
+Usage: START_ISSUE_E2E=1 test/e2e/human-gate.sh [--scenario done|human-gate|full-delivery]
 
 Runs start-issue against a real Codex CLI using the private fixture repository
 dapi/start-issue-e2e-fixture and its control issue #1. It deletes the temporary
 clone after a successful run; set START_ISSUE_E2E_KEEP=1 to retain it. The
 HUMAN_GATE scenario opens Codex resume interactively; exit it to continue.
+FULL_DELIVERY also requires START_ISSUE_E2E_FULL_DELIVERY=1. It authorizes an
+unsandboxed Codex run that creates a unique fixture commit, remote branch, and
+pull request. Those remote artifacts are retained as evidence.
 EOF
 }
 
@@ -40,8 +43,13 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-[[ "$scenario" == "done" || "$scenario" == "human-gate" ]] || fail "scenario must be done or human-gate"
+[[ "$scenario" == "done" || "$scenario" == "human-gate" || "$scenario" == "full-delivery" ]] || \
+    fail "scenario must be done, human-gate, or full-delivery"
 [[ "${START_ISSUE_E2E:-}" == "1" ]] || fail "set START_ISSUE_E2E=1 to authorize a real Codex session"
+if [[ "$scenario" == "full-delivery" ]]; then
+    [[ "${START_ISSUE_E2E_FULL_DELIVERY:-}" == "1" ]] || \
+        fail "set START_ISSUE_E2E_FULL_DELIVERY=1 to authorize unsandboxed GitHub delivery"
+fi
 start_issue_bin="${START_ISSUE_E2E_BINARY:-$repo_root/.build/start-issue}"
 
 [[ -x "$start_issue_bin" ]] || fail "start-issue executable not found: $start_issue_bin"
@@ -59,23 +67,53 @@ printf '%s' "$codex_exec_help" | grep -Fq -- '--output-last-message' || \
 if printf '%s' "$codex_exec_help" | grep -q -- '--ask-for-approval'; then
     fail "installed codex exec still advertises --ask-for-approval; use a current Codex CLI"
 fi
+if [[ "$scenario" == "full-delivery" ]]; then
+    codex_help="$(codex --help 2>&1)" || fail "codex --help failed"
+    printf '%s' "$codex_help" | grep -Fq -- '--dangerously-bypass-approvals-and-sandbox' || \
+        fail "resolved codex does not support the full-delivery permission option"
+fi
 
 fixture_root="$(mktemp -d "${TMPDIR:-/tmp}/start-issue-human-gate.XXXXXX")"
 fixture_dir="$fixture_root/fixture"
 worktree_parent="$fixture_root/worktrees"
 log_path="$fixture_root/e2e.log"
 expected_status="DONE"
+permission_args=()
 if [[ "$scenario" == "human-gate" ]]; then
     expected_status="HUMAN_GATE"
 fi
 
-prompt=$(cat <<EOF
+if [[ "$scenario" == "full-delivery" ]]; then
+    permission_args=(--human-gate-permissions full-delivery)
+    delivery_id="$(date -u +%Y%m%d%H%M%S)-$$"
+    delivery_branch="e2e/human-gate-full-delivery-$delivery_id"
+    delivery_file="full-delivery-$delivery_id.txt"
+    fixture_base="$(gh repo view "$fixture_repo" --json defaultBranchRef --jq '.defaultBranchRef.name')"
+    [[ -n "$fixture_base" ]] || fail "could not resolve fixture default branch"
+fi
+
+if [[ "$scenario" == "full-delivery" ]]; then
+    prompt=$(cat <<EOF
+This is an explicitly authorized full-delivery E2E test in the private fixture repository $fixture_repo.
+Complete these exact steps without changing any other tracked file:
+1. Create and switch to the new branch $delivery_branch.
+2. Create $delivery_file containing exactly: full-delivery $delivery_id
+3. Commit that file with message: Verify human-gate full delivery $delivery_id
+4. Push the branch to origin.
+5. Create a pull request into $fixture_base with title "Human-gate full delivery $delivery_id" and body "Automated retained evidence for start-issue human-gate full-delivery E2E."
+6. Verify the pull request exists, then reply with STATUS: DONE and include its URL.
+Do not merge or close the pull request. Do not modify production or any repository other than $fixture_repo.
+EOF
+    )
+else
+    prompt=$(cat <<EOF
 This is a controlled local human-gate E2E test.
 Do not use tools, run commands, inspect files, modify files, create commits, or call external services.
 Reply with exactly this one line and nothing else:
 STATUS: $expected_status
 EOF
-)
+    )
+fi
 
 printf 'E2E human-gate scenario: %s\n' "$scenario"
 printf 'Codex executable: %s\n' "$codex_path"
@@ -93,6 +131,7 @@ set +e
     "$start_issue_bin" "$fixture_issue" \
         --agent codex \
         --human-gate \
+        "${permission_args[@]}" \
         --no-init \
         --worktree-dir "$worktree_parent" \
         --prompt "$prompt"
@@ -118,6 +157,19 @@ grep -Fx "STATUS: $expected_status" "$last_message_path" >/dev/null || \
 if [[ "$scenario" == "human-gate" ]]; then
     grep -F 'Resume command: codex resume --include-non-interactive ' "$log_path" >/dev/null || \
         fail "resume command was not reported; inspect $log_path"
+fi
+
+if [[ "$scenario" == "full-delivery" ]]; then
+    current_branch="$(git -C "$worktree_path" branch --show-current)"
+    [[ "$current_branch" == "$delivery_branch" ]] || \
+        fail "full-delivery branch is $current_branch, want $delivery_branch"
+    git -C "$worktree_path" show "HEAD:$delivery_file" | grep -Fx "full-delivery $delivery_id" >/dev/null || \
+        fail "delivery commit does not contain the expected marker"
+    git -C "$worktree_path" ls-remote --exit-code --heads origin "$delivery_branch" >/dev/null || \
+        fail "remote delivery branch is missing: $delivery_branch"
+    pr_url="$(gh pr list --repo "$fixture_repo" --state open --head "$delivery_branch" --json url --jq '.[0].url // empty')"
+    [[ -n "$pr_url" ]] || fail "full-delivery pull request is missing for $delivery_branch"
+    printf 'Full-delivery PR: %s\n' "$pr_url"
 fi
 
 unexpected_changes="$(git -C "$worktree_path" status --porcelain | awk '$0 !~ /^\?\? \.start-issue\// { print }')"

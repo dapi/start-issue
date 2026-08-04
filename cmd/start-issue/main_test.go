@@ -58,6 +58,44 @@ func TestParseTracksWorktreeDirectorySource(t *testing.T) {
 	}
 }
 
+func TestParseHumanGatePermissionsPrecedenceAndValidation(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("START_ISSUE_HUMAN_GATE_PERMISSIONS", "")
+
+	o, err := parse([]string{"1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.humanGatePermissions != "restricted" || o.humanGatePermissionsSource != "built-in default" {
+		t.Fatalf("default permissions = %q (%s)", o.humanGatePermissions, o.humanGatePermissionsSource)
+	}
+
+	t.Setenv("START_ISSUE_HUMAN_GATE_PERMISSIONS", "full-delivery")
+	o, err = parse([]string{"1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.humanGatePermissions != "full-delivery" || o.humanGatePermissionsSource != "START_ISSUE_HUMAN_GATE_PERMISSIONS" {
+		t.Fatalf("environment permissions = %q (%s)", o.humanGatePermissions, o.humanGatePermissionsSource)
+	}
+
+	o, err = parse([]string{"1", "--human-gate-permissions", "restricted"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.humanGatePermissions != "restricted" || o.humanGatePermissionsSource != "CLI" {
+		t.Fatalf("CLI permissions = %q (%s)", o.humanGatePermissions, o.humanGatePermissionsSource)
+	}
+
+	if _, err := parse([]string{"1", "--human-gate-permissions", "unlimited"}); err == nil || !strings.Contains(err.Error(), "Use restricted or full-delivery") {
+		t.Fatalf("invalid CLI permissions error = %v", err)
+	}
+	t.Setenv("START_ISSUE_HUMAN_GATE_PERMISSIONS", "unlimited")
+	if _, err := parse([]string{"1"}); err == nil || !strings.Contains(err.Error(), "Use restricted or full-delivery") {
+		t.Fatalf("invalid environment permissions error = %v", err)
+	}
+}
+
 func TestUserHomeDirRejectsUnavailableOrRelativeHome(t *testing.T) {
 	t.Setenv("HOME", "")
 	if runtime.GOOS != "windows" {
@@ -1117,6 +1155,8 @@ func TestUsageListsCompatibilityEntryPoints(t *testing.T) {
 		"--update",
 		"--install",
 		"--human-gate-help",
+		"--human-gate-permissions <restricted|full-delivery>",
+		"START_ISSUE_HUMAN_GATE_PERMISSIONS",
 		"Agent selection precedence:",
 		".start-issue/agent in the git root",
 		"Prompt template precedence:",
@@ -1125,6 +1165,24 @@ func TestUsageListsCompatibilityEntryPoints(t *testing.T) {
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("help missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestHumanGateHelpExplainsPermissionContract(t *testing.T) {
+	output := captureStdout(t, humanGateHelp)
+	for _, want := range []string{
+		"restricted (default)",
+		"full-delivery (explicit opt-in)",
+		"--dangerously-bypass-approvals-and-sandbox",
+		"authenticated gh session",
+		"repository write permission",
+		"destructive, production, security, or product decisions",
+		"START_ISSUE_HUMAN_GATE_PERMISSIONS",
+		"gh auth status",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("human-gate help missing %q:\n%s", want, output)
 		}
 	}
 }
@@ -1772,7 +1830,7 @@ func TestHumanGateSavesThreadIDBeforeDone(t *testing.T) {
 	t.Setenv("CODEX_LAST", "STATUS: DONE")
 	t.Setenv("START_ISSUE_FAKE_CODEX_REJECT_ASK_FOR_APPROVAL", "1")
 
-	if err := humanGate("", worktree, "prompt", false); err != nil {
+	if err := humanGate("", worktree, "prompt", "restricted", "built-in default", false); err != nil {
 		t.Fatal(err)
 	}
 	threadID, err := os.ReadFile(filepath.Join(worktree, ".start-issue", "runs", "done", "thread-id"))
@@ -1789,7 +1847,7 @@ func TestHumanGateSavesThreadIDWhenFinalMessageIsMissing(t *testing.T) {
 	t.Setenv("CODEX_EVENTS", `{"type":"thread.started","thread_id":"thread-recovery"}`)
 	t.Setenv("CODEX_SKIP_LAST", "1")
 
-	err := humanGate("", worktree, "prompt", false)
+	err := humanGate("", worktree, "prompt", "restricted", "built-in default", false)
 	if err == nil || !strings.Contains(err.Error(), "No recognized final status found") {
 		t.Fatalf("humanGate error = %v, want missing final-status error", err)
 	}
@@ -1808,7 +1866,7 @@ func TestHumanGateExecFailureReturnsExitCodeOne(t *testing.T) {
 	t.Setenv("CODEX_LAST", "STATUS: DONE")
 	t.Setenv("CODEX_EXEC_EXIT", "42")
 
-	err := humanGate("", worktree, "prompt", false)
+	err := humanGate("", worktree, "prompt", "restricted", "built-in default", false)
 	var exit exitError
 	if !errors.As(err, &exit) || exit.code != 1 {
 		t.Fatalf("got %T %v, want human-gate exit code 1", err, err)
@@ -1836,11 +1894,13 @@ func TestHumanGateDryRunShowsAllStateArtifacts(t *testing.T) {
 	t.Setenv("START_ISSUE_RUN_ID", "plan")
 	dir := filepath.Join(worktree, ".start-issue", "runs", "plan")
 	output := captureStdout(t, func() {
-		if err := humanGate("", worktree, "prompt", true); err != nil {
+		if err := humanGate("", worktree, "prompt", "restricted", "built-in default", true); err != nil {
 			t.Fatal(err)
 		}
 	})
 	for _, want := range []string{
+		"Human-gate permissions: restricted (built-in default)",
+		"Restricted mode: working-tree edits only",
 		"--output-last-message " + filepath.Join(dir, "last-message.txt"),
 		"> " + filepath.Join(dir, "events.jsonl"),
 		"Would write captured thread ID: " + filepath.Join(dir, "thread-id"),
@@ -1857,6 +1917,73 @@ func TestHumanGateDryRunShowsAllStateArtifacts(t *testing.T) {
 	}
 }
 
+func TestHumanGateArgsMapPermissionModesInSupportedOrder(t *testing.T) {
+	worktree := "/tmp/worktree"
+	last := "/tmp/last-message.txt"
+	restricted := humanGateArgs("gpt-test", worktree, last, "restricted")
+	if got, want := fmt.Sprint(restricted), "[--model gpt-test exec --cd /tmp/worktree --sandbox workspace-write --json --output-last-message /tmp/last-message.txt -]"; got != want {
+		t.Fatalf("restricted args = %s, want %s", got, want)
+	}
+	fullDelivery := humanGateArgs("gpt-test", worktree, last, "full-delivery")
+	if got, want := fmt.Sprint(fullDelivery), "[--model gpt-test --dangerously-bypass-approvals-and-sandbox exec --cd /tmp/worktree --json --output-last-message /tmp/last-message.txt -]"; got != want {
+		t.Fatalf("full-delivery args = %s, want %s", got, want)
+	}
+}
+
+func TestHumanGateFullDeliveryDryRunShowsResolvedModeAndCommand(t *testing.T) {
+	worktree := t.TempDir()
+	t.Setenv("START_ISSUE_RUN_ID", "full-delivery-plan")
+	output := captureStdout(t, func() {
+		err := launchSelected(options{
+			dryRun:                     true,
+			humanGate:                  true,
+			humanGatePermissions:       "full-delivery",
+			humanGatePermissionsSource: "CLI",
+		}, "codex", "gpt-test", worktree, "prompt")
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	wantCommand := "codex --model gpt-test --dangerously-bypass-approvals-and-sandbox exec --cd "
+	for _, want := range []string{
+		"Human-gate permissions: full-delivery (CLI)",
+		wantCommand,
+		"WARNING: Codex will run without approvals or sandboxing",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("full-delivery dry-run missing %q:\n%s", want, output)
+		}
+	}
+	if strings.Contains(output, "--sandbox workspace-write") {
+		t.Fatalf("full-delivery dry-run retained restricted sandbox:\n%s", output)
+	}
+}
+
+func TestHumanGateFullDeliveryReportsWarningAndCompletes(t *testing.T) {
+	worktree, bin := t.TempDir(), t.TempDir()
+	writeFakeCodex(t, bin)
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("START_ISSUE_RUN_ID", "full-delivery")
+	t.Setenv("CODEX_EVENTS", `{"type":"thread.started","thread_id":"thread-full-delivery"}`)
+	t.Setenv("CODEX_LAST", "STATUS: DONE")
+
+	output := captureStdout(t, func() {
+		if err := humanGate("gpt-test", worktree, "prompt", "full-delivery", "CLI", false); err != nil {
+			t.Fatal(err)
+		}
+	})
+	for _, want := range []string{
+		"Human-gate permissions: full-delivery (CLI)",
+		"WARNING: Codex will run without approvals or sandboxing",
+		"destructive or production actions still require HUMAN_GATE",
+		"STATUS: DONE",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("full-delivery output missing %q:\n%s", want, output)
+		}
+	}
+}
+
 func TestHumanGatePreservesCallerWorkingDirectory(t *testing.T) {
 	worktree, bin, log := t.TempDir(), t.TempDir(), filepath.Join(t.TempDir(), "cwd")
 	writeFakeCodex(t, bin)
@@ -1869,7 +1996,7 @@ func TestHumanGatePreservesCallerWorkingDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := humanGate("", worktree, "prompt", false); err != nil {
+	if err := humanGate("", worktree, "prompt", "restricted", "built-in default", false); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(log)
@@ -1889,7 +2016,7 @@ func TestHumanGateRejectsDoneWithoutThreadID(t *testing.T) {
 	t.Setenv("CODEX_EVENTS", `{"type":"item.completed"}`)
 	t.Setenv("CODEX_LAST", "STATUS: DONE")
 
-	err := humanGate("", worktree, "prompt", false)
+	err := humanGate("", worktree, "prompt", "restricted", "built-in default", false)
 	if err == nil || !strings.Contains(err.Error(), "did not capture thread_id") {
 		t.Fatalf("got %v", err)
 	}
@@ -1904,7 +2031,7 @@ func TestHumanGateResumeFailureReturnsExitCodeTwo(t *testing.T) {
 	t.Setenv("CODEX_LAST", "STATUS: HUMAN_GATE")
 	t.Setenv("CODEX_RESUME_EXIT", "1")
 
-	err := humanGate("", worktree, "prompt", false)
+	err := humanGate("", worktree, "prompt", "restricted", "built-in default", false)
 	var exit exitError
 	if !errors.As(err, &exit) || exit.code != 2 {
 		t.Fatalf("got %T %v", err, err)
@@ -1928,9 +2055,28 @@ fi
 if [ -n "$START_ISSUE_CWD_LOG" ]; then
   pwd > "$START_ISSUE_CWD_LOG"
 fi
+while [ "$#" -gt 0 ] && [ "$1" != "exec" ] && [ "$1" != "resume" ]; do
+  case "$1" in
+    --model)
+      shift 2
+      ;;
+    --dangerously-bypass-approvals-and-sandbox)
+      shift
+      ;;
+    *)
+      printf '%s\n' "unexpected global option: $1" >&2
+      exit 1
+      ;;
+  esac
+done
 if [ "$1" = "exec" ]; then
+  shift
   last=""
   while [ "$#" -gt 0 ]; do
+    if [ "$1" = "--dangerously-bypass-approvals-and-sandbox" ]; then
+      printf '%s\n' "full-delivery option must precede exec" >&2
+      exit 1
+    fi
     if [ "$1" = "--output-last-message" ]; then
       last="$2"
       shift 2

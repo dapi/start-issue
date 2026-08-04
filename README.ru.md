@@ -81,6 +81,31 @@ Batch flow:
 
 Режим намеренно поддерживается только для Codex. `--human-gate` с любым другим agent завершается явной ошибкой.
 
+Права human-gate задаются явно:
+
+- `restricted` — безопасный default. Он использует `--sandbox workspace-write`
+  и разрешает редактирование worktree, но не гарантирует network, запись Git
+  metadata, push и доставку PR.
+- `full-delivery` — явный opt-in. Codex запускается с
+  `--dangerously-bypass-approvals-and-sandbox`, поэтому при корректной `gh`
+  session и правах репозитория workflow может прочитать GitHub context,
+  изменить и проверить код, сделать commit/push и создать или обновить PR.
+  Это unsandboxed execution.
+
+```bash
+start-issue 123 --agent codex --human-gate \
+  --human-gate-permissions full-delivery
+
+START_ISSUE_HUMAN_GATE_PERMISSIONS=full-delivery \
+  start-issue 123 --agent codex --human-gate
+```
+
+Приоритет: CLI, environment, затем `restricted`. Full delivery расширяет только
+технические возможности launcher и не разрешает destructive Git operations,
+production/security changes или product decisions: для них prompt по-прежнему
+обязан вернуть `STATUS: HUMAN_GATE`. Перед запуском проверьте `gh auth status`,
+выбранный account, remote и write access к репозиторию.
+
 Перед ожиданием решения по конфликту branch/worktree команда печатает
 `Waiting for input: ...`, а перед передачей управления agent —
 `Handing off to <agent> in <worktree>`. Ненулевой код `codex exec` считается
@@ -134,18 +159,29 @@ test/e2e/human-gate.sh --scenario human-gate
 
 Выйдите из возобновлённой Codex-сессии, после чего скрипт проверит артефакты.
 
+Для реальной проверки commit, push и создания PR в private fixture используется
+отдельно подтверждаемый unsandboxed scenario. Он сохраняет уникальные remote
+branch и PR как evidence:
+
+```bash
+START_ISSUE_E2E=1 START_ISSUE_E2E_FULL_DELIVERY=1 \
+  test/e2e/human-gate.sh --scenario full-delivery
+```
+
 #### Сценарии и проверки
 
 | Сценарий | Команда | Что проверяется |
 | --- | --- | --- |
 | `done` | `START_ISSUE_E2E=1 make e2e-human-gate` | Реальный Codex batch run выдаёт `thread.started`, сохраняет `thread-id`, `events.jsonl` и `last-message.txt`, заканчивается `STATUS: DONE` и не меняет fixture worktree за пределами `.start-issue` state. |
 | `human-gate` | `START_ISSUE_E2E=1 test/e2e/human-gate.sh --scenario human-gate` | Те же проверки артефактов и чистоты worktree, а также явный handoff `codex resume --include-non-interactive <thread_id>`. Перед завершением скрипта оператор выходит из возобновлённой interactive session. |
+| `full-delivery` | `START_ISSUE_E2E=1 START_ISSUE_E2E_FULL_DELIVERY=1 test/e2e/human-gate.sh --scenario full-delivery` | Текущий Codex принимает global full-delivery option и выполняет уникальные fixture commit, push и PR; runner печатает сохранённый PR URL. |
 
-Оба сценария проверяют авторизованный `gh`, реальный, а не fake Codex binary, и
+Все сценарии проверяют авторизованный `gh`, реальный, а не fake Codex binary, и
 обязательный интерфейс справки `codex exec` (`--output-last-message`, без
 устаревшего флага `--ask-for-approval`). Выбранный Codex executable печатается
-в test output. Они не доказывают поведение приложения за пределами human-gate
-protocol и намеренно не входят в CI.
+в test output. `done` и `human-gate` не доказывают поведение приложения за
+пределами protocol; `full-delivery` дополнительно проверяет явно разрешённую
+доставку в fixture. Все сценарии намеренно не входят в CI.
 
 ### CI sandbox E2E
 
@@ -260,6 +296,7 @@ boundaries. Новые возможности должны сохранять э
 | `--prompt-file PATH` | Файл prompt template для выбранного агента. С `init` - содержимое файла, которое нужно записать. Нельзя использовать вместе с `--prompt`. |
 | `--improve-prompt` | Попросить выбранного агента сгенерировать reviewable proposal улучшенного prompt template и выйти до создания worktree. |
 | `--human-gate` | Codex-only batch mode для issue workflow. Запускает `codex exec`, выходит на `STATUS: DONE` и резюмирует ту же сессию на `STATUS: HUMAN_GATE`. |
+| `--human-gate-permissions restricted\|full-delivery` | Выбрать capability contract human-gate. CLI имеет приоритет над `START_ISSUE_HUMAN_GATE_PERMISSIONS`; default — `restricted`. |
 | `--human-gate-help` | Показать отдельную справку по Codex human-gate workflow: prompt contract, exit codes и state files. |
 | `--prompt-output-file PATH` | Путь для proposal-файла в режиме `--improve-prompt`. |
 | `--no-init` | Не запускать `init.sh`, даже если он есть в созданном worktree. |
@@ -291,6 +328,7 @@ boundaries. Новые возможности должны сохранять э
 | `START_ISSUE_PROMPT` | Inline prompt template, который используется, если prompt не задан через CLI. Перебивает project и user prompt files. Нельзя использовать вместе с `START_ISSUE_PROMPT_FILE`, когда prompt не задан через CLI. |
 | `START_ISSUE_PROMPT_FILE` | Файл prompt template, который используется, если prompt не задан через CLI. Перебивает project и user prompt files. Нельзя использовать вместе с `START_ISSUE_PROMPT`, когда prompt не задан через CLI. |
 | `START_ISSUE_WORKTREE_DIR` | Родительская директория по умолчанию для создаваемых worktree, если `--worktree-dir` не передан. Встроенное значение по умолчанию: `~/worktrees`. |
+| `START_ISSUE_HUMAN_GATE_PERMISSIONS` | Capability contract human-gate при отсутствии CLI option: `restricted` или `full-delivery`. Built-in default: `restricted`. |
 | `START_ISSUE_DUMP_PROMPT` | Если задана в `1`, dry-run выводит полный rendered prompt вместо краткой информации. |
 
 ## Файлы конфигурации

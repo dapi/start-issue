@@ -72,6 +72,7 @@ Agent-specific behavior должен быть централизован за е
 | `--prompt-file` | Файл prompt template | См. приоритет prompt |
 | `--improve-prompt` | Сгенерировать reviewable proposal улучшенного prompt template и выйти до создания worktree | false |
 | `--human-gate` | Codex-only batch mode для issue workflow с resume на `STATUS: HUMAN_GATE` | false |
+| `--human-gate-permissions <restricted\|full-delivery>` | Capability contract для human-gate; CLI имеет приоритет над `START_ISSUE_HUMAN_GATE_PERMISSIONS` | `restricted` |
 | `--human-gate-help` | Показать отдельную справку по human-gate mode | false |
 | `--prompt-output-file` | Путь proposal-файла для `--improve-prompt` | Для `.md`: рядом с source как `*.improved.md`; для остальных файлов: `<source>.improved`; иначе `.start-issue/prompt.improved.md` |
 | `--no-init` | Пропустить запуск `init.sh` | false |
@@ -202,11 +203,14 @@ git rev-parse --show-toplevel
 
 1. Режим валиден только для `agent=codex`; для остальных agent он завершается явной ошибкой.
 2. До agent launch workflow остается обычным: parse input, resolve config, fetch issue, plan branch, create/reuse worktree, run optional `init.sh`, render prompt.
-3. Вместо интерактивного Codex launch выполняется:
+3. Permission mode разрешается в порядке CLI
+   `--human-gate-permissions`, `START_ISSUE_HUMAN_GATE_PERMISSIONS`, built-in
+   `restricted`. Другие значения отклоняются до issue fetch и worktree mutation.
+4. В restricted mode вместо интерактивного Codex launch выполняется:
 
 ```bash
-codex exec \
-  [--model "$MODEL"] \
+codex [--model "$MODEL"] \
+  exec \
   --cd "$WORKTREE_PATH" \
   --sandbox workspace-write \
   --json \
@@ -214,21 +218,36 @@ codex exec \
   -
 ```
 
-4. Rendered prompt передается в `codex exec` через stdin.
-5. Из JSONL event stream извлекается `thread_id` из события `thread.started`.
-6. Saved `last-message.txt` является единственным источником final status.
-7. Поддерживаются только два terminal status:
+5. В explicit full-delivery mode выполняется:
+
+```bash
+codex [--model "$MODEL"] \
+  --dangerously-bypass-approvals-and-sandbox \
+  exec \
+  --cd "$WORKTREE_PATH" \
+  --json \
+  --output-last-message "$STATE_DIR/last-message.txt" \
+  -
+```
+
+6. Full delivery требует authenticated `gh`, корректный remote и repository
+   write permission. Это unsandboxed execution, но оно не авторизует destructive,
+   production/security или product decisions: они остаются `HUMAN_GATE`.
+7. Rendered prompt передается в `codex exec` через stdin.
+8. Из JSONL event stream извлекается `thread_id` из события `thread.started`.
+9. Saved `last-message.txt` является единственным источником final status.
+10. Поддерживаются только два terminal status:
    - `STATUS: DONE`
    - `STATUS: HUMAN_GATE`
-8. На `STATUS: DONE` команда завершается с кодом `0`, не открывая Codex TUI.
-9. На `STATUS: HUMAN_GATE` выполняется:
+11. На `STATUS: DONE` команда завершается с кодом `0`, не открывая Codex TUI.
+12. На `STATUS: HUMAN_GATE` выполняется:
 
 ```bash
 codex resume --include-non-interactive "$thread_id"
 ```
 
-10. `codex resume --last` не используется как primary mechanism.
-11. `codex exec --ephemeral` не используется, потому что session должна быть resumable.
+13. `codex resume --last` не используется как primary mechanism.
+14. `codex exec --ephemeral` не используется, потому что session должна быть resumable.
 
 Dedicated help доступен через:
 
