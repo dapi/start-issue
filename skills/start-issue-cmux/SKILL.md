@@ -36,6 +36,62 @@ direnv exec . start-issue <issue> --agent codex
 
 If `.envrc` is absent, it runs `start-issue` directly. Pass `--focus` only when the user explicitly wants cmux to switch focus.
 
+## Example user requests
+
+These are representative prompts that should trigger this skill. The clearest form names the issue, asks for cmux/start-issue, and names the agent when relevant.
+
+### Start an issue
+
+```text
+Запусти GitHub issue #5001 в отдельной вкладке cmux через start-issue, агент Codex.
+```
+
+```text
+Открой issue https://github.com/BrandyMint/merchantly/issues/5001
+в отдельном cmux workspace и начни реализацию через start-issue.
+```
+
+```text
+Из репозитория /Users/danil/code/brandymint/merchantly
+запусти issue #5001 в отдельной cmux-вкладке через start-issue.
+```
+
+```text
+Используй $start-issue-cmux и запусти issue #5001 в репозитории merchantly через Codex.
+```
+
+### Resume and monitor
+
+```text
+Возобнови работу над issue #5001 в существующем cmux workspace.
+Не создавай новый worktree и второго агента.
+```
+
+```text
+Проверь статус агента, который работает над issue #5001 через start-issue.
+```
+
+```text
+Прочитай последние 100 строк из вкладки cmux для merchantly #5001
+и скажи, ждёт ли агент человека.
+```
+
+### Add helper surfaces
+
+```text
+Для issue #5001 добавь справа в том же cmux workspace отдельную панель для логов.
+```
+
+```text
+Запусти issue #5001 в cmux и добавь browser surface для проверки localhost.
+```
+
+```text
+Покажи implementation plan issue #5001 в Markdown-панели рядом с терминалом агента.
+```
+
+Plain requests such as `почини issue #5001` do not necessarily request cmux integration. In that case, use the normal `start-issue` workflow unless the user explicitly names cmux or invokes `$start-issue-cmux`.
+
 ## Workflow
 
 1. Resolve the target repository and issue. Prefer the full GitHub issue URL when available.
