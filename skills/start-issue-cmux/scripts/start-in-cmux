@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: start-in-cmux ISSUE [--agent AGENT] [--repo OWNER/REPO] [--cwd DIR] [--name NAME] [--focus]
+
+Create a dedicated cmux workspace and run start-issue inside it.
+EOF
+}
+
+if [[ $# -lt 1 || "$1" == "-h" || "$1" == "--help" ]]; then
+  usage >&2
+  [[ $# -ge 1 ]] && [[ "$1" == "-h" || "$1" == "--help" ]] && exit 0
+  exit 2
+fi
+
+issue="$1"
+shift
+agent="${START_ISSUE_AGENT:-codex}"
+repo=""
+cwd="$(pwd -P)"
+name=""
+focus="false"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --agent)
+      [[ $# -ge 2 ]] || { echo "--agent requires a value" >&2; exit 2; }
+      agent="$2"
+      shift 2
+      ;;
+    --repo)
+      [[ $# -ge 2 ]] || { echo "--repo requires a value" >&2; exit 2; }
+      repo="$2"
+      shift 2
+      ;;
+    --cwd)
+      [[ $# -ge 2 ]] || { echo "--cwd requires a value" >&2; exit 2; }
+      cwd="$2"
+      shift 2
+      ;;
+    --name)
+      [[ $# -ge 2 ]] || { echo "--name requires a value" >&2; exit 2; }
+      name="$2"
+      shift 2
+      ;;
+    --focus)
+      focus="true"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+for required_command in cmux git start-issue; do
+  command -v "$required_command" >/dev/null 2>&1 || {
+    echo "Required command not found: $required_command" >&2
+    exit 1
+  }
+done
+
+[[ -d "$cwd" ]] || { echo "Directory does not exist: $cwd" >&2; exit 1; }
+cwd="$(cd "$cwd" && pwd -P)"
+git -C "$cwd" rev-parse --show-toplevel >/dev/null 2>&1 || {
+  echo "--cwd must point to a Git repository" >&2
+  exit 1
+}
+
+issue_number="${issue##*/}"
+issue_number="${issue_number%/}"
+issue_number="${issue_number#\#}"
+if [[ ! "$issue_number" =~ ^[0-9]+$ ]]; then
+  issue_number="issue"
+fi
+
+if [[ -z "$name" ]]; then
+  repo_name="$(basename "$(git -C "$cwd" rev-parse --show-toplevel)")"
+  name="$repo_name #$issue_number"
+fi
+
+start_command=(start-issue "$issue" --agent "$agent")
+if [[ -n "$repo" ]]; then
+  start_command+=(--repo "$repo")
+fi
+
+if [[ -f "$cwd/.envrc" ]] && command -v direnv >/dev/null 2>&1; then
+  launch_command=(direnv exec . "${start_command[@]}")
+else
+  launch_command=("${start_command[@]}")
+fi
+
+quote_for_shell() {
+  printf '%q ' "$1"
+}
+
+command_text=""
+for argument in "${launch_command[@]}"; do
+  command_text+="$(quote_for_shell "$argument")"
+done
+
+focus_args=(--focus false)
+if [[ "$focus" == "true" ]]; then
+  focus_args=(--focus true)
+fi
+
+printf 'Creating cmux workspace %q in %s\n' "$name" "$cwd"
+cmux new-workspace \
+  --name "$name" \
+  --description "start-issue: $issue" \
+  --cwd "$cwd" \
+  --command "$command_text" \
+  "${focus_args[@]}"
