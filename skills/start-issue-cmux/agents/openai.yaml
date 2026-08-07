@@ -1,0 +1,7 @@
+interface:
+  display_name: "Start Issue in cmux"
+  short_description: "Launch and monitor issue work in cmux"
+  default_prompt: "Use $start-issue-cmux to launch this GitHub issue in a dedicated cmux workspace and monitor its agent lifecycle."
+
+policy:
+  allow_implicit_invocation: true
