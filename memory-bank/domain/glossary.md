@@ -39,7 +39,8 @@ canonical_for:
 | `prompt proposal` | Reviewable improved prompt file written by `--improve-prompt` | Prompt improvement | Active prompt template |
 | `release asset` | Built single-file `start-issue` binary uploaded to GitHub Releases | Install and update | Source modules |
 | `running executable` | The exact `start-issue` path invoked by the user | Self-update | Repository source script |
-| `human-gate run` | Codex batch execution with persisted state and final status parsing | `--human-gate` | Normal interactive Codex launch |
+| `batch run` | Autonomous Codex execution with persisted state and final status parsing | `--batch`; legacy alias `--human-gate` | Normal interactive Codex launch |
+| `human gate` | Terminal batch outcome that resumes the saved Codex thread for a human decision | `STATUS: HUMAN_GATE` | The batch mode itself or a permission mode |
 | `memory-bank` | Governed project documentation and process layer adapted from `dapi/memory-bank` | Agent/project context | Runtime state under `.start-issue` |
 
 ## Naming Rules
@@ -50,8 +51,8 @@ canonical_for:
   config initialization.
 - Use `worktree` for git worktrees only; use `workspace` only in prose when the
   branch/worktree/agent setup is meant together.
-- Use `human-gate` only for the Codex batch/resume workflow currently grounded
-  in `codex exec` and `codex resume`.
+- Use `batch` for the Codex execution mode grounded in `codex exec`; use
+  `human gate` only for the `STATUS: HUMAN_GATE` outcome and saved-thread resume.
 
 ## Ambiguous Terms
 

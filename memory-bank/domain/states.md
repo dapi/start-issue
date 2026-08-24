@@ -24,7 +24,7 @@ canonical_for:
 | `SM-02` | Worktree lifecycle | `worktree.sh` | Plan before side effects |
 | `SM-03` | Configuration setup | `init.sh` / `config.sh` | `setup` and `init` have distinct scopes |
 | `SM-04` | Self-update workflow | `update.sh` | Independent from git repo and issue workflow |
-| `SM-05` | Codex human-gate run | `agent.sh` / `pipeline.sh` | Uses persisted run state |
+| `SM-05` | Codex batch run | Go launcher | Uses persisted run state and may end at a human gate |
 
 ## States
 
@@ -50,7 +50,7 @@ canonical_for:
 | `TR-02` | `config_resolved` | `issue_fetched` | Issue workflow continues | Issue input is present and dependencies are available | Mode is `setup`, `init`, or `update` |
 | `TR-03` | `issue_fetched` | `worktree_planned` | Worktree planner runs | Branch name can be generated | Branch/path state is unreadable |
 | `TR-04` | `worktree_planned` | `worktree_ready` | User or planner selects create/reuse/delete path | Path validation passes | Existing path belongs to another branch |
-| `TR-05` | `worktree_ready` | `agent_launched` | Agent launch | Agent is supported and not `none` | `--human-gate` with non-Codex |
+| `TR-05` | `worktree_ready` | `agent_launched` | Agent launch | Agent is supported and not `none` | `--batch` with non-Codex |
 | `TR-06` | `worktree_ready` | `manual_next_steps` | No-agent mode | Agent is `none` | none |
 | `TR-07` | `config_resolved` | `update_noop` / `update_installed` | Update mode | Release metadata and running executable version known | Checksum/download/install fails |
 | `TR-08` | `worktree_ready` | `human_gate_done` / `human_gate_resume` | Codex batch final status parsed | Agent is Codex and thread id/status are valid | Missing or unknown final status |
@@ -60,7 +60,7 @@ canonical_for:
 - `SI-01` Side effects that assume a valid worktree cannot run before
   `worktree_ready`.
 - `SI-02` Update states do not require git repository context.
-- `SI-03` Human-gate terminal verdict comes only from saved `last-message.txt`.
+- `SI-03` Batch terminal verdict comes only from saved `last-message.txt`.
 
 ## Implementation Notes
 

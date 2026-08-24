@@ -57,11 +57,12 @@ func versionFromBuildInfo(info *debug.BuildInfo, fallback ...string) string {
 }
 
 type options struct {
-	repo, base, worktreeDir, agent, model, promptFile, prompt, command       string
-	promptOutput, worktreeDirSource                                          string
-	issue                                                                    string
-	dryRun, noInit, flat, ai, improvePrompt, humanGate, project, user, force bool
-	mode                                                                     string
+	repo, base, worktreeDir, agent, model, promptFile, prompt, command   string
+	promptOutput, worktreeDirSource                                      string
+	batchPermissions, batchPermissionsSource                             string
+	issue                                                                string
+	dryRun, noInit, flat, ai, improvePrompt, batch, project, user, force bool
+	mode                                                                 string
 }
 
 type issue struct {
@@ -138,9 +139,17 @@ func main() {
 }
 
 func parse(args []string) (options, error) {
-	o := options{worktreeDir: os.Getenv("START_ISSUE_WORKTREE_DIR")}
+	o := options{
+		worktreeDir:            os.Getenv("START_ISSUE_WORKTREE_DIR"),
+		batchPermissions:       "restricted",
+		batchPermissionsSource: "built-in default",
+	}
 	if o.worktreeDir != "" {
 		o.worktreeDirSource = "START_ISSUE_WORKTREE_DIR"
+	}
+	if permissions := os.Getenv("START_ISSUE_BATCH_PERMISSIONS"); permissions != "" {
+		o.batchPermissions = permissions
+		o.batchPermissionsSource = "START_ISSUE_BATCH_PERMISSIONS"
 	}
 	var err error
 	for len(args) > 0 {
@@ -197,8 +206,13 @@ func parse(args []string) (options, error) {
 			o.improvePrompt = true
 		case "--prompt-output-file":
 			o.promptOutput, err = value()
-		case "--human-gate":
-			o.humanGate = true
+		case "--batch", "--human-gate":
+			o.batch = true
+		case "--batch-permissions":
+			o.batchPermissions, err = value()
+			if err == nil {
+				o.batchPermissionsSource = "CLI"
+			}
 		case "--project":
 			o.project = true
 		case "--user":
@@ -211,8 +225,8 @@ func parse(args []string) (options, error) {
 				return o, fmt.Errorf("Use only one command mode; got %s and %s.", o.mode, mode)
 			}
 			o.mode = mode
-		case "--human-gate-help":
-			humanGateHelp()
+		case "--batch-help", "--human-gate-help":
+			batchHelp()
 			os.Exit(0)
 		default:
 			if strings.HasPrefix(a, "-") {
@@ -239,6 +253,12 @@ func parse(args []string) (options, error) {
 	if o.mode != "" && o.issue != "" {
 		return o, fmt.Errorf("Use either %s or <issue-url-or-number>, not both.", o.mode)
 	}
+	if o.batchPermissionsSource == "CLI" && !o.batch {
+		return o, errors.New("--batch-permissions requires --batch.")
+	}
+	if !validBatchPermissions(o.batchPermissions) {
+		return o, fmt.Errorf("Invalid batch permissions %q. Use restricted or full-delivery.", o.batchPermissions)
+	}
 	if o.worktreeDir == "" && o.mode == "" {
 		home, err := userHomeDir()
 		if err != nil {
@@ -248,6 +268,10 @@ func parse(args []string) (options, error) {
 		o.worktreeDirSource = "built-in default"
 	}
 	return o, nil
+}
+
+func validBatchPermissions(value string) bool {
+	return value == "restricted" || value == "full-delivery"
 }
 
 func userHomeDir() (string, error) {
@@ -282,8 +306,8 @@ func runWithReader(o options, reader *bufio.Reader) error {
 	if err != nil {
 		return err
 	}
-	if o.humanGate && agent != "codex" {
-		return fmt.Errorf("--human-gate requires agent 'codex'. Current agent: %s.", agent)
+	if o.batch && agent != "codex" {
+		return fmt.Errorf("--batch requires agent 'codex'. Current agent: %s.", agent)
 	}
 	if o.improvePrompt && agent == "none" {
 		return errors.New("--improve-prompt requires an agent. Use --agent claude, codex, kimi, or pi.")
@@ -424,8 +448,8 @@ func runWithReader(o options, reader *bufio.Reader) error {
 	rendered := renderIssuePrompt(prompt, issueURL, number, in, labels, repo, branch, worktree, o.base)
 	if o.dryRun {
 		fmt.Printf("   [DRY-RUN] Would run: git worktree add -b %s %s %s\n", branch, worktree, o.base)
-		if o.humanGate {
-			return humanGate(model, worktree, rendered, true)
+		if o.batch {
+			return runBatch(model, worktree, rendered, o.batchPermissions, o.batchPermissionsSource, true)
 		}
 		return launchSelected(options{dryRun: true}, agent, model, worktree, rendered)
 	}
@@ -1742,8 +1766,8 @@ func canonicalPath(path string) string {
 }
 func launchSelected(o options, agent, model, worktree, prompt string) error {
 	if o.dryRun {
-		if o.humanGate {
-			return humanGate(model, worktree, prompt, true)
+		if o.batch {
+			return runBatch(model, worktree, prompt, o.batchPermissions, o.batchPermissionsSource, true)
 		}
 		if agent == "none" {
 			printManualNextSteps(model, worktree)
@@ -1752,11 +1776,11 @@ func launchSelected(o options, agent, model, worktree, prompt string) error {
 		printLaunch(agent, model, worktree, prompt)
 		return nil
 	}
-	if o.humanGate {
+	if o.batch {
 		if !o.dryRun {
 			printAgentHandoff(agent, worktree)
 		}
-		return humanGate(model, worktree, prompt, false)
+		return runBatch(model, worktree, prompt, o.batchPermissions, o.batchPermissionsSource, false)
 	}
 	if !o.dryRun && agent != "none" {
 		printAgentHandoff(agent, worktree)
@@ -1824,16 +1848,21 @@ func normalizePromptProposal(result string) string {
 	}
 	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
-func humanGate(model, worktree, prompt string, dryRun bool) error {
+func runBatch(model, worktree, prompt, permissions, permissionsSource string, dryRun bool) error {
 	runID := os.Getenv("START_ISSUE_RUN_ID")
 	if runID == "" {
 		runID = time.Now().Format("20060102-150405")
 	}
 	dir := filepath.Join(worktree, ".start-issue", "runs", runID)
 	events, last := filepath.Join(dir, "events.jsonl"), filepath.Join(dir, "last-message.txt")
-	args := []string{"exec", "--cd", worktree, "--sandbox", "workspace-write", "--json", "--output-last-message", last, "-"}
-	if model != "" {
-		args = append([]string{"exec", "--model", model}, args[1:]...)
+	args := batchArgs(model, worktree, last, permissions)
+	fmt.Printf("   State dir: %s\n", dir)
+	fmt.Printf("   Batch permissions: %s (%s)\n", permissions, permissionsSource)
+	if permissions == "full-delivery" {
+		fmt.Println("   WARNING: Codex will run without approvals or sandboxing for GitHub and Git delivery.")
+		fmt.Println("   Requires authenticated GitHub access and repository write permission; destructive or production actions still require HUMAN_GATE.")
+	} else {
+		fmt.Println("   Restricted mode: working-tree edits only; network, Git metadata writes, push, and PR delivery are not guaranteed.")
 	}
 	if dryRun {
 		threadID := filepath.Join(dir, "thread-id")
@@ -1888,6 +1917,21 @@ func humanGate(model, worktree, prompt string, dryRun bool) error {
 	return fmt.Errorf("No recognized final status found. Inspect: %s", last)
 }
 
+func batchArgs(model, worktree, lastMessage, permissions string) []string {
+	args := []string{}
+	if model != "" {
+		args = append(args, "--model", model)
+	}
+	if permissions == "full-delivery" {
+		args = append(args, "--dangerously-bypass-approvals-and-sandbox")
+	}
+	args = append(args, "exec", "--cd", worktree)
+	if permissions == "restricted" {
+		args = append(args, "--sandbox", "workspace-write")
+	}
+	return append(args, "--json", "--output-last-message", lastMessage, "-")
+}
+
 func captureThreadID(events string) (string, error) {
 	eventsBody, err := os.ReadFile(events)
 	if err != nil {
@@ -1902,7 +1946,7 @@ func captureThreadID(events string) (string, error) {
 			return event.ThreadID, nil
 		}
 	}
-	return "", fmt.Errorf("Codex human-gate run did not capture thread_id. Inspect: %s", events)
+	return "", fmt.Errorf("Codex batch run did not capture thread_id. Inspect: %s", events)
 }
 
 func finalStatus(body string) string {
@@ -2158,8 +2202,13 @@ Options:
   --prompt-file <path>       Prompt template file for the launched agent
   --improve-prompt           Ask the selected agent to improve the selected
                              prompt template and write a reviewable proposal
-  --human-gate               Codex-only batch mode that resumes on HUMAN_GATE
-  --human-gate-help          Show detailed help for the human-gate mode
+  --batch                    Run Codex autonomously until DONE or HUMAN_GATE
+  --human-gate               Compatibility alias for --batch
+  --batch-permissions <restricted|full-delivery>
+                             Requires --batch; capability contract for the run
+                             Default: START_ISSUE_BATCH_PERMISSIONS or restricted
+  --batch-help               Show detailed help for Codex batch mode
+  --human-gate-help          Compatibility alias for --batch-help
   --prompt-output-file <path>
                              Output path for --improve-prompt proposal
   --no-init                  Skip init.sh execution
@@ -2215,6 +2264,7 @@ Environment variables:
   START_ISSUE_PROMPT
   START_ISSUE_PROMPT_FILE
   START_ISSUE_WORKTREE_DIR
+  START_ISSUE_BATCH_PERMISSIONS
   START_ISSUE_DUMP_PROMPT
 
 Examples:
@@ -2223,7 +2273,8 @@ Examples:
   start-issue 123 --repo owner/repo --base develop
   start-issue 123 --agent codex
   start-issue 123 --agent codex --model gpt-5.2
-  start-issue 123 --agent codex --human-gate
+  start-issue 123 --batch
+  start-issue 123 --batch --batch-permissions full-delivery
   start-issue 123 --agent claude --model sonnet
   start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
   start-issue 123 --no-agent              # Only create worktree
@@ -2240,7 +2291,7 @@ Examples:
   start-issue --update
   start-issue install
   start-issue --install
-  start-issue --human-gate-help
+  start-issue --batch-help
 `, runningVersion())
 }
 
@@ -2248,18 +2299,53 @@ func printBanner() {
 	fmt.Printf("start-issue v%s\n\n", runningVersion())
 }
 
-func humanGateHelp() {
+func batchHelp() {
 	printBanner()
-	fmt.Println(`Codex human-gate mode
+	fmt.Println(`Codex batch mode
+
+What it is:
+  --batch runs Codex autonomously through codex exec instead of opening the
+  interactive UI immediately. Codex works until its final message reports
+  STATUS: DONE or STATUS: HUMAN_GATE. HUMAN_GATE resumes the exact saved
+  thread so the operator can make the required decision.
+
+  Batch mode requires the resolved agent to be codex. The examples below
+  assume codex is already selected in project or user configuration.
 
 Usage:
-  start-issue <issue-url-or-number> --agent codex --human-gate
-  start-issue --human-gate-help
+  start-issue <issue-url-or-number> --batch
+  start-issue <issue-url-or-number> --batch \
+    --batch-permissions full-delivery
+  start-issue --batch-help
+
+Compatibility aliases:
+  --human-gate       Same behavior as --batch.
+  --human-gate-help  Same behavior as --batch-help.
+
+Permission modes:
+  restricted (default)
+    Uses Codex workspace-write sandboxing. Working-tree edits are supported,
+    but network access, Git metadata writes, push, and PR delivery are not
+    guaranteed. Select with START_ISSUE_BATCH_PERMISSIONS=restricted or
+    --batch-permissions restricted.
+
+  full-delivery (explicit opt-in)
+    Runs Codex with --dangerously-bypass-approvals-and-sandbox so a normal
+    issue workflow can read GitHub context, edit, test, commit, push, and
+    create or update a PR. This is unsandboxed execution. It requires an
+    authenticated gh session and repository write permission. It does not
+    authorize destructive, production, security, or product decisions; those
+    still require STATUS: HUMAN_GATE.
+
+Precedence:
+  --batch-permissions, START_ISSUE_BATCH_PERMISSIONS, restricted.
+  --batch-permissions requires --batch or its --human-gate alias.
 
 Flow:
   The normal issue workflow creates or reuses the worktree, renders the
-  prompt, and runs Codex in batch mode. The final message must contain one
-  terminal status line: STATUS: DONE or STATUS: HUMAN_GATE.
+  prompt, and runs Codex in batch mode. start-issue saves the event stream,
+  last message, and thread id. The final message must contain one terminal
+  status line: STATUS: DONE or STATUS: HUMAN_GATE.
 
 Exit codes:
   0  Codex returned STATUS: DONE.
@@ -2280,6 +2366,10 @@ Final status examples:
 Troubleshooting:
   Inspect events.jsonl and last-message.txt when batch parsing fails.
   The explicit thread id is saved before status handling when available.
+  If restricted mode cannot read GitHub or write Git metadata, either finish
+  delivery manually or explicitly select full-delivery after reviewing its risk.
+  If full delivery cannot push or create a PR, verify gh auth status, the
+  selected GitHub account, remote URL, and repository permissions.
   If automatic resume fails, run:
     codex resume --include-non-interactive <thread_id>`)
 }

@@ -32,7 +32,7 @@ behavior behind implicit magic.
 | --- | --- | --- | --- | --- |
 | `BET-01` | Agent-neutral start workflow | Developers switch between Claude, Codex, Kimi, Pi, and manual mode | Current adapter support in README/spec | Revisit when adding an agent |
 | `BET-02` | Reviewable prompt/config evolution | Prompt templates materially affect agent output | `--improve-prompt`, setup/init flows | Revisit when prompt placeholders change |
-| `BET-03` | Resumable batch work for Codex | Some issue work can run unattended until a real human gate | `--human-gate` feature | Revisit when other agents expose equivalent resume contracts |
+| `BET-03` | Resumable batch work for Codex | Some issue work can run unattended until a real human gate | `--batch` feature | Revisit when other agents expose equivalent resume contracts |
 
 ## Experience Principles
 

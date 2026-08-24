@@ -39,9 +39,9 @@ audience: humans_and_agents
 - [FT-016: Real Codex human-gate E2E suite](FT-016/README.md)
   Opt-in local smoke suite that validates the real Codex human-gate path.
 
-- [FT-017: Codex human-gate delivery permissions](FT-017/README.md)
+- [FT-017: Codex batch delivery permissions](FT-017/README.md)
   Explicit restricted/default and opt-in full-delivery capability contract for
-  Codex human-gate runs.
+  Codex batch runs.
 
 - [FT-018: Agent CLI launch compatibility](FT-018/README.md)
   Issue #34 follow-up package for current Kimi Code CLI command and cwd compatibility.

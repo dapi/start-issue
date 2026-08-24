@@ -30,7 +30,7 @@ canonical_for:
 | `AgentAdapter` | policy/boundary | Agent-specific validation and command construction | Uses `Configuration`, `RenderedPrompt`, worktree path | Owns Codex/Claude/Kimi/Pi differences |
 | `ReleaseMetadata` | value object | Latest release tag and asset URLs | Used by self-update | Comes from GitHub Releases |
 | `InstalledExecutable` | entity | Running binary path and current version | Updated in place by self-update | Not necessarily repo checkout |
-| `HumanGateRun` | entity | Codex batch state directory, events, last message, thread id | Belongs to one worktree run | Final status comes from `last-message.txt` |
+| `BatchRun` | entity | Codex batch state directory, events, last message, thread id | Belongs to one worktree run | Final status comes from `last-message.txt`; `HUMAN_GATE` is one outcome |
 | `FeaturePackage` | documentation aggregate | Governed docs for one delivery unit | Uses memory-bank flows and stable IDs | Existing packages may use legacy layout |
 
 ## Relationship Map

@@ -2,7 +2,7 @@
 title: "FT-017: Design"
 doc_kind: feature
 doc_function: canonical
-purpose: "Solution-space document for explicit restricted and full-delivery Codex human-gate permission modes."
+purpose: "Solution-space document for explicit restricted and full-delivery Codex batch permission modes."
 derived_from:
   - brief.md
   - ../FT-015/solution.md
@@ -31,10 +31,12 @@ capability boundary around that lifecycle. The solution must keep restricted
 behavior safe by default while giving an operator one deliberate, visible way
 to authorize end-to-end Git delivery.
 
-The local reference CLI is Codex `0.145.0`. Its approval and sandbox flags are
-global options, while JSONL and last-message outputs are `exec` options. The
-design therefore needs a stable semantic contract owned by `start-issue`, not
-an unchecked string of arbitrary Codex arguments.
+Issue #37 reproduces the obsolete `--ask-for-approval` placement with Codex
+`0.144.6`. The current upstream Codex `exec` source exposes
+`--dangerously-bypass-approvals-and-sandbox` as a global option and keeps the
+JSONL/last-message contract on `exec`. The design therefore owns a semantic
+contract rather than passing arbitrary Codex arguments; the exact approved
+release remains a live-verification concern.
 
 ## C4 Applicability
 
@@ -63,13 +65,12 @@ enforces credentials and repository authorization independently.
 
 ## Selected Solution
 
-- `SOL-01` Add one semantic configuration axis named human-gate permissions
+- `SOL-01` Add one semantic configuration axis named batch permissions
   with exactly two values: `restricted` and `full-delivery`. Resolve it as CLI
   option → environment variable → built-in `restricted`.
-- `SOL-02` Map `restricted` to Codex global options
-  `--ask-for-approval never --sandbox workspace-write` and map explicit
-  `full-delivery` to
-  `--ask-for-approval never --sandbox danger-full-access`.
+- `SOL-02` Keep `restricted` on the existing `--sandbox workspace-write`
+  command and map explicit `full-delivery` to the global
+  `--dangerously-bypass-approvals-and-sandbox` option.
 - `SOL-03` Build the command in supported grammar order: `codex`, global model
   and permission options, `exec`, then worktree and batch-output options.
 - `SOL-04` Print the resolved semantic mode and a concise capability statement
@@ -81,6 +82,9 @@ enforces credentials and repository authorization independently.
 - `SOL-06` Extend the opt-in real-Codex E2E runner with a separately authorized
   full-delivery scenario that uses isolated fixture resources and retains
   delivery evidence.
+- `SOL-07` Expose the existing workflow primarily as `--batch` and
+  `--batch-help`; keep the released `--human-gate` and `--human-gate-help`
+  spellings as compatibility aliases for the same internal mode.
 
 ## Alternatives Considered
 
@@ -96,16 +100,16 @@ enforces credentials and repository authorization independently.
 | Trade-off ID | Decision | Benefit | Cost / Risk |
 | --- | --- | --- | --- |
 | `TRD-01` | Expose two semantic modes instead of raw Codex controls | Small, testable public contract with stable operator meaning | Advanced Codex policies are not expressible through this feature. |
-| `TRD-02` | Use `danger-full-access` for explicit full delivery | Provides network and Git metadata writes required by the delivery contract | Batch commands are unsandboxed and must be treated as high risk. |
-| `TRD-03` | Keep `never` approval for batch execution | Preserves unattended human-gate semantics | Capability errors cannot escalate mid-run and must be diagnosed clearly. |
+| `TRD-02` | Use the explicit Codex bypass option for full delivery | Covers the approvals and sandbox boundaries implicated by issue #37 | Batch commands are unsandboxed and must be treated as high risk. |
+| `TRD-03` | Use the explicit bypass mode for unattended batch execution | Preserves unattended human-gate semantics for the selected full-delivery mode | Capability errors cannot escalate mid-run and must be diagnosed clearly. |
 
 ## Accepted Local Decisions
 
 - `SD-01` Name the public values by user outcome (`restricted`,
   `full-delivery`) rather than Codex implementation names so help and future
   adapters can describe capability without leaking every low-level flag.
-- `SD-02` Use `--human-gate-permissions VALUE` and
-  `START_ISSUE_HUMAN_GATE_PERMISSIONS` as the two explicit inputs. Project/user
+- `SD-02` Use `--batch-permissions VALUE` and
+  `START_ISSUE_BATCH_PERMISSIONS` as the two explicit inputs. Project/user
   persistence is deferred; the dangerous mode must not become an unnoticed
   repository default in this feature.
 - `SD-03` A full-delivery selection is itself explicit authorization to launch
@@ -113,16 +117,20 @@ enforces credentials and repository authorization independently.
   production actions excluded by `NS-03`.
 - `SD-04` Live full-delivery verification remains a manual approval gate and is
   never folded into `make test` or CI.
+- `SD-05` Name the execution mode after what the user starts (`batch`), while
+  keeping `HUMAN_GATE` as one terminal outcome of that mode rather than the
+  mode's primary public name.
 
 ## Contracts
 
 | Contract ID | Input / Output | Producer / Consumer | Semantics / Constraints |
 | --- | --- | --- | --- |
-| `CTR-01` | `--human-gate-permissions restricted\|full-delivery` | CLI parser / config resolver | CLI value wins over environment; invalid or empty explicit values fail before issue fetch. |
-| `CTR-02` | `START_ISSUE_HUMAN_GATE_PERMISSIONS` | shell environment / config resolver | Used only when CLI input is absent; unset resolves to `restricted`. |
-| `CTR-03` | Restricted Codex command | launcher / Codex | `codex [--model MODEL] --ask-for-approval never --sandbox workspace-write exec --cd WORKTREE --json --output-last-message PATH -`. |
-| `CTR-04` | Full-delivery Codex command | launcher / Codex | Same shape as `CTR-03`, with `--sandbox danger-full-access`; selected only by explicit `full-delivery`. |
+| `CTR-01` | `--batch-permissions restricted\|full-delivery` | CLI parser / config resolver | CLI value wins over environment; it requires batch mode through `--batch` or its legacy alias; invalid or empty explicit values fail before issue fetch. |
+| `CTR-02` | `START_ISSUE_BATCH_PERMISSIONS` | shell environment / config resolver | Used only when CLI input is absent; unset resolves to `restricted`. |
+| `CTR-03` | Restricted Codex command | launcher / Codex | `codex [--model MODEL] exec --cd WORKTREE --sandbox workspace-write --json --output-last-message PATH -`. |
+| `CTR-04` | Full-delivery Codex command | launcher / Codex | `codex [--model MODEL] --dangerously-bypass-approvals-and-sandbox exec --cd WORKTREE --json --output-last-message PATH -`; selected only by explicit `full-delivery`. |
 | `CTR-05` | Permission status output | launcher / operator | Reports semantic mode and capability boundary before execution and in dry-run; full delivery includes an unsandboxed-execution warning. |
+| `CTR-06` | `--batch`, `--batch-help`; legacy `--human-gate`, `--human-gate-help` | CLI parser / operator | Batch names are primary in help/docs; each legacy form maps to exactly the same runtime or help behavior without a second implementation path. |
 
 ## Invariants
 
@@ -133,6 +141,8 @@ enforces credentials and repository authorization independently.
 - `INV-04` Batch commands remain arrays and are never evaluated through `eval`.
 - `INV-05` FT-015's exact thread-id resume and state-artifact paths remain
   stable across permission modes.
+- `INV-06` Primary and legacy batch entrypoints resolve to one internal boolean
+  mode and cannot diverge in command, state, resume, or exit semantics.
 
 ## Failure Modes
 
@@ -147,6 +157,8 @@ enforces credentials and repository authorization independently.
 - `FM-04` A full-delivery prompt proposes destructive or production work:
   prompt policy still requires `STATUS: HUMAN_GATE`; permission mode does not
   broaden product authorization.
+- `FM-05` A legacy alias diverges from `--batch`: shared parser-state tests fail
+  and the release is blocked until both entrypoints use the same internal path.
 
 ## Rollout / Backout
 
@@ -174,3 +186,4 @@ contract changes.
 | `REQ-06` | `SOL-04`, `TRD-02`, `SD-03` | `CTR-05`, `INV-03` | `FM-02`, `FM-04`, `RB-02` |
 | `REQ-07` | `SOL-01` - `SOL-05` | `CTR-01` - `CTR-05`, `INV-01` - `INV-05` | `FM-01` - `FM-04`, `RB-01`, `RB-02` |
 | `REQ-08` | `SOL-06`, `SD-04` | `INV-03`, `INV-05` | `FM-02`, `RB-03` |
+| `REQ-09` | `SOL-07`, `SD-05` | `CTR-06`, `INV-06` | `FM-05`, `RB-01` |

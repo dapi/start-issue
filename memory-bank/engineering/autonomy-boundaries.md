@@ -46,7 +46,7 @@ Stop and ask before:
 - deleting user worktrees or local branches outside an explicit tested workflow;
 - changing release tags, publishing releases, or pushing to `master`;
 - adding a new runtime language/core rewrite;
-- generalizing Codex human-gate behavior to other agents without evidence;
+- generalizing Codex batch behavior to other agents without evidence;
 - changing security/sandbox approval defaults for agent launch;
 - resolving contradictory product requirements by guessing.
 

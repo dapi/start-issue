@@ -1,8 +1,8 @@
 ---
-title: "FT-017: Codex human-gate delivery permissions"
+title: "FT-017: Codex batch delivery permissions"
 doc_kind: feature
 doc_function: canonical
-purpose: "Canonical brief for making Codex human-gate capabilities explicit and supporting opt-in end-to-end Git delivery."
+purpose: "Canonical brief for making Codex batch capabilities explicit and supporting opt-in end-to-end Git delivery."
 derived_from:
   - ../../flows/feature-flow.md
   - ../../product/context.md
@@ -10,14 +10,14 @@ derived_from:
   - ../FT-015/feature.md
   - https://github.com/dapi/start-issue/issues/37
 status: active
-delivery_status: planned
+delivery_status: in_progress
 audience: humans_and_agents
 must_not_define:
   - implementation_sequence
   - solution_space
 ---
 
-# FT-017: Codex human-gate delivery permissions
+# FT-017: Codex batch delivery permissions
 
 ## What
 
@@ -41,19 +41,19 @@ supported Codex CLI while closing the remaining capability-contract gap.
 
 | Metric ID | Metric | Baseline | Target | Measurement method |
 | --- | --- | --- | --- | --- |
-| `MET-01` | Human-gate capability contract visibility | One implicit `workspace-write` command | Every run reports either restricted or full-delivery permissions | Dry-run/help assertions |
+| `MET-01` | Batch capability contract visibility | One implicit `workspace-write` command | Every run reports either restricted or full-delivery permissions | Dry-run/help assertions |
 | `MET-02` | Full Git delivery reachability | GitHub/network/Git writes are not guaranteed | An explicitly authorized mode can edit, test, commit, push, and create/update a PR | Deterministic command tests plus opt-in live E2E evidence |
-| `MET-03` | Supported Codex command compatibility | Compatibility can drift with CLI option placement | Generated commands are accepted by the supported Codex CLI contract | Bats command-shape coverage and real-Codex smoke validation |
+| `MET-03` | Supported Codex command compatibility | Compatibility can drift with CLI option placement | Generated commands are accepted by the supported Codex CLI contract | Go command-shape tests and real-Codex smoke validation |
 
 ### Scope
 
-- `REQ-01` Preserve a restricted human-gate mode for working-tree-only
+- `REQ-01` Preserve a restricted batch mode for working-tree-only
   automation and make that restricted completion boundary explicit in output
   and help.
 - `REQ-02` Add an explicit opt-in full-delivery mode whose declared contract
   includes GitHub reads, network operations, Git metadata writes, push, and
   pull-request creation/update.
-- `REQ-03` Resolve the human-gate permission mode from a documented CLI option,
+- `REQ-03` Resolve the batch permission mode from a documented CLI option,
   environment variable, and safe built-in default, and show the winning value
   in dry-run output.
 - `REQ-04` Generate a Codex command compatible with the supported CLI syntax,
@@ -64,16 +64,19 @@ supported Codex CLI while closing the remaining capability-contract gap.
   occurs before the batch run.
 - `REQ-06` Explain authentication, network access, Git write access, the risk of
   full-delivery mode, restricted-mode limitations, and troubleshooting in
-  dedicated human-gate help and project documentation.
+  dedicated batch help and project documentation.
 - `REQ-07` Add deterministic automated coverage for permission precedence,
   validation, command construction, dry-run visibility, default compatibility,
   and existing `DONE`/`HUMAN_GATE` behavior.
 - `REQ-08` Provide an explicit opt-in real-Codex E2E procedure for validating
   full delivery without adding live GitHub writes to `make test` or CI.
+- `REQ-09` Present `--batch` and `--batch-help` as the primary public names
+  while preserving the released `--human-gate` and `--human-gate-help` forms
+  as behaviorally equivalent compatibility aliases.
 
 ### Non-Scope
 
-- `NS-01` Do not generalize human-gate mode to Claude, Kimi, Pi, or `agent=none`.
+- `NS-01` Do not generalize batch mode to Claude, Kimi, Pi, or `agent=none`.
 - `NS-02` Do not provision GitHub credentials, modify Codex user configuration,
   or store secrets in project files.
 - `NS-03` Do not authorize production changes, destructive Git operations, or
@@ -86,8 +89,10 @@ supported Codex CLI while closing the remaining capability-contract gap.
 
 ### Constraints / Assumptions
 
-- `ASM-01` The supported reference environment is Codex CLI `0.145.0`, whose
-  global permission options are accepted before the `exec` subcommand.
+- `ASM-01` Issue #37 reproduces the rejected argument order with Codex CLI
+  `0.144.6`. Local parser validation confirms both selected command forms on
+  Codex CLI `0.145.0`; live full-delivery behavior still requires the explicit
+  `CHK-03` approval gate. The repository does not pin an installed version.
 - `ASM-02` Full delivery requires independently configured GitHub
   authentication and repository authorization; `start-issue` can select a
   launcher policy but cannot grant those external capabilities.
@@ -122,6 +127,8 @@ supported Codex CLI while closing the remaining capability-contract gap.
   security risk, mode selection, and troubleshooting consistently.
 - `EC-06` An explicitly approved live E2E can demonstrate end-to-end Git
   delivery and preserve auditable artifacts without becoming a CI dependency.
+- `EC-07` New users can discover the workflow as batch mode, while existing
+  `--human-gate` invocations continue to work without behavior changes.
 
 ### Traceability matrix
 
@@ -135,13 +142,14 @@ supported Codex CLI while closing the remaining capability-contract gap.
 | `REQ-06` | `ASM-02`, `CON-03` | `EC-05`, `SC-05` | `CHK-02` | `EVID-02` |
 | `REQ-07` | `CON-01` | `EC-01` - `EC-04`, `SC-01` - `SC-04`, `NEG-01` | `CHK-01` | `EVID-01` |
 | `REQ-08` | `CON-04` | `EC-06`, `SC-06` | `CHK-03` | `EVID-03` |
+| `REQ-09` | `PCON-01` | `EC-07`, `SC-07` | `CHK-01`, `CHK-02` | `EVID-01`, `EVID-02` |
 
 ### Acceptance Scenarios
 
 - `SC-01` Given no permission override, when a user inspects or runs
-  human-gate mode, then restricted mode is selected and its working-tree-only
+  batch mode, then restricted mode is selected and its working-tree-only
   completion boundary is visible.
-- `SC-02` Given explicit full-delivery selection, when the human-gate command is
+- `SC-02` Given explicit full-delivery selection, when the batch command is
   built, then the mode is visibly reported and the command permits the declared
   GitHub/network/Git delivery workflow.
 - `SC-03` Given the supported Codex CLI, when either permission mode builds the
@@ -156,6 +164,9 @@ supported Codex CLI while closing the remaining capability-contract gap.
 - `SC-06` Given explicit operator authorization, isolated fixture resources,
   and valid credentials, when the full-delivery E2E runs, then it records
   successful commit/push/PR delivery and retained diagnostic artifacts.
+- `SC-07` Given either primary `--batch` or legacy `--human-gate`, when the
+  same issue workflow runs, then command construction, state, status, resume,
+  and exit behavior are identical; help presents the legacy form as an alias.
 
 ### Negative / Edge Scenarios
 
@@ -168,13 +179,16 @@ supported Codex CLI while closing the remaining capability-contract gap.
 - `NEG-03` Given full-delivery mode without valid GitHub credentials or remote
   authorization, when the live workflow reaches delivery, then it fails with a
   capability diagnostic and does not relabel the failure as a product decision.
+- `NEG-04` Given `--batch-permissions` without either batch entrypoint, when
+  arguments are parsed, then the CLI rejects the option before issue fetch or
+  worktree mutation and names `--batch` as the required primary mode.
 
 ### Checks
 
 | Check ID | Covers | How to check | Expected result | Evidence path |
 | --- | --- | --- | --- | --- |
-| `CHK-01` | `EC-01` - `EC-04`, `SC-01` - `SC-04`, `NEG-01` | `make test` | Syntax, shellcheck, memory-bank audit, and deterministic Bats coverage pass for both modes and FT-015 regressions. | Local terminal/CI test output |
-| `CHK-02` | `EC-01`, `EC-05`, `SC-01`, `SC-05`, `NEG-02` | Review `--help`, `--human-gate-help`, README files, and spec alongside output assertions | All surfaces state the same default, opt-in, capability, risk, and troubleshooting contract. | Review diff and Bats output |
+| `CHK-01` | `EC-01` - `EC-04`, `EC-07`, `SC-01` - `SC-04`, `SC-07`, `NEG-01`, `NEG-04` | `make test` | Go formatting/vet/tests, memory-bank audit, and deterministic batch coverage pass for both permission modes, primary and legacy entrypoints, and FT-015 regressions. | Local terminal/CI test output |
+| `CHK-02` | `EC-01`, `EC-05`, `EC-07`, `SC-01`, `SC-05`, `SC-07`, `NEG-02` | Review `--help`, `--batch-help`, README files, practical guides, and spec alongside Go output assertions | All surfaces present batch as primary, label legacy aliases, and state the same default, opt-in, capability, risk, and troubleshooting contract. | Review diff and Go test output |
 | `CHK-03` | `EC-02`, `EC-03`, `EC-06`, `SC-02`, `SC-03`, `SC-06`, `NEG-03` | With explicit approval, run the real-Codex full-delivery E2E procedure from FT-017's plan | Supported Codex accepts the command and the isolated fixture records commit, push, PR, terminal status, and retained artifacts. | Retained E2E artifact directory and fixture PR URL |
 
 ### Test matrix
@@ -198,5 +212,5 @@ supported Codex CLI while closing the remaining capability-contract gap.
 | Evidence ID | Artifact | Producer | Path contract | Reused by checks |
 | --- | --- | --- | --- | --- |
 | `EVID-01` | Local and CI test output | implementer / CI | Terminal output and GitHub Actions job | `CHK-01` |
-| `EVID-02` | Documentation diff plus help assertions | implementer / reviewer | Changed docs and Bats output | `CHK-02` |
+| `EVID-02` | Documentation diff plus help assertions | implementer / reviewer | Changed docs and Go test output | `CHK-02` |
 | `EVID-03` | Live-E2E log, state files, commit/PR identifiers | approved operator | Retained E2E artifact path printed by runner | `CHK-03` |

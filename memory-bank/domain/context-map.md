@@ -61,4 +61,4 @@ canonical_for:
 - `OQ-01` How future lifecycle commands should be decomposed into focused Go
   helpers without weakening the existing ownership boundaries.
 - `OQ-02` Whether non-Codex agents will expose enough resumable batch semantics
-  to generalize human-gate mode.
+  to generalize batch mode.

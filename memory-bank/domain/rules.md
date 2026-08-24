@@ -26,7 +26,7 @@ canonical_for:
 | `DR-04` | Existing worktree reuse requires exact branch/path validation before side effects | `WorktreePlan` | Avoid corrupting unrelated local work | FT-008 |
 | `DR-05` | `setup` writes only user config, while project config belongs to `init --project` | `setup`, `init` | Keep onboarding safe outside git repos | FT-014 |
 | `DR-06` | `update` uses latest GitHub Release and updates the running executable path | `InstalledExecutable` | Avoid updating the wrong binary | FT-013 |
-| `DR-07` | `--human-gate` is Codex-only until another adapter has an equivalent grounded resume contract | `HumanGateRun` | Avoid false support claims | FT-015 |
+| `DR-07` | `--batch` is Codex-only until another adapter has an equivalent grounded resume contract; `--human-gate` is a compatibility alias | `BatchRun` | Avoid false support claims without breaking released commands | FT-015, FT-017 |
 | `DR-08` | Agent-specific behavior must stay behind the adapter boundary | `AgentAdapter` | Prevent scattered per-agent branching | FT-009 / spec |
 
 ## Policies

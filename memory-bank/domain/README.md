@@ -14,7 +14,7 @@ audience: humans_and_agents
 
 `memory-bank/domain/` defines the stable language and workflow model for
 `start-issue`: issue input, repository context, configuration, prompt templates,
-worktrees, agent adapters, release assets, human-gate runs, and feature
+worktrees, agent adapters, release assets, batch runs, human gates, and feature
 packages.
 
 Domain documents do not own product positioning, shell implementation sequence,
