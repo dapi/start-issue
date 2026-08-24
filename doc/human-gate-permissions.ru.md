@@ -1,14 +1,39 @@
-# Права Codex human-gate
+# Codex human-gate: зачем он нужен и как выбрать права
 
 Эта инструкция объясняет, как выбрать границу возможностей для Codex
 human-gate run. Полный контракт CLI описан в [spec.md](spec.md).
+
+В примерах предполагается, что `codex` уже выбран в project или user config.
+
+## Зачем нужен human-gate
+
+Обычный запуск `start-issue` передаёт управление интерактивной agent session.
+Human-gate вместо этого запускает Codex в batch mode: агент может выполнить
+issue без постоянного присутствия оператора в интерактивном UI, а в конце
+обязан вернуть одно из двух явных состояний:
+
+- `STATUS: DONE` — запрошенная работа завершена;
+- `STATUS: HUMAN_GATE` — требуется реальное решение или недостающее разрешение,
+  поэтому `start-issue` открывает оператору точный сохранённый Codex thread.
+
+Такой режим нужен для полуавтономной работы над issue: реализация и тесты могут
+выполняться без участия человека, но destructive actions, missing credentials
+и product decisions по-прежнему останавливаются на видимом human gate.
+
+Отдельные permission modes нужны потому, что изменение worktree и доставка PR
+пересекают разные границы доверия. Codex в sandbox обычно может изменить и
+проверить код, но может не получить доступ к GitHub, записи Git metadata, push
+или созданию PR. Если сразу дать каждому run полный доступ, техническая проблема
+исчезнет ценой незаметного расширения привилегий. Поэтому `start-issue`
+сохраняет безопасную границу по умолчанию и требует явный opt-in, когда агент
+должен самостоятельно доставить изменение до PR.
 
 ## Выбор режима
 
 Для обычной реализации в worktree используйте `restricted`:
 
 ```bash
-start-issue 123 --agent codex --human-gate
+start-issue 123 --human-gate
 ```
 
 `restricted` — режим по умолчанию. Codex работает в sandbox
@@ -20,7 +45,7 @@ worktree, но network access, запись Git metadata, push и доставк
 или обновлять pull request, явно включите `full-delivery`:
 
 ```bash
-start-issue 123 --agent codex --human-gate \
+start-issue 123 --human-gate \
   --human-gate-permissions full-delivery
 ```
 
@@ -44,7 +69,7 @@ gh repo view --json nameWithOwner,viewerPermission
 создаст worktree и не запустит Codex.
 
 ```bash
-start-issue 123 --agent codex --human-gate \
+start-issue 123 --human-gate \
   --human-gate-permissions full-delivery \
   --dry-run
 ```
@@ -63,7 +88,7 @@ GitHub account имеет write access.
 1. Просмотрите план запуска:
 
    ```bash
-   start-issue 123 --agent codex --human-gate \
+   start-issue 123 --human-gate \
      --human-gate-permissions full-delivery \
      --dry-run
    ```
@@ -71,7 +96,7 @@ GitHub account имеет write access.
 2. После проверки warning об unsandboxed execution запустите реальный run:
 
    ```bash
-   start-issue 123 --agent codex --human-gate \
+   start-issue 123 --human-gate \
      --human-gate-permissions full-delivery
    ```
 
@@ -97,7 +122,7 @@ Environment variable удобно использовать для одной к�
 
 ```bash
 START_ISSUE_HUMAN_GATE_PERMISSIONS=full-delivery \
-  start-issue 123 --agent codex --human-gate
+  start-issue 123 --human-gate
 ```
 
 CLI option имеет приоритет над environment variable. Не стоит добавлять

@@ -1,14 +1,40 @@
-# Codex human-gate permissions
+# Codex human-gate: purpose and permission modes
 
 This guide explains how to choose the capability boundary for a Codex
 human-gate run. For the complete CLI contract, see [spec.md](spec.md).
+
+The examples assume that `codex` is already selected by project or user
+configuration.
+
+## Why use human-gate
+
+A normal `start-issue` run hands control to an interactive agent session.
+Human-gate instead runs Codex in batch mode so it can work through the issue
+without the operator staying in the interactive UI. Codex then ends in one of
+two explicit states:
+
+- `STATUS: DONE` — the requested work is complete;
+- `STATUS: HUMAN_GATE` — a real decision or missing permission requires the
+  operator, so `start-issue` resumes the exact saved Codex thread.
+
+This is useful for semi-autonomous issue work: implementation and tests can run
+unattended, while destructive actions, missing credentials, and product
+decisions still stop at a visible human gate.
+
+Permission modes are needed because editing a worktree and delivering a pull
+request cross different trust boundaries. A sandboxed Codex run can usually
+change and test code, but may be unable to access GitHub, write Git metadata,
+push, or create a PR. Giving every run unrestricted access would solve that
+technical limitation by silently broadening privileges. `start-issue` therefore
+keeps the safe boundary by default and requires a visible opt-in when the agent
+must deliver the change end to end.
 
 ## Choose a mode
 
 Use `restricted` for normal working-tree implementation:
 
 ```bash
-start-issue 123 --agent codex --human-gate
+start-issue 123 --human-gate
 ```
 
 `restricted` is the default. Codex runs with the `workspace-write` sandbox. It
@@ -19,7 +45,7 @@ Use `full-delivery` only when the run must also read GitHub context, commit,
 push, and create or update a pull request:
 
 ```bash
-start-issue 123 --agent codex --human-gate \
+start-issue 123 --human-gate \
   --human-gate-permissions full-delivery
 ```
 
@@ -43,7 +69,7 @@ Run a dry-run to verify the resolved mode and launch command without creating
 a worktree or starting Codex:
 
 ```bash
-start-issue 123 --agent codex --human-gate \
+start-issue 123 --human-gate \
   --human-gate-permissions full-delivery \
   --dry-run
 ```
@@ -62,7 +88,7 @@ account has write access.
 1. Inspect the planned run:
 
    ```bash
-   start-issue 123 --agent codex --human-gate \
+   start-issue 123 --human-gate \
      --human-gate-permissions full-delivery \
      --dry-run
    ```
@@ -70,7 +96,7 @@ account has write access.
 2. Start the real run after reviewing the unsandboxed-execution warning:
 
    ```bash
-   start-issue 123 --agent codex --human-gate \
+   start-issue 123 --human-gate \
      --human-gate-permissions full-delivery
    ```
 
@@ -96,7 +122,7 @@ wrapper:
 
 ```bash
 START_ISSUE_HUMAN_GATE_PERMISSIONS=full-delivery \
-  start-issue 123 --agent codex --human-gate
+  start-issue 123 --human-gate
 ```
 
 The CLI option has higher precedence than the environment variable. Avoid
