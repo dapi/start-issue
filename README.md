@@ -6,6 +6,10 @@
 
 Turn a GitHub issue into a dedicated branch, git worktree, and coding-agent session.
 
+<p align="center">
+  <img src="docs/assets/start-issue-demo.gif" alt="start-issue creates an issue branch and worktree, then hands off to Codex" width="1000">
+</p>
+
 `start-issue` turns issue context into a repeatable workflow:
 
 1. issue -> branch
@@ -70,6 +74,8 @@ start-issue init
 start-issue init --project --agent codex --model gpt-5.2
 start-issue update
 start-issue --update
+start-issue install
+start-issue --install
 start-issue --human-gate-help
 ```
 
@@ -136,10 +142,11 @@ second runtime implementation.
 
 | Argument | Description |
 |----------|-------------|
-| `ISSUE` | GitHub issue number or full GitHub issue URL. Required. |
+| `ISSUE` | GitHub issue number or full GitHub issue URL. Required for the issue-start workflow. |
 | `init` | Create default configuration files for either the current project or the current user. |
 | `setup` | Run first-run onboarding for user config in `~/.config/start-issue`. |
 | `update` | Update the running `start-issue` executable from the latest published GitHub Release. |
+| `install` | Install the latest published release into `~/.local/bin`. |
 | `--repo OWNER/REPO`, `-r OWNER/REPO` | Repository to read the issue from when `ISSUE` is a number. If omitted, `start-issue` detects the repository from `origin`. |
 | `--base BRANCH`, `-b BRANCH` | Base branch for the new worktree branch. If omitted, `start-issue` uses the repository default when available, otherwise the current branch. |
 | `--worktree-dir DIR`, `-w DIR` | Parent directory for created worktrees. Overrides `START_ISSUE_WORKTREE_DIR`. |
@@ -163,6 +170,7 @@ second runtime implementation.
 | `--dry-run` | Print the selected configuration and launch command without creating a worktree, running `init.sh`, or launching an agent. With `init`, print planned config writes without creating files. |
 | `--setup` | Run the same user-config onboarding flow as `start-issue setup`. |
 | `--update` | Update the running `start-issue` executable from the latest published GitHub Release. Equivalent to `start-issue update`. |
+| `--install` | Install the latest published release into `~/.local/bin`. Equivalent to `start-issue install`. |
 | `--version`, `-v` | Show version. |
 | `--help`, `-h` | Show help. |
 
@@ -263,7 +271,7 @@ State files:
 
 ### Local real-Codex E2E smoke test
 
-The normal Bats suite uses a fake Codex CLI. To exercise the real local Codex
+The normal automated test suite uses a fake Codex CLI. To exercise the real local Codex
 CLI, run this opt-in test from a `start-issue` checkout:
 
 ```bash
@@ -313,7 +321,7 @@ Configuration precedence:
 
 1. Agent: CLI `--agent` / `--no-agent`, then project config, user config, `START_ISSUE_AGENT`, then built-in default `claude`
 2. Model: CLI `--model`, then project config, user config, `START_ISSUE_MODEL`, then built-in unset
-3. Prompt: CLI, then project config, user config, environment prompt, then built-in default
+3. Prompt: CLI, then environment prompt, project config, user config, then built-in default
 
 Claude uses the plugin-native command by default:
 
@@ -363,7 +371,7 @@ Optional dependency for Zellij support:
 
 - `git`
 - `gh` CLI with authenticated GitHub session
-- selected agent CLI unless `--agent none` or `--dry-run` is used
+- selected agent CLI for issue-start commands unless `--agent none` or `--dry-run` is used
 
 Building from source additionally requires Go 1.24+. The optional Bash
 installer and the manual-install snippet require `bash`, `curl` or `wget`, and
@@ -385,8 +393,9 @@ To prepare a release locally:
 
 ```bash
 make test
-git tag v2.0.0
-git push origin v2.0.0
+version=vX.Y.Z
+git tag "$version"
+git push origin "$version"
 ```
 
 Before preparing a release, add user-facing changes under `## [Unreleased]` in `CHANGELOG.md`.
@@ -401,7 +410,7 @@ git push origin master --follow-tags
 
 ## Specification
 
-The script specification is in [doc/spec.md](doc/spec.md).
+The CLI specification is in [doc/spec.md](doc/spec.md).
 
 ## License
 

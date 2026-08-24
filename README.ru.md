@@ -6,6 +6,10 @@
 
 Превращайте GitHub issue в отдельную ветку, git worktree и сессию coding agent.
 
+<p align="center">
+  <img src="docs/assets/start-issue-demo.gif" alt="start-issue создаёт ветку и worktree для issue, затем передаёт работу Codex" width="1000">
+</p>
+
 `start-issue` превращает контекст issue в повторяемый workflow:
 
 1. issue -> branch
@@ -110,7 +114,7 @@ State files:
 
 ### Локальный E2E smoke test с реальным Codex
 
-Обычный Bats-набор использует fake Codex CLI. Для проверки с реальным локальным
+Обычный автоматизированный набор тестов использует fake Codex CLI. Для проверки с реальным локальным
 Codex из checkout `start-issue` выполните opt-in команду:
 
 ```bash
@@ -174,6 +178,8 @@ start-issue init
 start-issue init --project --agent codex --model gpt-5.2
 start-issue update
 start-issue --update
+start-issue install
+start-issue --install
 start-issue --human-gate-help
 ```
 
@@ -237,10 +243,11 @@ boundaries. Новые возможности должны сохранять э
 
 | Аргумент | Описание |
 |----------|----------|
-| `ISSUE` | Номер GitHub issue или полный URL GitHub issue. Обязательный аргумент. |
+| `ISSUE` | Номер GitHub issue или полный URL GitHub issue. Обязательный аргумент для issue-start workflow. |
 | `init` | Создать файлы конфигурации по умолчанию для текущего проекта или текущего пользователя. |
 | `setup` | Запустить first-run onboarding пользовательской конфигурации в `~/.config/start-issue`. |
 | `update` | Обновить запущенный executable `start-issue` из последнего опубликованного GitHub Release. |
+| `install` | Установить последний опубликованный release в `~/.local/bin`. |
 | `--repo OWNER/REPO`, `-r OWNER/REPO` | Репозиторий, из которого нужно прочитать issue, если `ISSUE` передан номером. Если не задан, `start-issue` определяет репозиторий из `origin`. |
 | `--base BRANCH`, `-b BRANCH` | Базовая ветка для новой worktree branch. Если не задана, `start-issue` использует default branch репозитория, когда она доступна, иначе текущую ветку. |
 | `--worktree-dir DIR`, `-w DIR` | Родительская директория для создаваемых worktree. Переопределяет `START_ISSUE_WORKTREE_DIR`. |
@@ -264,6 +271,7 @@ boundaries. Новые возможности должны сохранять э
 | `--dry-run` | Напечатать выбранную конфигурацию и launch command без создания worktree, запуска `init.sh` или запуска агента. С `init` - напечатать план записи конфигурации без создания файлов. |
 | `--setup` | Запустить тот же user-config onboarding flow, что и `start-issue setup`. |
 | `--update` | Обновить запущенный executable `start-issue` из последнего опубликованного GitHub Release. Эквивалентно `start-issue update`. |
+| `--install` | Установить последний опубликованный release в `~/.local/bin`. Эквивалентно `start-issue install`. |
 | `--version`, `-v` | Показать версию. |
 | `--help`, `-h` | Показать справку. |
 
@@ -321,7 +329,7 @@ Workflow обновления работает вне git repository и треб
 
 1. Agent: CLI `--agent` / `--no-agent`, затем project config, user config, `START_ISSUE_AGENT`, затем built-in default `claude`
 2. Model: CLI `--model`, затем project config, user config, `START_ISSUE_MODEL`, затем built-in unset
-3. Prompt: CLI, затем project config, user config, env prompt, затем built-in default
+3. Prompt: CLI, затем env prompt, project config, user config, затем built-in default
 
 Claude по умолчанию использует plugin-native команду:
 
@@ -371,7 +379,7 @@ Prompt templates поддерживают:
 
 - `git`
 - `gh` CLI с авторизованной GitHub session
-- CLI выбранного агента, если не используется `--agent none` или `--dry-run`
+- CLI выбранного агента для issue-start команд, если не используется `--agent none` или `--dry-run`
 
 Для сборки из исходников дополнительно нужен Go 1.24+. Опциональному Bash
 installer и manual-install snippet нужны `bash`, `curl` или `wget` и SHA-256
@@ -389,8 +397,9 @@ GitHub Releases публикуются автоматически, когда в
 
 ```bash
 make test
-git tag v2.0.0
-git push origin v2.0.0
+version=vX.Y.Z
+git tag "$version"
+git push origin "$version"
 ```
 
 Перед подготовкой релиза добавьте user-facing изменения в `CHANGELOG.md` под `## [Unreleased]`.
@@ -405,7 +414,7 @@ git push origin master --follow-tags
 
 ## Спецификация
 
-Спецификация скрипта находится в [doc/spec.md](doc/spec.md).
+Спецификация CLI находится в [doc/spec.md](doc/spec.md).
 
 ## Лицензия
 
