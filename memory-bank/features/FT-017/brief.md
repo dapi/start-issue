@@ -176,7 +176,7 @@ supported Codex CLI while closing the remaining capability-contract gap.
 | Check ID | Covers | How to check | Expected result | Evidence path |
 | --- | --- | --- | --- | --- |
 | `CHK-01` | `EC-01` - `EC-04`, `SC-01` - `SC-04`, `NEG-01` | `make test` | Go formatting/vet/tests, memory-bank audit, and deterministic human-gate coverage pass for both modes and FT-015 regressions. | Local terminal/CI test output |
-| `CHK-02` | `EC-01`, `EC-05`, `SC-01`, `SC-05`, `NEG-02` | Review `--help`, `--human-gate-help`, README files, and spec alongside Go output assertions | All surfaces state the same default, opt-in, capability, risk, and troubleshooting contract. | Review diff and Go test output |
+| `CHK-02` | `EC-01`, `EC-05`, `SC-01`, `SC-05`, `NEG-02` | Review `--help`, `--human-gate-help`, README files, practical guides, and spec alongside Go output assertions | All surfaces state the same default, opt-in, capability, risk, and troubleshooting contract. | Review diff and Go test output |
 | `CHK-03` | `EC-02`, `EC-03`, `EC-06`, `SC-02`, `SC-03`, `SC-06`, `NEG-03` | With explicit approval, run the real-Codex full-delivery E2E procedure from FT-017's plan | Supported Codex accepts the command and the isolated fixture records commit, push, PR, terminal status, and retained artifacts. | Retained E2E artifact directory and fixture PR URL |
 
 ### Test matrix

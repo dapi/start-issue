@@ -255,6 +255,11 @@ Dedicated help доступен через:
 start-issue --human-gate-help
 ```
 
+Практические инструкции и пример полного запуска:
+
+- [English](human-gate-permissions.md)
+- [Русский](human-gate-permissions.ru.md)
+
 Там документируются:
 
 - полный flow;

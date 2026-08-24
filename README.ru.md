@@ -118,6 +118,9 @@ production/security changes или product decisions: для них prompt по-
 start-issue --human-gate-help
 ```
 
+Пошаговая проверка и готовый end-to-end пример находятся в
+[инструкции по правам Codex human-gate](doc/human-gate-permissions.ru.md).
+
 Контракт prompt:
 
 - Финальное сообщение должно содержать ровно одну terminal status line: `STATUS: DONE` или `STATUS: HUMAN_GATE`.

@@ -281,6 +281,9 @@ Dedicated help:
 start-issue --human-gate-help
 ```
 
+For a copy-ready preflight and end-to-end example, see
+[Codex human-gate permissions](doc/human-gate-permissions.md).
+
 Prompt contract:
 
 - The final message must contain exactly one terminal status line: `STATUS: DONE` or `STATUS: HUMAN_GATE`.
