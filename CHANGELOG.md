@@ -6,6 +6,8 @@ This project follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-08-24
+
 ### Added
 
 - Added `--batch` and `--batch-help` as the primary names for autonomous Codex
