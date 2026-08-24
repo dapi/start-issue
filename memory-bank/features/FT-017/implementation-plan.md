@@ -2,7 +2,7 @@
 title: "FT-017: Implementation Plan"
 doc_kind: feature
 doc_function: derived
-purpose: "Execution plan for explicit restricted and full-delivery Codex human-gate permission modes."
+purpose: "Execution plan for explicit restricted and full-delivery Codex batch permission modes."
 derived_from:
   - brief.md
   - design.md
@@ -40,11 +40,11 @@ creates retained fixture GitHub state.
 
 | Path / module | Current role | Why relevant | Reuse / mirror |
 | --- | --- | --- | --- |
-| `cmd/start-issue/main.go` | Go CLI parser, config resolution, launcher, help, and human-gate state | Owns the new option, command mapping, and diagnostics | Extend existing options and array-based `exec.Cmd` construction |
-| `cmd/start-issue/main_test.go` | Deterministic Go regression suite | Existing tests cover human-gate command, DONE, HUMAN_GATE, and errors | Add precedence, invalid value, full-delivery, and order assertions |
+| `cmd/start-issue/main.go` | Go CLI parser, config resolution, launcher, help, and batch state | Owns the primary names, compatibility aliases, permission mapping, and diagnostics | Extend existing options and array-based `exec.Cmd` construction |
+| `cmd/start-issue/main_test.go` | Deterministic Go regression suite | Existing tests cover batch command, DONE, HUMAN_GATE, and errors | Add precedence, invalid value, full-delivery, and order assertions |
 | `cmd/start-issue/parity_integration_test.go` | Go/Bash observable parity coverage | Protects unaffected legacy behavior during the Go implementation | Keep non-human-gate parity cases green |
-| `test/e2e/human-gate.sh` | Opt-in real-Codex smoke runner | Closest existing live verification surface | Add a separately guarded full-delivery scenario only after approval |
-| `README.md`, `README.ru.md`, `doc/human-gate-permissions*.md`, `doc/spec.md` | Public guides and canonical behavior docs | Must match help and command behavior | Update together with output assertions |
+| `test/e2e/batch.sh` | Opt-in real-Codex smoke runner | Closest existing live verification surface | Add a separately guarded full-delivery scenario only after approval |
+| `README.md`, `README.ru.md`, `doc/batch-mode*.md`, `doc/spec.md` | Public guides and canonical behavior docs | Must match help and command behavior | Update together with output assertions |
 
 ## Test Strategy
 
@@ -53,7 +53,7 @@ creates retained fixture GitHub state.
 | Permission resolution and validation | `REQ-03`, `SC-01`, `SC-02`, `NEG-01`, `CTR-01`, `CTR-02` | None | CLI beats env; env beats default; invalid value fails before fetch/mutation | `make test` | Existing test job | none | none |
 | Codex command construction | `REQ-01`, `REQ-02`, `REQ-04`, `SC-03`, `CTR-03`, `CTR-04`, `INV-02`, `INV-04` | Restricted dry-run and fake Codex execution | Assert semantic mode mapping, global-before-`exec` order, model coexistence, and no raw interpolation | `make test` | Existing test job | Real installed-Codex parser behavior is external | `AG-01` for live run |
 | FT-015 state/resume regression | `REQ-05`, `SC-04`, `INV-05` | DONE, HUMAN_GATE, missing status/thread | Run existing scenarios under default restricted and one full-delivery fake path | `make test` | Existing test job | none | none |
-| Help/docs contract | `REQ-01`, `REQ-06`, `SC-05`, `NEG-02`, `CTR-05` | Dedicated human-gate help assertions | Assert default, full-delivery warning, prerequisites, limitations, and troubleshooting | `make test`; documentation review | Existing test job | Prose consistency review is manual | reviewer approval in PR |
+| Help/docs contract | `REQ-01`, `REQ-06`, `REQ-09`, `SC-05`, `SC-07`, `NEG-02`, `CTR-05`, `CTR-06` | Dedicated batch help assertions | Assert primary and legacy names, default, full-delivery warning, prerequisites, limitations, and troubleshooting | `make test`; documentation review | Existing test job | Prose consistency review is manual | reviewer approval in PR |
 | End-to-end Git delivery | `REQ-02`, `REQ-08`, `SC-06`, `NEG-03`, `SOL-06`, `RB-03` | Real Codex terminal-state smoke only | Keep syntax/static coverage automated; add guarded scenario entrypoint | `make test` plus explicitly approved E2E | Excluded from CI | Requires real Codex, credentials, network, Git writes, push, and PR creation | `AG-01` |
 
 ## Open Questions / Ambiguities
@@ -87,7 +87,7 @@ creates retained fixture GitHub state.
 | --- | --- | --- | --- | --- |
 | `WS-1` | `REQ-03`, `SOL-01`, `SD-02`, `CTR-01`, `CTR-02` | Validated permission resolution and early errors | agent | `PRE-01` |
 | `WS-2` | `REQ-01`, `REQ-02`, `REQ-04`, `SOL-02` - `SOL-05`, `CTR-03` - `CTR-05` | Correct commands and visible capability status | agent | `WS-1`, `PRE-02` |
-| `WS-3` | `REQ-06`, `REQ-07`, `SC-01` - `SC-05` | Automated regression coverage and aligned docs | agent | `WS-1`, `WS-2` |
+| `WS-3` | `REQ-06`, `REQ-07`, `REQ-09`, `SC-01` - `SC-05`, `SC-07` | Automated regression coverage, compatibility aliases, and aligned docs | agent | `WS-1`, `WS-2` |
 | `WS-4` | `REQ-08`, `SOL-06`, `SC-06`, `RB-03` | Guarded full-delivery E2E evidence | human + agent | `WS-2`, `WS-3`, `PRE-03`, `AG-01` |
 
 ## Approval Gates
@@ -100,7 +100,7 @@ creates retained fixture GitHub state.
 
 | Step ID | Actor | Implements | Goal | Touchpoints | Artifact | Verifies | Evidence IDs | Check command / procedure | Blocked by | Needs approval | Escalate if |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `STEP-01` | agent | `REQ-03`, `SOL-01`, `SD-02`, `CTR-01`, `CTR-02`, `FM-03` | Add CLI/environment/default resolution and fail-fast validation | `cmd/start-issue/main.go`, `main_test.go` | Resolved mode and source | `CHK-01`, `NEG-01` | `EVID-01` | Focused Go tests, then `make test` | `PRE-01` | none | Validation occurs after fetch or mutation |
+| `STEP-01` | agent | `REQ-03`, `REQ-09`, `SOL-01`, `SOL-07`, `SD-02`, `SD-05`, `CTR-01`, `CTR-02`, `CTR-06`, `FM-03`, `FM-05` | Add primary batch names, compatibility aliases, permission resolution, and fail-fast validation | `cmd/start-issue/main.go`, `main_test.go` | One internal batch mode with resolved permissions and source | `CHK-01`, `SC-07`, `NEG-01`, `NEG-04` | `EVID-01` | Focused Go tests, then `make test` | `PRE-01` | none | Alias behavior diverges or validation occurs after fetch/mutation |
 | `STEP-02` | agent | `REQ-07`, `INV-01`, `INV-02` | Extend the fake Codex process and Go tests before changing launcher behavior | `cmd/start-issue/main_test.go` | Red/green command contract tests | `CHK-01`, `SC-01` - `SC-04` | `EVID-01` | `go test ./cmd/start-issue` | `STEP-01` | none | Fake cannot distinguish global and exec arguments |
 | `STEP-03` | agent | `REQ-01`, `REQ-02`, `REQ-04`, `SOL-02`, `SOL-03`, `CTR-03`, `CTR-04`, `INV-04` | Build validated restricted/full-delivery commands in supported order | `cmd/start-issue/main.go` | Array-based Codex command mapping | `CHK-01`, `SC-02`, `SC-03` | `EVID-01` | Focused Go tests; inspect `--dry-run` command | `STEP-02`, `PRE-02` | none | Supported Codex rejects generated grammar |
 | `STEP-04` | agent | `REQ-01`, `REQ-06`, `SOL-04`, `CTR-05`, `FM-02`, `FM-04` | Add capability output, warning, dedicated help, and public docs | `cmd/start-issue/main.go`, README files, practical guides, spec | Consistent operator contract | `CHK-02`, `SC-05`, `NEG-02` | `EVID-02` | Help assertions and documentation review | `STEP-03` | none | Docs imply permission equals credentials or product authorization |

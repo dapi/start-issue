@@ -89,7 +89,7 @@ production actions. `CHK-03` and `AG-01` remain mandatory before acceptance.
 **Status:** accepted by FPF review on 2026-08-04.
 
 The feature package must target the current Go implementation under
-`cmd/start-issue/`, its Go tests, `test/e2e/human-gate.sh`, `Makefile`, and the
+`cmd/start-issue/`, its Go tests, `test/e2e/batch.sh`, `Makefile`, and the
 README/spec documentation. The earlier references to `scripts/lib/start_issue`
 and Bats were stale artifacts from the pre-Go implementation and have been
 removed from the execution plan.

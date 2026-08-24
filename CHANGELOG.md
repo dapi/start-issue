@@ -6,6 +6,16 @@ This project follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Added `--batch` and `--batch-help` as the primary names for autonomous Codex
+  execution while keeping `--human-gate` and `--human-gate-help` as compatible
+  aliases.
+- Added explicit `restricted` and `full-delivery` batch permissions through
+  `--batch-permissions` and `START_ISSUE_BATCH_PERMISSIONS`.
+- Added English and Russian batch-mode guides with preflight, examples, human
+  handoff semantics, and troubleshooting.
+
 ## [2.0.2] - 2026-08-04
 
 ### Changed

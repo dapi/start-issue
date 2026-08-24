@@ -71,9 +71,11 @@ Agent-specific behavior должен быть централизован за е
 | `--prompt` | Inline prompt template | См. приоритет prompt |
 | `--prompt-file` | Файл prompt template | См. приоритет prompt |
 | `--improve-prompt` | Сгенерировать reviewable proposal улучшенного prompt template и выйти до создания worktree | false |
-| `--human-gate` | Codex-only batch mode для issue workflow с resume на `STATUS: HUMAN_GATE` | false |
-| `--human-gate-permissions <restricted\|full-delivery>` | Capability contract для human-gate; требует `--human-gate`; CLI имеет приоритет над `START_ISSUE_HUMAN_GATE_PERMISSIONS` | `restricted` |
-| `--human-gate-help` | Показать отдельную справку по human-gate mode | false |
+| `--batch` | Codex-only batch mode для issue workflow с resume на `STATUS: HUMAN_GATE` | false |
+| `--human-gate` | Совместимый alias для `--batch` | false |
+| `--batch-permissions <restricted\|full-delivery>` | Capability contract для batch mode; требует `--batch` или его legacy alias; CLI имеет приоритет над `START_ISSUE_BATCH_PERMISSIONS` | `restricted` |
+| `--batch-help` | Показать отдельную справку по batch mode и `HUMAN_GATE` handoff | false |
+| `--human-gate-help` | Совместимый alias для `--batch-help` | false |
 | `--prompt-output-file` | Путь proposal-файла для `--improve-prompt` | Для `.md`: рядом с source как `*.improved.md`; для остальных файлов: `<source>.improved`; иначе `.start-issue/prompt.improved.md` |
 | `--no-init` | Пропустить запуск `init.sh` | false |
 | `--command` / `-c` | Совместимый Claude command для дефолтного Claude prompt | `/task-router:route-task` |
@@ -195,16 +197,18 @@ git rev-parse --show-toplevel
 
 - `gh` CLI с авторизованной GitHub session
 
-## Codex human-gate mode
+## Codex batch mode
 
-`--human-gate` вводит отдельный Codex-only launch path для issue workflow.
+`--batch` вводит отдельный Codex-only launch path для issue workflow.
+Ранее выпущенный `--human-gate` является совместимым alias и включает тот же
+внутренний mode без отдельной ветки поведения.
 
 Контракт режима:
 
 1. Режим валиден только для `agent=codex`; для остальных agent он завершается явной ошибкой.
 2. До agent launch workflow остается обычным: parse input, resolve config, fetch issue, plan branch, create/reuse worktree, run optional `init.sh`, render prompt.
 3. Permission mode разрешается в порядке CLI
-   `--human-gate-permissions`, `START_ISSUE_HUMAN_GATE_PERMISSIONS`, built-in
+   `--batch-permissions`, `START_ISSUE_BATCH_PERMISSIONS`, built-in
    `restricted`. Другие значения отклоняются до issue fetch и worktree mutation.
 4. В restricted mode вместо интерактивного Codex launch выполняется:
 
@@ -252,13 +256,15 @@ codex resume --include-non-interactive "$thread_id"
 Dedicated help доступен через:
 
 ```bash
-start-issue --human-gate-help
+start-issue --batch-help
 ```
+
+`start-issue --human-gate-help` сохраняется как совместимый alias.
 
 Практические инструкции и пример полного запуска:
 
-- [English](human-gate-permissions.md)
-- [Русский](human-gate-permissions.ru.md)
+- [English](batch-mode.md)
+- [Русский](batch-mode.ru.md)
 
 Там документируются:
 
@@ -390,7 +396,7 @@ Templating правила:
 11. Если включен `--improve-prompt`, сгенерировать proposal улучшенного prompt template и завершить workflow до worktree/agent launch.
 12. Если это ordinary non-setup launch и `~/.config/start-issue` отсутствует, выполнить first-run onboarding gate перед оставшимся workflow.
 
-Если включен `--human-gate`:
+Если включен `--batch`:
 
 1. После `render_prompt_template` проверить, что resolved agent равен `codex`.
 2. Создать `STATE_DIR=<worktree>/.start-issue/runs/<timestamp>`.
@@ -591,7 +597,7 @@ start-issue 123 --repo owner/repo
 start-issue 123 --base develop
 start-issue 123 --agent codex
 start-issue 123 --agent codex --model gpt-5.2
-start-issue 123 --agent codex --human-gate
+start-issue 123 --batch
 start-issue 123 --agent claude --model sonnet
 start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
 start-issue 123 --agent codex --improve-prompt
@@ -608,7 +614,7 @@ start-issue init --user --force
 START_ISSUE_AGENT=codex start-issue 123
 START_ISSUE_MODEL=sonnet start-issue 123
 START_ISSUE_WORKTREE_DIR=~/projects/worktrees start-issue 123
-start-issue --human-gate-help
+start-issue --batch-help
 ```
 
 ## Зависимости
@@ -630,7 +636,8 @@ start-issue --human-gate-help
 
 - [x] `start-issue 123` по умолчанию выбирает `claude`.
 - [x] `start-issue 123 --agent codex` создает worktree и запускает Codex в этом worktree.
-- [x] `start-issue 123 --agent codex --human-gate` запускает Codex через `codex exec`, а не через обычный интерактивный launch.
+- [x] `start-issue 123 --batch` запускает Codex через `codex exec`, а не через обычный интерактивный launch.
+- [x] `start-issue 123 --human-gate` включает тот же batch path как совместимый alias.
 - [x] `start-issue 123 --agent kimi` запускает Kimi в этом worktree.
 - [x] `start-issue 123 --agent pi` запускает Pi в этом worktree.
 - [x] `start-issue 123 --no-agent` только готовит worktree и печатает следующие шаги.
@@ -648,7 +655,8 @@ start-issue --human-gate-help
 - [x] `STATUS: DONE` завершает workflow без открытия Codex TUI.
 - [x] `STATUS: HUMAN_GATE` резюмирует ту же Codex session по explicit `thread_id`.
 - [x] Missing final status или missing `thread_id` завершаются явной ошибкой с указанием diagnostic artifact.
-- [x] `start-issue --human-gate-help` документирует flow, prompt contract, exit codes и state files.
+- [x] `start-issue --batch-help` документирует flow, prompt contract, exit codes и state files.
+- [x] `start-issue --human-gate-help` сохраняет совместимость как alias для `--batch-help`.
 - [x] `--improve-prompt` создает reviewable proposal улучшенного prompt template и не перезаписывает active prompt.
 - [x] Claude-specific aliases сохранены, help text описывает agent-neutral поведение.
 - [x] `--dry-run` печатает selected agent, selected model, prompt source и launch command.

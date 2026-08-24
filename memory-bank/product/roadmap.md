@@ -42,7 +42,7 @@ into feature packages.
 
 ## Open Bets
 
-- `BET-01` Whether Codex human-gate patterns should remain Codex-only or become
+- `BET-01` Whether Codex batch/human-gate patterns should remain Codex-only or become
   a generic agent capability after other CLIs expose equivalent contracts.
 - `BET-02` Whether future lifecycle complexity warrants extracting Go helper
   packages from the current command package.

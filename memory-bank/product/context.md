@@ -58,7 +58,7 @@ tracker, or the developer's review and merge process.
   prompt silently.
 - `WF-04` Update the installed CLI: compare the running executable version with
   the latest GitHub Release, verify checksum, and install into the same path.
-- `WF-05` Run Codex human-gate mode: execute Codex in batch mode, persist run
+- `WF-05` Run Codex batch mode: execute Codex autonomously, persist run
   state, exit on `STATUS: DONE`, and resume interactively on `STATUS:
   HUMAN_GATE`.
 

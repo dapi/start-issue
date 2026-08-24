@@ -25,7 +25,7 @@ canonical_for:
 | `DE-03` | `WorktreeReady` | It is safe to run init/prompt/agent inside the target worktree | Worktree lifecycle | Pipeline, agent launch | branch name and path |
 | `DE-04` | `PromptProposalWritten` | A reviewable improved prompt proposal exists | Prompt improvement workflow | User/maintainer | output path and source prompt |
 | `DE-05` | `ReleaseUpdateInstalled` | Running executable has been replaced by verified release asset | Update workflow | CLI user | old version, new version, executable path |
-| `DE-06` | `HumanGateReached` | Codex batch run requires a human decision | Human-gate workflow | CLI user, resume command | thread id, state directory, final message |
+| `DE-06` | `HumanGateReached` | Codex batch run requires a human decision | Batch workflow | CLI user, resume command | thread id, state directory, final message |
 | `DE-07` | `MemoryBankAuditPassed` | Governed docs are reachable and links are valid | `check_memory_bank_index.py` | Maintainer/agent | scope, entrypoint, max depth |
 
 ## Event Rules
@@ -39,5 +39,5 @@ canonical_for:
 
 This project does not currently publish runtime domain events. The events above
 are conceptual workflow facts used for documentation, tests, and feature design.
-For Codex human-gate, JSONL `thread.started` is an external technical event
+For Codex batch mode, JSONL `thread.started` is an external technical event
 observed by the workflow, while `HumanGateReached` is the local workflow verdict.

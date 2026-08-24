@@ -21,7 +21,7 @@ must_not_define:
 
 | Path / module | Current role | Why relevant | Reuse / mirror |
 | --- | --- | --- | --- |
-| `test/e2e/human-gate.sh` | Existing real-agent E2E | Establishes E2E script conventions and opt-in boundary | Keep separate because it needs secrets/interactive Codex |
+| `test/e2e/batch.sh` | Existing real-agent E2E | Establishes E2E script conventions and opt-in boundary | Keep separate because it needs secrets/interactive Codex |
 | `Makefile` | Build/test entrypoint | Owns the local and CI target | Add sandbox target beside human-gate target |
 | `.github/workflows/ci.yml` | CI checks | Runs Go build and tests | Add network-free sandbox job |
 | `cmd/start-issue/main.go` | Product executable | Must be exercised as a built subprocess | Do not add test-only product hooks |

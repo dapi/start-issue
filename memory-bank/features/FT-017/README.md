@@ -1,8 +1,8 @@
 ---
-title: "FT-017: Codex human-gate delivery permissions"
+title: "FT-017: Codex batch delivery permissions"
 doc_kind: feature
 doc_function: index
-purpose: "Navigation for the Codex human-gate permission and full-delivery contract feature package."
+purpose: "Navigation for the Codex batch permission and full-delivery contract feature package."
 derived_from:
   - ../../dna/governance.md
   - brief.md
@@ -12,7 +12,7 @@ status: active
 audience: humans_and_agents
 ---
 
-# FT-017: Codex human-gate delivery permissions
+# FT-017: Codex batch delivery permissions
 
 ## About
 

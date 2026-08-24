@@ -36,7 +36,7 @@ Agent-specific behavior must stay centralized in Go adapter helpers:
 - model argument handling;
 - AI branch-name helper commands;
 - prompt-improvement helper commands;
-- Codex-specific human-gate batch/resume command construction.
+- Codex-specific batch/resume command construction.
 
 Do not add ad hoc `case "$AGENT"` branches in unrelated modules unless the
 change is only routing to the adapter boundary.
@@ -58,10 +58,10 @@ The owner is the Go configuration layer; user-facing descriptions must stay alig
 ## Failure Handling
 
 - Fail fast for invalid user intent: unknown agents, prompt source conflicts,
-  unsupported human-gate agent, missing required update dependencies.
+  unsupported batch agent, missing required update dependencies.
 - Treat optional integrations as warnings when documented as optional:
   `zellij-tab-status` and non-zero `init.sh` do not abort the normal workflow.
-- Preserve diagnostic artifacts for Codex human-gate failures under the run state
+- Preserve diagnostic artifacts for Codex batch failures under the run state
   directory.
 - Never continue after a worktree safety validation failure.
 

@@ -55,7 +55,7 @@ There is no centralized runtime observability. Diagnostics come from:
 - command output;
 - Go test logs;
 - GitHub Actions logs;
-- human-gate state files under
+- batch state files under
   `<worktree>/.start-issue/runs/<timestamp>/`.
 
 ## Test Data And Smoke Targets

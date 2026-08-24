@@ -21,7 +21,7 @@ the CLI: flags, prompts, help text, dry-run output, and agent launch commands.
 - `--dry-run` output.
 - `setup` and first-run onboarding prompts.
 - `init` prompts and planned writes.
-- `--human-gate-help`.
+- `--batch-help` (`--human-gate-help` remains a compatibility alias).
 - Release/update status messages.
 
 ## CLI UX Rules
@@ -29,7 +29,7 @@ the CLI: flags, prompts, help text, dry-run output, and agent launch commands.
 - Keep output explicit about effective config and sources.
 - Do not hide destructive choices behind defaults.
 - Keep normal help concise; use dedicated help for complex modes such as
-  `--human-gate-help`.
+  `--batch-help`.
 - When adding interactive prompts, support non-interactive test coverage through
   Go test input simulation.
 

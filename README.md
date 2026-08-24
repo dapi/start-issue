@@ -64,7 +64,7 @@ start-issue https://github.com/owner/repo/issues/123
 start-issue 123 --repo owner/repo --base develop
 start-issue 123 --agent codex
 start-issue 123 --agent codex --model gpt-5.2
-start-issue 123 --agent codex --human-gate
+start-issue 123 --batch
 start-issue 123 --agent kimi --prompt-file .start-issue/prompt.md
 start-issue 123 --no-agent
 start-issue 123 --dry-run
@@ -76,7 +76,7 @@ start-issue update
 start-issue --update
 start-issue install
 start-issue --install
-start-issue --human-gate-help
+start-issue --batch-help
 ```
 
 Running `start-issue` without an issue prints the normal help plus the currently
@@ -120,7 +120,7 @@ explicit external process boundaries.
 - Repository/worktree helpers fetch issue metadata, plan reuse safely, and run
   the optional `init.sh` hook found in a prepared worktree.
 - Agent helpers validate adapters, build launch commands, generate AI branch
-  names, and run Codex human-gate mode.
+  names, and run Codex batch mode.
 - Release helpers select platform assets, verify checksums and staged
   `--version` output, and atomically install updates.
 
@@ -158,9 +158,11 @@ second runtime implementation.
 | `--prompt TEXT` | Inline prompt template for the selected agent. With `init`, the prompt template to write. Mutually exclusive with `--prompt-file`. |
 | `--prompt-file PATH` | Prompt template file for the selected agent. With `init`, the file content to write. Mutually exclusive with `--prompt`. |
 | `--improve-prompt` | Ask the selected agent to generate a reviewable improved prompt template proposal, then exit before creating a worktree. |
-| `--human-gate` | Codex-only batch mode for issue work. Runs `codex exec`, exits on `STATUS: DONE`, and resumes the same session on `STATUS: HUMAN_GATE`. |
-| `--human-gate-permissions restricted\|full-delivery` | Select the human-gate capability contract. Requires `--human-gate`; CLI overrides `START_ISSUE_HUMAN_GATE_PERMISSIONS`; default is `restricted`. |
-| `--human-gate-help` | Show dedicated help for the Codex human-gate workflow, including prompt contract, exit codes, and state files. |
+| `--batch` | Codex-only batch mode for issue work. Runs `codex exec`, exits on `STATUS: DONE`, and resumes the same session on `STATUS: HUMAN_GATE`. |
+| `--human-gate` | Compatibility alias for `--batch`. |
+| `--batch-permissions restricted\|full-delivery` | Select the batch capability contract. Requires `--batch` or its legacy alias; CLI overrides `START_ISSUE_BATCH_PERMISSIONS`; default is `restricted`. |
+| `--batch-help` | Show dedicated help for Codex batch mode, including the `HUMAN_GATE` handoff, exit codes, and state files. |
+| `--human-gate-help` | Compatibility alias for `--batch-help`. |
 | `--prompt-output-file PATH` | Proposal output path for `--improve-prompt`. |
 | `--no-init` | Do not run `init.sh` even if it exists in the created worktree. |
 | `--command COMMAND`, `-c COMMAND` | Claude command prefix used by the default Claude prompt. Default: `/task-router:route-task`. |
@@ -191,7 +193,7 @@ Related Claude Code marketplace workflows:
 | `START_ISSUE_PROMPT` | Inline prompt template used when no CLI prompt is provided. It overrides project and user prompt files. Mutually exclusive with `START_ISSUE_PROMPT_FILE` when no CLI prompt is provided. |
 | `START_ISSUE_PROMPT_FILE` | Prompt template file used when no CLI prompt is provided. It overrides project and user prompt files. Mutually exclusive with `START_ISSUE_PROMPT` when no CLI prompt is provided. |
 | `START_ISSUE_WORKTREE_DIR` | Default parent directory for created worktrees when `--worktree-dir` is not provided. Built-in default: `~/worktrees`. |
-| `START_ISSUE_HUMAN_GATE_PERMISSIONS` | Human-gate capability contract when the CLI option is absent: `restricted` or `full-delivery`. Built-in default: `restricted`. |
+| `START_ISSUE_BATCH_PERMISSIONS` | Batch capability contract when the CLI option is absent: `restricted` or `full-delivery`. Built-in default: `restricted`. |
 | `START_ISSUE_DUMP_PROMPT` | When set to `1`, dry-run output includes the full rendered prompt instead of only summary information. |
 
 ## Configuration Files
@@ -227,9 +229,9 @@ The update workflow works outside a git repository and requires only `gh`.
 The Go binary parses release metadata, downloads assets, and verifies checksums
 internally.
 
-## Codex Human-Gate
+## Codex Batch Mode
 
-`start-issue 123 --agent codex --human-gate` keeps the normal issue-start workflow through worktree creation, optional `init.sh`, and prompt rendering, but replaces the final interactive Codex launch with a resumable batch run.
+`start-issue 123 --batch` keeps the normal issue-start workflow through worktree creation, optional `init.sh`, and prompt rendering, but replaces the final interactive Codex launch with a resumable batch run.
 
 The batch flow:
 
@@ -238,9 +240,11 @@ The batch flow:
 3. exits `0` on `STATUS: DONE`;
 4. opens `codex resume --include-non-interactive <thread_id>` on `STATUS: HUMAN_GATE`.
 
-This mode is intentionally Codex-only. `--human-gate` with any other agent fails clearly instead of being ignored.
+This mode is intentionally Codex-only. `--batch` with any other resolved agent
+fails clearly instead of being ignored. The released `--human-gate` flag remains
+available as a compatibility alias for `--batch`.
 
-Human-gate permissions are explicit:
+Batch permissions are explicit:
 
 - `restricted` is the default. It uses `--sandbox workspace-write` and supports
   working-tree edits, but network access, Git metadata writes, push, and PR
@@ -255,11 +259,11 @@ Select the mode with the CLI (highest precedence), the environment, or the
 safe built-in default:
 
 ```bash
-start-issue 123 --agent codex --human-gate \
-  --human-gate-permissions full-delivery
+start-issue 123 --batch \
+  --batch-permissions full-delivery
 
-START_ISSUE_HUMAN_GATE_PERMISSIONS=full-delivery \
-  start-issue 123 --agent codex --human-gate
+START_ISSUE_BATCH_PERMISSIONS=full-delivery \
+  start-issue 123 --batch
 ```
 
 Full delivery changes launcher capability only. It does not authorize
@@ -272,17 +276,17 @@ an explicit full-delivery rerun, not reported as a task-level product decision.
 When the workflow is about to block for a branch/worktree decision, it prints
 `Waiting for input: ...`. Before handing control to an interactive agent or
 Codex batch run, it prints `Handing off to <agent> in <worktree>`. A non-zero
-exit from `codex exec` is reported as a failed human-gate run with exit code 1;
+exit from `codex exec` is reported as a failed batch run with exit code 1;
 the captured events and thread id remain available for diagnosis.
 
 Dedicated help:
 
 ```bash
-start-issue --human-gate-help
+start-issue --batch-help
 ```
 
 For a copy-ready preflight and end-to-end example, see
-[Codex human-gate permissions](doc/human-gate-permissions.md).
+[Codex batch mode: autonomous work with a human gate](doc/batch-mode.md).
 
 Prompt contract:
 
@@ -309,7 +313,7 @@ The normal automated test suite uses a fake Codex CLI. To exercise the real loca
 CLI, run this opt-in test from a `start-issue` checkout:
 
 ```bash
-START_ISSUE_E2E=1 make e2e-human-gate
+START_ISSUE_E2E=1 make e2e-batch
 ```
 
 The script uses the private `dapi/start-issue-e2e-fixture` repository and its
@@ -320,7 +324,7 @@ fixture worktree change other than its `.start-issue` state. To test interactive
 
 ```bash
 START_ISSUE_E2E=1 \
-test/e2e/human-gate.sh --scenario human-gate
+test/e2e/batch.sh --scenario human-gate
 ```
 
 Exit the resumed Codex session to let the script verify the artifacts.
@@ -331,16 +335,16 @@ remote branch, PR, and local diagnostic fixture as evidence:
 
 ```bash
 START_ISSUE_E2E=1 START_ISSUE_E2E_FULL_DELIVERY=1 \
-  test/e2e/human-gate.sh --scenario full-delivery
+  test/e2e/batch.sh --scenario full-delivery
 ```
 
 #### Scenarios and checks
 
 | Scenario | Command | What it verifies |
 | --- | --- | --- |
-| `done` | `START_ISSUE_E2E=1 make e2e-human-gate` | A real Codex batch run emits `thread.started`, saves `thread-id`, `events.jsonl`, and `last-message.txt`, ends with `STATUS: DONE`, and leaves no fixture change other than `.start-issue` state. |
-| `human-gate` | `START_ISSUE_E2E=1 test/e2e/human-gate.sh --scenario human-gate` | The same artifact and clean-worktree checks, plus the reported explicit `codex resume --include-non-interactive <thread_id>` handoff. The operator exits the resumed interactive session before the script can finish. |
-| `full-delivery` | `START_ISSUE_E2E=1 START_ISSUE_E2E_FULL_DELIVERY=1 test/e2e/human-gate.sh --scenario full-delivery` | The current Codex accepts the global full-delivery option and completes a unique fixture commit, push, and PR; the runner prints the retained PR URL and local artifact path. |
+| `done` | `START_ISSUE_E2E=1 make e2e-batch` | A real Codex batch run emits `thread.started`, saves `thread-id`, `events.jsonl`, and `last-message.txt`, ends with `STATUS: DONE`, and leaves no fixture change other than `.start-issue` state. |
+| `human-gate` | `START_ISSUE_E2E=1 test/e2e/batch.sh --scenario human-gate` | The same artifact and clean-worktree checks, plus the reported explicit `codex resume --include-non-interactive <thread_id>` handoff. The operator exits the resumed interactive session before the script can finish. |
+| `full-delivery` | `START_ISSUE_E2E=1 START_ISSUE_E2E_FULL_DELIVERY=1 test/e2e/batch.sh --scenario full-delivery` | The current Codex accepts the global full-delivery option and completes a unique fixture commit, push, and PR; the runner prints the retained PR URL and local artifact path. |
 
 All scenarios verify authenticated `gh`, a real rather than fake Codex binary,
 and the required `codex exec` help interface (`--output-last-message`, without
